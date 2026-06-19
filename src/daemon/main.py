@@ -5,11 +5,16 @@ from config import RELAY_URL, AGENT_COMMAND, RECONNECT_DELAY
 from websockets.asyncio.client import connect
 
 
+def log(msg: str):
+    print(msg, flush=True)
+
+
 async def run_daemon():
+    proc = None
     while True:
         try:
             async with connect(RELAY_URL) as websocket:
-                print("Connected to relay!")
+                log("Connected to relay!")
                 proc = await asyncio.create_subprocess_exec(
                     *AGENT_COMMAND,
                     stdin=asyncio.subprocess.PIPE,
@@ -19,7 +24,7 @@ async def run_daemon():
 
                 async def relay_to_agent():
                     async for message in websocket:
-                        print(f"relay → agent: {message}")
+                        log(f"relay → agent: {message}")
                         proc.stdin.write(message.encode() + b"\n")
                         await proc.stdin.drain()
 
@@ -27,17 +32,17 @@ async def run_daemon():
                     async for line in proc.stdout:
                         message = line.decode().strip()
                         if message:
-                            print(f"agent → relay: {message}")
+                            log(f"agent → relay: {message}")
                             await websocket.send(message)
 
                 async def log_stderr():
                     async for line in proc.stderr:
                         if line:
-                            print(f"agent stderr: {line.decode().strip()}", file=sys.stderr)
+                            print(f"agent stderr: {line.decode().strip()}", file=sys.stderr, flush=True)
 
                 async def watch_agent():
                     await proc.wait()
-                    print(f"Agent exited with code {proc.returncode}")
+                    log(f"Agent exited with code {proc.returncode}")
 
                 tasks = [
                     asyncio.create_task(coro())
@@ -50,9 +55,20 @@ async def run_daemon():
         except asyncio.CancelledError:
             raise
         except Exception as e:
-            print(f"Connection error: {e}")
+            log(f"Connection error: {e}")
 
-        print(f"Reconnecting in {RECONNECT_DELAY}s...")
+        # kill stale agent before reconnecting
+        if proc is not None and proc.returncode is None:
+            log("Killing stale agent process...")
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=5)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+            proc = None
+
+        log(f"Reconnecting in {RECONNECT_DELAY}s...")
         await asyncio.sleep(RECONNECT_DELAY)
 
 
