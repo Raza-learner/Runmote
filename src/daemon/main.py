@@ -1,7 +1,8 @@
 import asyncio
+import json
 import signal
 import sys
-from config import RELAY_URL, AGENT_COMMAND, RECONNECT_DELAY
+from config import RELAY_URL, AGENT_COMMAND, DAEMON_ID, RECONNECT_DELAY
 from websockets.asyncio.client import connect
 
 
@@ -15,6 +16,15 @@ async def run_daemon():
         try:
             async with connect(RELAY_URL) as websocket:
                 log("Connected to relay!")
+
+                # Identify to the relay so sessions are tagged
+                identify = json.dumps({
+                    "jsonrpc": "2.0",
+                    "method": "daemon/identify",
+                    "params": {"daemonId": DAEMON_ID},
+                })
+                await websocket.send(identify)
+                log(f"→ sent identify: {DAEMON_ID}")
                 proc = await asyncio.create_subprocess_exec(
                     *AGENT_COMMAND,
                     stdin=asyncio.subprocess.PIPE,

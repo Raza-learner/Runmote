@@ -1,6 +1,6 @@
 {
-    "name": "flutter_app",
-    "short_name": "flutter_app",
+    "name": "acp_remote",
+    "short_name": "acp_remote",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
