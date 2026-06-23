@@ -1,5 +1,5 @@
 name: acp_remote
-description: "ACP Remote - Cross-platform ACP client"
+description: "ACP Remote - Connect to ACP AI agents via pairing code"
 publish_to: 'none'
 version: 2.0.0+1
 
@@ -10,20 +10,19 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_riverpod: ^2.6.1
-  riverpod_annotation: ^2.6.1
   go_router: ^14.8.1
+  web_socket_channel: ^3.0.3
   freezed_annotation: ^2.4.4
   json_annotation: ^4.9.0
-  web_socket_channel: ^3.0.3
-  flutter_markdown: ^0.7.6
   shared_preferences: ^2.3.0
   drift: ^2.22.0
   sqlite3_flutter_libs: ^0.5.0
-  path_provider: ^2.0.0
+  sqlite3: ^2.4.0
+  path_provider: ^2.1.0
   path: ^1.9.0
   uuid: ^4.5.1
-  file_picker: ^12.0.0-beta.7
   cupertino_icons: ^1.0.8
+  multicast_dns: ^0.3.3+1
 
 dev_dependencies:
   flutter_test:
@@ -32,7 +31,6 @@ dev_dependencies:
   build_runner: ^2.4.13
   freezed: ^2.5.7
   json_serializable: ^6.8.0
-  riverpod_generator: ^2.6.3
   drift_dev: ^2.22.0
 
 flutter:

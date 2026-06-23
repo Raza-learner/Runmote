@@ -9,34 +9,24 @@ part of 'assistant_segment.dart';
 _$AssistantSegmentImpl _$$AssistantSegmentImplFromJson(
   Map<String, dynamic> json,
 ) => _$AssistantSegmentImpl(
-  id: json['id'] as String? ?? '',
-  kind:
-      $enumDecodeNullable(_$AssistantSegmentKindEnumMap, json['kind']) ??
-      AssistantSegmentKind.message,
-  text: json['text'] as String? ?? '',
-  toolCall: json['toolCall'] == null
-      ? null
-      : ToolCallDisplay.fromJson(json['toolCall'] as Map<String, dynamic>),
-  planEntries:
-      (json['planEntries'] as List<dynamic>?)
-          ?.map((e) => PlanEntry.fromJson(e as Map<String, dynamic>))
-          .toList() ??
-      const <PlanEntry>[],
+  id: json['id'] as String,
+  kind: $enumDecode(_$SegmentKindEnumMap, json['kind']),
+  text: json['text'] as String,
+  metadata: json['metadata'] as Map<String, dynamic>? ?? const {},
 );
 
 Map<String, dynamic> _$$AssistantSegmentImplToJson(
   _$AssistantSegmentImpl instance,
 ) => <String, dynamic>{
   'id': instance.id,
-  'kind': _$AssistantSegmentKindEnumMap[instance.kind]!,
+  'kind': _$SegmentKindEnumMap[instance.kind]!,
   'text': instance.text,
-  'toolCall': instance.toolCall,
-  'planEntries': instance.planEntries,
+  'metadata': instance.metadata,
 };
 
-const _$AssistantSegmentKindEnumMap = {
-  AssistantSegmentKind.message: 'message',
-  AssistantSegmentKind.thought: 'thought',
-  AssistantSegmentKind.toolCall: 'toolCall',
-  AssistantSegmentKind.plan: 'plan',
+const _$SegmentKindEnumMap = {
+  SegmentKind.message: 'message',
+  SegmentKind.thought: 'thought',
+  SegmentKind.toolCall: 'toolCall',
+  SegmentKind.plan: 'plan',
 };

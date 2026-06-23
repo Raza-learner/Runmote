@@ -3,417 +3,293 @@
 part of 'app_database.dart';
 
 // ignore_for_file: type=lint
-class $ServerConfigsTable extends ServerConfigs
-    with TableInfo<$ServerConfigsTable, ServerConfig> {
+class $PairedDevicesTable extends PairedDevices
+    with TableInfo<$PairedDevicesTable, PairedDevice> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $ServerConfigsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  $PairedDevicesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _codeMeta = const VerificationMeta('code');
   @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+    'code',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  static const VerificationMeta _deviceNameMeta = const VerificationMeta(
+    'deviceName',
+  );
   @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
+  late final GeneratedColumn<String> deviceName = GeneratedColumn<String>(
+    'device_name',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _schemeMeta = const VerificationMeta('scheme');
+  static const VerificationMeta _pairedAtMeta = const VerificationMeta(
+    'pairedAt',
+  );
   @override
-  late final GeneratedColumn<String> scheme = GeneratedColumn<String>(
-    'scheme',
+  late final GeneratedColumn<double> pairedAt = GeneratedColumn<double>(
+    'paired_at',
     aliasedName,
     false,
-    type: DriftSqlType.string,
+    type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _hostMeta = const VerificationMeta('host');
-  @override
-  late final GeneratedColumn<String> host = GeneratedColumn<String>(
-    'host',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
+  static const VerificationMeta _lastConnectedAtMeta = const VerificationMeta(
+    'lastConnectedAt',
   );
-  static const VerificationMeta _tokenMeta = const VerificationMeta('token');
   @override
-  late final GeneratedColumn<String> token = GeneratedColumn<String>(
-    'token',
+  late final GeneratedColumn<double> lastConnectedAt = GeneratedColumn<double>(
+    'last_connected_at',
     aliasedName,
     false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _preferredAuthMethodIdMeta =
-      const VerificationMeta('preferredAuthMethodId');
-  @override
-  late final GeneratedColumn<String> preferredAuthMethodId =
-      GeneratedColumn<String>(
-        'preferred_auth_method_id',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-      );
-  static const VerificationMeta _typeMeta = const VerificationMeta('type');
-  @override
-  late final GeneratedColumn<String> type = GeneratedColumn<String>(
-    'type',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
+    type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
   @override
   List<GeneratedColumn> get $columns => [
-    id,
-    name,
-    scheme,
-    host,
-    token,
-    preferredAuthMethodId,
-    type,
+    code,
+    deviceName,
+    pairedAt,
+    lastConnectedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'server_configs';
+  static const String $name = 'paired_devices';
   @override
   VerificationContext validateIntegrity(
-    Insertable<ServerConfig> instance, {
+    Insertable<PairedDevice> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('name')) {
+    if (data.containsKey('code')) {
       context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+        _codeMeta,
+        code.isAcceptableOrUnknown(data['code']!, _codeMeta),
       );
     } else if (isInserting) {
-      context.missing(_nameMeta);
+      context.missing(_codeMeta);
     }
-    if (data.containsKey('scheme')) {
+    if (data.containsKey('device_name')) {
       context.handle(
-        _schemeMeta,
-        scheme.isAcceptableOrUnknown(data['scheme']!, _schemeMeta),
+        _deviceNameMeta,
+        deviceName.isAcceptableOrUnknown(data['device_name']!, _deviceNameMeta),
       );
     } else if (isInserting) {
-      context.missing(_schemeMeta);
+      context.missing(_deviceNameMeta);
     }
-    if (data.containsKey('host')) {
+    if (data.containsKey('paired_at')) {
       context.handle(
-        _hostMeta,
-        host.isAcceptableOrUnknown(data['host']!, _hostMeta),
+        _pairedAtMeta,
+        pairedAt.isAcceptableOrUnknown(data['paired_at']!, _pairedAtMeta),
       );
     } else if (isInserting) {
-      context.missing(_hostMeta);
+      context.missing(_pairedAtMeta);
     }
-    if (data.containsKey('token')) {
+    if (data.containsKey('last_connected_at')) {
       context.handle(
-        _tokenMeta,
-        token.isAcceptableOrUnknown(data['token']!, _tokenMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_tokenMeta);
-    }
-    if (data.containsKey('preferred_auth_method_id')) {
-      context.handle(
-        _preferredAuthMethodIdMeta,
-        preferredAuthMethodId.isAcceptableOrUnknown(
-          data['preferred_auth_method_id']!,
-          _preferredAuthMethodIdMeta,
+        _lastConnectedAtMeta,
+        lastConnectedAt.isAcceptableOrUnknown(
+          data['last_connected_at']!,
+          _lastConnectedAtMeta,
         ),
       );
-    }
-    if (data.containsKey('type')) {
-      context.handle(
-        _typeMeta,
-        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
-      );
     } else if (isInserting) {
-      context.missing(_typeMeta);
+      context.missing(_lastConnectedAtMeta);
     }
     return context;
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {id};
+  Set<GeneratedColumn> get $primaryKey => {code};
   @override
-  ServerConfig map(Map<String, dynamic> data, {String? tablePrefix}) {
+  PairedDevice map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return ServerConfig(
-      id: attachedDatabase.typeMapping.read(
+    return PairedDevice(
+      code: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}id'],
+        data['${effectivePrefix}code'],
       )!,
-      name: attachedDatabase.typeMapping.read(
+      deviceName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}name'],
+        data['${effectivePrefix}device_name'],
       )!,
-      scheme: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}scheme'],
+      pairedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}paired_at'],
       )!,
-      host: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}host'],
-      )!,
-      token: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}token'],
-      )!,
-      preferredAuthMethodId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}preferred_auth_method_id'],
-      ),
-      type: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}type'],
+      lastConnectedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}last_connected_at'],
       )!,
     );
   }
 
   @override
-  $ServerConfigsTable createAlias(String alias) {
-    return $ServerConfigsTable(attachedDatabase, alias);
+  $PairedDevicesTable createAlias(String alias) {
+    return $PairedDevicesTable(attachedDatabase, alias);
   }
 }
 
-class ServerConfig extends DataClass implements Insertable<ServerConfig> {
-  final String id;
-  final String name;
-  final String scheme;
-  final String host;
-  final String token;
-  final String? preferredAuthMethodId;
-  final String type;
-  const ServerConfig({
-    required this.id,
-    required this.name,
-    required this.scheme,
-    required this.host,
-    required this.token,
-    this.preferredAuthMethodId,
-    required this.type,
+class PairedDevice extends DataClass implements Insertable<PairedDevice> {
+  final String code;
+  final String deviceName;
+  final double pairedAt;
+  final double lastConnectedAt;
+  const PairedDevice({
+    required this.code,
+    required this.deviceName,
+    required this.pairedAt,
+    required this.lastConnectedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['name'] = Variable<String>(name);
-    map['scheme'] = Variable<String>(scheme);
-    map['host'] = Variable<String>(host);
-    map['token'] = Variable<String>(token);
-    if (!nullToAbsent || preferredAuthMethodId != null) {
-      map['preferred_auth_method_id'] = Variable<String>(preferredAuthMethodId);
-    }
-    map['type'] = Variable<String>(type);
+    map['code'] = Variable<String>(code);
+    map['device_name'] = Variable<String>(deviceName);
+    map['paired_at'] = Variable<double>(pairedAt);
+    map['last_connected_at'] = Variable<double>(lastConnectedAt);
     return map;
   }
 
-  ServerConfigsCompanion toCompanion(bool nullToAbsent) {
-    return ServerConfigsCompanion(
-      id: Value(id),
-      name: Value(name),
-      scheme: Value(scheme),
-      host: Value(host),
-      token: Value(token),
-      preferredAuthMethodId: preferredAuthMethodId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(preferredAuthMethodId),
-      type: Value(type),
+  PairedDevicesCompanion toCompanion(bool nullToAbsent) {
+    return PairedDevicesCompanion(
+      code: Value(code),
+      deviceName: Value(deviceName),
+      pairedAt: Value(pairedAt),
+      lastConnectedAt: Value(lastConnectedAt),
     );
   }
 
-  factory ServerConfig.fromJson(
+  factory PairedDevice.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return ServerConfig(
-      id: serializer.fromJson<String>(json['id']),
-      name: serializer.fromJson<String>(json['name']),
-      scheme: serializer.fromJson<String>(json['scheme']),
-      host: serializer.fromJson<String>(json['host']),
-      token: serializer.fromJson<String>(json['token']),
-      preferredAuthMethodId: serializer.fromJson<String?>(
-        json['preferredAuthMethodId'],
-      ),
-      type: serializer.fromJson<String>(json['type']),
+    return PairedDevice(
+      code: serializer.fromJson<String>(json['code']),
+      deviceName: serializer.fromJson<String>(json['deviceName']),
+      pairedAt: serializer.fromJson<double>(json['pairedAt']),
+      lastConnectedAt: serializer.fromJson<double>(json['lastConnectedAt']),
     );
   }
   @override
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'name': serializer.toJson<String>(name),
-      'scheme': serializer.toJson<String>(scheme),
-      'host': serializer.toJson<String>(host),
-      'token': serializer.toJson<String>(token),
-      'preferredAuthMethodId': serializer.toJson<String?>(
-        preferredAuthMethodId,
-      ),
-      'type': serializer.toJson<String>(type),
+      'code': serializer.toJson<String>(code),
+      'deviceName': serializer.toJson<String>(deviceName),
+      'pairedAt': serializer.toJson<double>(pairedAt),
+      'lastConnectedAt': serializer.toJson<double>(lastConnectedAt),
     };
   }
 
-  ServerConfig copyWith({
-    String? id,
-    String? name,
-    String? scheme,
-    String? host,
-    String? token,
-    Value<String?> preferredAuthMethodId = const Value.absent(),
-    String? type,
-  }) => ServerConfig(
-    id: id ?? this.id,
-    name: name ?? this.name,
-    scheme: scheme ?? this.scheme,
-    host: host ?? this.host,
-    token: token ?? this.token,
-    preferredAuthMethodId: preferredAuthMethodId.present
-        ? preferredAuthMethodId.value
-        : this.preferredAuthMethodId,
-    type: type ?? this.type,
+  PairedDevice copyWith({
+    String? code,
+    String? deviceName,
+    double? pairedAt,
+    double? lastConnectedAt,
+  }) => PairedDevice(
+    code: code ?? this.code,
+    deviceName: deviceName ?? this.deviceName,
+    pairedAt: pairedAt ?? this.pairedAt,
+    lastConnectedAt: lastConnectedAt ?? this.lastConnectedAt,
   );
-  ServerConfig copyWithCompanion(ServerConfigsCompanion data) {
-    return ServerConfig(
-      id: data.id.present ? data.id.value : this.id,
-      name: data.name.present ? data.name.value : this.name,
-      scheme: data.scheme.present ? data.scheme.value : this.scheme,
-      host: data.host.present ? data.host.value : this.host,
-      token: data.token.present ? data.token.value : this.token,
-      preferredAuthMethodId: data.preferredAuthMethodId.present
-          ? data.preferredAuthMethodId.value
-          : this.preferredAuthMethodId,
-      type: data.type.present ? data.type.value : this.type,
+  PairedDevice copyWithCompanion(PairedDevicesCompanion data) {
+    return PairedDevice(
+      code: data.code.present ? data.code.value : this.code,
+      deviceName: data.deviceName.present
+          ? data.deviceName.value
+          : this.deviceName,
+      pairedAt: data.pairedAt.present ? data.pairedAt.value : this.pairedAt,
+      lastConnectedAt: data.lastConnectedAt.present
+          ? data.lastConnectedAt.value
+          : this.lastConnectedAt,
     );
   }
 
   @override
   String toString() {
-    return (StringBuffer('ServerConfig(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('scheme: $scheme, ')
-          ..write('host: $host, ')
-          ..write('token: $token, ')
-          ..write('preferredAuthMethodId: $preferredAuthMethodId, ')
-          ..write('type: $type')
+    return (StringBuffer('PairedDevice(')
+          ..write('code: $code, ')
+          ..write('deviceName: $deviceName, ')
+          ..write('pairedAt: $pairedAt, ')
+          ..write('lastConnectedAt: $lastConnectedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, scheme, host, token, preferredAuthMethodId, type);
+  int get hashCode => Object.hash(code, deviceName, pairedAt, lastConnectedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is ServerConfig &&
-          other.id == this.id &&
-          other.name == this.name &&
-          other.scheme == this.scheme &&
-          other.host == this.host &&
-          other.token == this.token &&
-          other.preferredAuthMethodId == this.preferredAuthMethodId &&
-          other.type == this.type);
+      (other is PairedDevice &&
+          other.code == this.code &&
+          other.deviceName == this.deviceName &&
+          other.pairedAt == this.pairedAt &&
+          other.lastConnectedAt == this.lastConnectedAt);
 }
 
-class ServerConfigsCompanion extends UpdateCompanion<ServerConfig> {
-  final Value<String> id;
-  final Value<String> name;
-  final Value<String> scheme;
-  final Value<String> host;
-  final Value<String> token;
-  final Value<String?> preferredAuthMethodId;
-  final Value<String> type;
+class PairedDevicesCompanion extends UpdateCompanion<PairedDevice> {
+  final Value<String> code;
+  final Value<String> deviceName;
+  final Value<double> pairedAt;
+  final Value<double> lastConnectedAt;
   final Value<int> rowid;
-  const ServerConfigsCompanion({
-    this.id = const Value.absent(),
-    this.name = const Value.absent(),
-    this.scheme = const Value.absent(),
-    this.host = const Value.absent(),
-    this.token = const Value.absent(),
-    this.preferredAuthMethodId = const Value.absent(),
-    this.type = const Value.absent(),
+  const PairedDevicesCompanion({
+    this.code = const Value.absent(),
+    this.deviceName = const Value.absent(),
+    this.pairedAt = const Value.absent(),
+    this.lastConnectedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  ServerConfigsCompanion.insert({
-    required String id,
-    required String name,
-    required String scheme,
-    required String host,
-    required String token,
-    this.preferredAuthMethodId = const Value.absent(),
-    required String type,
+  PairedDevicesCompanion.insert({
+    required String code,
+    required String deviceName,
+    required double pairedAt,
+    required double lastConnectedAt,
     this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       name = Value(name),
-       scheme = Value(scheme),
-       host = Value(host),
-       token = Value(token),
-       type = Value(type);
-  static Insertable<ServerConfig> custom({
-    Expression<String>? id,
-    Expression<String>? name,
-    Expression<String>? scheme,
-    Expression<String>? host,
-    Expression<String>? token,
-    Expression<String>? preferredAuthMethodId,
-    Expression<String>? type,
+  }) : code = Value(code),
+       deviceName = Value(deviceName),
+       pairedAt = Value(pairedAt),
+       lastConnectedAt = Value(lastConnectedAt);
+  static Insertable<PairedDevice> custom({
+    Expression<String>? code,
+    Expression<String>? deviceName,
+    Expression<double>? pairedAt,
+    Expression<double>? lastConnectedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (name != null) 'name': name,
-      if (scheme != null) 'scheme': scheme,
-      if (host != null) 'host': host,
-      if (token != null) 'token': token,
-      if (preferredAuthMethodId != null)
-        'preferred_auth_method_id': preferredAuthMethodId,
-      if (type != null) 'type': type,
+      if (code != null) 'code': code,
+      if (deviceName != null) 'device_name': deviceName,
+      if (pairedAt != null) 'paired_at': pairedAt,
+      if (lastConnectedAt != null) 'last_connected_at': lastConnectedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
-  ServerConfigsCompanion copyWith({
-    Value<String>? id,
-    Value<String>? name,
-    Value<String>? scheme,
-    Value<String>? host,
-    Value<String>? token,
-    Value<String?>? preferredAuthMethodId,
-    Value<String>? type,
+  PairedDevicesCompanion copyWith({
+    Value<String>? code,
+    Value<String>? deviceName,
+    Value<double>? pairedAt,
+    Value<double>? lastConnectedAt,
     Value<int>? rowid,
   }) {
-    return ServerConfigsCompanion(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      scheme: scheme ?? this.scheme,
-      host: host ?? this.host,
-      token: token ?? this.token,
-      preferredAuthMethodId:
-          preferredAuthMethodId ?? this.preferredAuthMethodId,
-      type: type ?? this.type,
+    return PairedDevicesCompanion(
+      code: code ?? this.code,
+      deviceName: deviceName ?? this.deviceName,
+      pairedAt: pairedAt ?? this.pairedAt,
+      lastConnectedAt: lastConnectedAt ?? this.lastConnectedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -421,28 +297,17 @@ class ServerConfigsCompanion extends UpdateCompanion<ServerConfig> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
+    if (code.present) {
+      map['code'] = Variable<String>(code.value);
     }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
+    if (deviceName.present) {
+      map['device_name'] = Variable<String>(deviceName.value);
     }
-    if (scheme.present) {
-      map['scheme'] = Variable<String>(scheme.value);
+    if (pairedAt.present) {
+      map['paired_at'] = Variable<double>(pairedAt.value);
     }
-    if (host.present) {
-      map['host'] = Variable<String>(host.value);
-    }
-    if (token.present) {
-      map['token'] = Variable<String>(token.value);
-    }
-    if (preferredAuthMethodId.present) {
-      map['preferred_auth_method_id'] = Variable<String>(
-        preferredAuthMethodId.value,
-      );
-    }
-    if (type.present) {
-      map['type'] = Variable<String>(type.value);
+    if (lastConnectedAt.present) {
+      map['last_connected_at'] = Variable<double>(lastConnectedAt.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -452,892 +317,11 @@ class ServerConfigsCompanion extends UpdateCompanion<ServerConfig> {
 
   @override
   String toString() {
-    return (StringBuffer('ServerConfigsCompanion(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('scheme: $scheme, ')
-          ..write('host: $host, ')
-          ..write('token: $token, ')
-          ..write('preferredAuthMethodId: $preferredAuthMethodId, ')
-          ..write('type: $type, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $GatewaySourcesTable extends GatewaySources
-    with TableInfo<$GatewaySourcesTable, GatewaySource> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $GatewaySourcesTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _schemeMeta = const VerificationMeta('scheme');
-  @override
-  late final GeneratedColumn<String> scheme = GeneratedColumn<String>(
-    'scheme',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _hostMeta = const VerificationMeta('host');
-  @override
-  late final GeneratedColumn<String> host = GeneratedColumn<String>(
-    'host',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _gatewayCredentialMeta = const VerificationMeta(
-    'gatewayCredential',
-  );
-  @override
-  late final GeneratedColumn<String> gatewayCredential =
-      GeneratedColumn<String>(
-        'gateway_credential',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-      );
-  static const VerificationMeta _gatewayCredentialExpiresAtMeta =
-      const VerificationMeta('gatewayCredentialExpiresAt');
-  @override
-  late final GeneratedColumn<DateTime> gatewayCredentialExpiresAt =
-      GeneratedColumn<DateTime>(
-        'gateway_credential_expires_at',
-        aliasedName,
-        true,
-        type: DriftSqlType.dateTime,
-        requiredDuringInsert: false,
-      );
-  static const VerificationMeta _gatewayRemoteModeMeta = const VerificationMeta(
-    'gatewayRemoteMode',
-  );
-  @override
-  late final GeneratedColumn<String> gatewayRemoteMode =
-      GeneratedColumn<String>(
-        'gateway_remote_mode',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-      );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    name,
-    scheme,
-    host,
-    gatewayCredential,
-    gatewayCredentialExpiresAt,
-    gatewayRemoteMode,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'gateway_sources';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<GatewaySource> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('scheme')) {
-      context.handle(
-        _schemeMeta,
-        scheme.isAcceptableOrUnknown(data['scheme']!, _schemeMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_schemeMeta);
-    }
-    if (data.containsKey('host')) {
-      context.handle(
-        _hostMeta,
-        host.isAcceptableOrUnknown(data['host']!, _hostMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_hostMeta);
-    }
-    if (data.containsKey('gateway_credential')) {
-      context.handle(
-        _gatewayCredentialMeta,
-        gatewayCredential.isAcceptableOrUnknown(
-          data['gateway_credential']!,
-          _gatewayCredentialMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_gatewayCredentialMeta);
-    }
-    if (data.containsKey('gateway_credential_expires_at')) {
-      context.handle(
-        _gatewayCredentialExpiresAtMeta,
-        gatewayCredentialExpiresAt.isAcceptableOrUnknown(
-          data['gateway_credential_expires_at']!,
-          _gatewayCredentialExpiresAtMeta,
-        ),
-      );
-    }
-    if (data.containsKey('gateway_remote_mode')) {
-      context.handle(
-        _gatewayRemoteModeMeta,
-        gatewayRemoteMode.isAcceptableOrUnknown(
-          data['gateway_remote_mode']!,
-          _gatewayRemoteModeMeta,
-        ),
-      );
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  GatewaySource map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return GatewaySource(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      scheme: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}scheme'],
-      )!,
-      host: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}host'],
-      )!,
-      gatewayCredential: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}gateway_credential'],
-      )!,
-      gatewayCredentialExpiresAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}gateway_credential_expires_at'],
-      ),
-      gatewayRemoteMode: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}gateway_remote_mode'],
-      ),
-    );
-  }
-
-  @override
-  $GatewaySourcesTable createAlias(String alias) {
-    return $GatewaySourcesTable(attachedDatabase, alias);
-  }
-}
-
-class GatewaySource extends DataClass implements Insertable<GatewaySource> {
-  final String id;
-  final String name;
-  final String scheme;
-  final String host;
-  final String gatewayCredential;
-  final DateTime? gatewayCredentialExpiresAt;
-  final String? gatewayRemoteMode;
-  const GatewaySource({
-    required this.id,
-    required this.name,
-    required this.scheme,
-    required this.host,
-    required this.gatewayCredential,
-    this.gatewayCredentialExpiresAt,
-    this.gatewayRemoteMode,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['name'] = Variable<String>(name);
-    map['scheme'] = Variable<String>(scheme);
-    map['host'] = Variable<String>(host);
-    map['gateway_credential'] = Variable<String>(gatewayCredential);
-    if (!nullToAbsent || gatewayCredentialExpiresAt != null) {
-      map['gateway_credential_expires_at'] = Variable<DateTime>(
-        gatewayCredentialExpiresAt,
-      );
-    }
-    if (!nullToAbsent || gatewayRemoteMode != null) {
-      map['gateway_remote_mode'] = Variable<String>(gatewayRemoteMode);
-    }
-    return map;
-  }
-
-  GatewaySourcesCompanion toCompanion(bool nullToAbsent) {
-    return GatewaySourcesCompanion(
-      id: Value(id),
-      name: Value(name),
-      scheme: Value(scheme),
-      host: Value(host),
-      gatewayCredential: Value(gatewayCredential),
-      gatewayCredentialExpiresAt:
-          gatewayCredentialExpiresAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(gatewayCredentialExpiresAt),
-      gatewayRemoteMode: gatewayRemoteMode == null && nullToAbsent
-          ? const Value.absent()
-          : Value(gatewayRemoteMode),
-    );
-  }
-
-  factory GatewaySource.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return GatewaySource(
-      id: serializer.fromJson<String>(json['id']),
-      name: serializer.fromJson<String>(json['name']),
-      scheme: serializer.fromJson<String>(json['scheme']),
-      host: serializer.fromJson<String>(json['host']),
-      gatewayCredential: serializer.fromJson<String>(json['gatewayCredential']),
-      gatewayCredentialExpiresAt: serializer.fromJson<DateTime?>(
-        json['gatewayCredentialExpiresAt'],
-      ),
-      gatewayRemoteMode: serializer.fromJson<String?>(
-        json['gatewayRemoteMode'],
-      ),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'name': serializer.toJson<String>(name),
-      'scheme': serializer.toJson<String>(scheme),
-      'host': serializer.toJson<String>(host),
-      'gatewayCredential': serializer.toJson<String>(gatewayCredential),
-      'gatewayCredentialExpiresAt': serializer.toJson<DateTime?>(
-        gatewayCredentialExpiresAt,
-      ),
-      'gatewayRemoteMode': serializer.toJson<String?>(gatewayRemoteMode),
-    };
-  }
-
-  GatewaySource copyWith({
-    String? id,
-    String? name,
-    String? scheme,
-    String? host,
-    String? gatewayCredential,
-    Value<DateTime?> gatewayCredentialExpiresAt = const Value.absent(),
-    Value<String?> gatewayRemoteMode = const Value.absent(),
-  }) => GatewaySource(
-    id: id ?? this.id,
-    name: name ?? this.name,
-    scheme: scheme ?? this.scheme,
-    host: host ?? this.host,
-    gatewayCredential: gatewayCredential ?? this.gatewayCredential,
-    gatewayCredentialExpiresAt: gatewayCredentialExpiresAt.present
-        ? gatewayCredentialExpiresAt.value
-        : this.gatewayCredentialExpiresAt,
-    gatewayRemoteMode: gatewayRemoteMode.present
-        ? gatewayRemoteMode.value
-        : this.gatewayRemoteMode,
-  );
-  GatewaySource copyWithCompanion(GatewaySourcesCompanion data) {
-    return GatewaySource(
-      id: data.id.present ? data.id.value : this.id,
-      name: data.name.present ? data.name.value : this.name,
-      scheme: data.scheme.present ? data.scheme.value : this.scheme,
-      host: data.host.present ? data.host.value : this.host,
-      gatewayCredential: data.gatewayCredential.present
-          ? data.gatewayCredential.value
-          : this.gatewayCredential,
-      gatewayCredentialExpiresAt: data.gatewayCredentialExpiresAt.present
-          ? data.gatewayCredentialExpiresAt.value
-          : this.gatewayCredentialExpiresAt,
-      gatewayRemoteMode: data.gatewayRemoteMode.present
-          ? data.gatewayRemoteMode.value
-          : this.gatewayRemoteMode,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('GatewaySource(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('scheme: $scheme, ')
-          ..write('host: $host, ')
-          ..write('gatewayCredential: $gatewayCredential, ')
-          ..write('gatewayCredentialExpiresAt: $gatewayCredentialExpiresAt, ')
-          ..write('gatewayRemoteMode: $gatewayRemoteMode')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    id,
-    name,
-    scheme,
-    host,
-    gatewayCredential,
-    gatewayCredentialExpiresAt,
-    gatewayRemoteMode,
-  );
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is GatewaySource &&
-          other.id == this.id &&
-          other.name == this.name &&
-          other.scheme == this.scheme &&
-          other.host == this.host &&
-          other.gatewayCredential == this.gatewayCredential &&
-          other.gatewayCredentialExpiresAt == this.gatewayCredentialExpiresAt &&
-          other.gatewayRemoteMode == this.gatewayRemoteMode);
-}
-
-class GatewaySourcesCompanion extends UpdateCompanion<GatewaySource> {
-  final Value<String> id;
-  final Value<String> name;
-  final Value<String> scheme;
-  final Value<String> host;
-  final Value<String> gatewayCredential;
-  final Value<DateTime?> gatewayCredentialExpiresAt;
-  final Value<String?> gatewayRemoteMode;
-  final Value<int> rowid;
-  const GatewaySourcesCompanion({
-    this.id = const Value.absent(),
-    this.name = const Value.absent(),
-    this.scheme = const Value.absent(),
-    this.host = const Value.absent(),
-    this.gatewayCredential = const Value.absent(),
-    this.gatewayCredentialExpiresAt = const Value.absent(),
-    this.gatewayRemoteMode = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  GatewaySourcesCompanion.insert({
-    required String id,
-    required String name,
-    required String scheme,
-    required String host,
-    required String gatewayCredential,
-    this.gatewayCredentialExpiresAt = const Value.absent(),
-    this.gatewayRemoteMode = const Value.absent(),
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       name = Value(name),
-       scheme = Value(scheme),
-       host = Value(host),
-       gatewayCredential = Value(gatewayCredential);
-  static Insertable<GatewaySource> custom({
-    Expression<String>? id,
-    Expression<String>? name,
-    Expression<String>? scheme,
-    Expression<String>? host,
-    Expression<String>? gatewayCredential,
-    Expression<DateTime>? gatewayCredentialExpiresAt,
-    Expression<String>? gatewayRemoteMode,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (name != null) 'name': name,
-      if (scheme != null) 'scheme': scheme,
-      if (host != null) 'host': host,
-      if (gatewayCredential != null) 'gateway_credential': gatewayCredential,
-      if (gatewayCredentialExpiresAt != null)
-        'gateway_credential_expires_at': gatewayCredentialExpiresAt,
-      if (gatewayRemoteMode != null) 'gateway_remote_mode': gatewayRemoteMode,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  GatewaySourcesCompanion copyWith({
-    Value<String>? id,
-    Value<String>? name,
-    Value<String>? scheme,
-    Value<String>? host,
-    Value<String>? gatewayCredential,
-    Value<DateTime?>? gatewayCredentialExpiresAt,
-    Value<String?>? gatewayRemoteMode,
-    Value<int>? rowid,
-  }) {
-    return GatewaySourcesCompanion(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      scheme: scheme ?? this.scheme,
-      host: host ?? this.host,
-      gatewayCredential: gatewayCredential ?? this.gatewayCredential,
-      gatewayCredentialExpiresAt:
-          gatewayCredentialExpiresAt ?? this.gatewayCredentialExpiresAt,
-      gatewayRemoteMode: gatewayRemoteMode ?? this.gatewayRemoteMode,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (scheme.present) {
-      map['scheme'] = Variable<String>(scheme.value);
-    }
-    if (host.present) {
-      map['host'] = Variable<String>(host.value);
-    }
-    if (gatewayCredential.present) {
-      map['gateway_credential'] = Variable<String>(gatewayCredential.value);
-    }
-    if (gatewayCredentialExpiresAt.present) {
-      map['gateway_credential_expires_at'] = Variable<DateTime>(
-        gatewayCredentialExpiresAt.value,
-      );
-    }
-    if (gatewayRemoteMode.present) {
-      map['gateway_remote_mode'] = Variable<String>(gatewayRemoteMode.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('GatewaySourcesCompanion(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('scheme: $scheme, ')
-          ..write('host: $host, ')
-          ..write('gatewayCredential: $gatewayCredential, ')
-          ..write('gatewayCredentialExpiresAt: $gatewayCredentialExpiresAt, ')
-          ..write('gatewayRemoteMode: $gatewayRemoteMode, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class $GatewayAgentBindingsTable extends GatewayAgentBindings
-    with TableInfo<$GatewayAgentBindingsTable, GatewayAgentBinding> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $GatewayAgentBindingsTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _gatewaySourceIdMeta = const VerificationMeta(
-    'gatewaySourceId',
-  );
-  @override
-  late final GeneratedColumn<String> gatewaySourceId = GeneratedColumn<String>(
-    'gateway_source_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _agentIdMeta = const VerificationMeta(
-    'agentId',
-  );
-  @override
-  late final GeneratedColumn<String> agentId = GeneratedColumn<String>(
-    'agent_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _preferredAuthMethodIdMeta =
-      const VerificationMeta('preferredAuthMethodId');
-  @override
-  late final GeneratedColumn<String> preferredAuthMethodId =
-      GeneratedColumn<String>(
-        'preferred_auth_method_id',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-      );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    name,
-    gatewaySourceId,
-    agentId,
-    preferredAuthMethodId,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'gateway_agent_bindings';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<GatewayAgentBinding> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('gateway_source_id')) {
-      context.handle(
-        _gatewaySourceIdMeta,
-        gatewaySourceId.isAcceptableOrUnknown(
-          data['gateway_source_id']!,
-          _gatewaySourceIdMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_gatewaySourceIdMeta);
-    }
-    if (data.containsKey('agent_id')) {
-      context.handle(
-        _agentIdMeta,
-        agentId.isAcceptableOrUnknown(data['agent_id']!, _agentIdMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_agentIdMeta);
-    }
-    if (data.containsKey('preferred_auth_method_id')) {
-      context.handle(
-        _preferredAuthMethodIdMeta,
-        preferredAuthMethodId.isAcceptableOrUnknown(
-          data['preferred_auth_method_id']!,
-          _preferredAuthMethodIdMeta,
-        ),
-      );
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  GatewayAgentBinding map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return GatewayAgentBinding(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      gatewaySourceId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}gateway_source_id'],
-      )!,
-      agentId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}agent_id'],
-      )!,
-      preferredAuthMethodId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}preferred_auth_method_id'],
-      ),
-    );
-  }
-
-  @override
-  $GatewayAgentBindingsTable createAlias(String alias) {
-    return $GatewayAgentBindingsTable(attachedDatabase, alias);
-  }
-}
-
-class GatewayAgentBinding extends DataClass
-    implements Insertable<GatewayAgentBinding> {
-  final String id;
-  final String name;
-  final String gatewaySourceId;
-  final String agentId;
-  final String? preferredAuthMethodId;
-  const GatewayAgentBinding({
-    required this.id,
-    required this.name,
-    required this.gatewaySourceId,
-    required this.agentId,
-    this.preferredAuthMethodId,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['name'] = Variable<String>(name);
-    map['gateway_source_id'] = Variable<String>(gatewaySourceId);
-    map['agent_id'] = Variable<String>(agentId);
-    if (!nullToAbsent || preferredAuthMethodId != null) {
-      map['preferred_auth_method_id'] = Variable<String>(preferredAuthMethodId);
-    }
-    return map;
-  }
-
-  GatewayAgentBindingsCompanion toCompanion(bool nullToAbsent) {
-    return GatewayAgentBindingsCompanion(
-      id: Value(id),
-      name: Value(name),
-      gatewaySourceId: Value(gatewaySourceId),
-      agentId: Value(agentId),
-      preferredAuthMethodId: preferredAuthMethodId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(preferredAuthMethodId),
-    );
-  }
-
-  factory GatewayAgentBinding.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return GatewayAgentBinding(
-      id: serializer.fromJson<String>(json['id']),
-      name: serializer.fromJson<String>(json['name']),
-      gatewaySourceId: serializer.fromJson<String>(json['gatewaySourceId']),
-      agentId: serializer.fromJson<String>(json['agentId']),
-      preferredAuthMethodId: serializer.fromJson<String?>(
-        json['preferredAuthMethodId'],
-      ),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'name': serializer.toJson<String>(name),
-      'gatewaySourceId': serializer.toJson<String>(gatewaySourceId),
-      'agentId': serializer.toJson<String>(agentId),
-      'preferredAuthMethodId': serializer.toJson<String?>(
-        preferredAuthMethodId,
-      ),
-    };
-  }
-
-  GatewayAgentBinding copyWith({
-    String? id,
-    String? name,
-    String? gatewaySourceId,
-    String? agentId,
-    Value<String?> preferredAuthMethodId = const Value.absent(),
-  }) => GatewayAgentBinding(
-    id: id ?? this.id,
-    name: name ?? this.name,
-    gatewaySourceId: gatewaySourceId ?? this.gatewaySourceId,
-    agentId: agentId ?? this.agentId,
-    preferredAuthMethodId: preferredAuthMethodId.present
-        ? preferredAuthMethodId.value
-        : this.preferredAuthMethodId,
-  );
-  GatewayAgentBinding copyWithCompanion(GatewayAgentBindingsCompanion data) {
-    return GatewayAgentBinding(
-      id: data.id.present ? data.id.value : this.id,
-      name: data.name.present ? data.name.value : this.name,
-      gatewaySourceId: data.gatewaySourceId.present
-          ? data.gatewaySourceId.value
-          : this.gatewaySourceId,
-      agentId: data.agentId.present ? data.agentId.value : this.agentId,
-      preferredAuthMethodId: data.preferredAuthMethodId.present
-          ? data.preferredAuthMethodId.value
-          : this.preferredAuthMethodId,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('GatewayAgentBinding(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('gatewaySourceId: $gatewaySourceId, ')
-          ..write('agentId: $agentId, ')
-          ..write('preferredAuthMethodId: $preferredAuthMethodId')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(id, name, gatewaySourceId, agentId, preferredAuthMethodId);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is GatewayAgentBinding &&
-          other.id == this.id &&
-          other.name == this.name &&
-          other.gatewaySourceId == this.gatewaySourceId &&
-          other.agentId == this.agentId &&
-          other.preferredAuthMethodId == this.preferredAuthMethodId);
-}
-
-class GatewayAgentBindingsCompanion
-    extends UpdateCompanion<GatewayAgentBinding> {
-  final Value<String> id;
-  final Value<String> name;
-  final Value<String> gatewaySourceId;
-  final Value<String> agentId;
-  final Value<String?> preferredAuthMethodId;
-  final Value<int> rowid;
-  const GatewayAgentBindingsCompanion({
-    this.id = const Value.absent(),
-    this.name = const Value.absent(),
-    this.gatewaySourceId = const Value.absent(),
-    this.agentId = const Value.absent(),
-    this.preferredAuthMethodId = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  GatewayAgentBindingsCompanion.insert({
-    required String id,
-    required String name,
-    required String gatewaySourceId,
-    required String agentId,
-    this.preferredAuthMethodId = const Value.absent(),
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       name = Value(name),
-       gatewaySourceId = Value(gatewaySourceId),
-       agentId = Value(agentId);
-  static Insertable<GatewayAgentBinding> custom({
-    Expression<String>? id,
-    Expression<String>? name,
-    Expression<String>? gatewaySourceId,
-    Expression<String>? agentId,
-    Expression<String>? preferredAuthMethodId,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (name != null) 'name': name,
-      if (gatewaySourceId != null) 'gateway_source_id': gatewaySourceId,
-      if (agentId != null) 'agent_id': agentId,
-      if (preferredAuthMethodId != null)
-        'preferred_auth_method_id': preferredAuthMethodId,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  GatewayAgentBindingsCompanion copyWith({
-    Value<String>? id,
-    Value<String>? name,
-    Value<String>? gatewaySourceId,
-    Value<String>? agentId,
-    Value<String?>? preferredAuthMethodId,
-    Value<int>? rowid,
-  }) {
-    return GatewayAgentBindingsCompanion(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      gatewaySourceId: gatewaySourceId ?? this.gatewaySourceId,
-      agentId: agentId ?? this.agentId,
-      preferredAuthMethodId:
-          preferredAuthMethodId ?? this.preferredAuthMethodId,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (gatewaySourceId.present) {
-      map['gateway_source_id'] = Variable<String>(gatewaySourceId.value);
-    }
-    if (agentId.present) {
-      map['agent_id'] = Variable<String>(agentId.value);
-    }
-    if (preferredAuthMethodId.present) {
-      map['preferred_auth_method_id'] = Variable<String>(
-        preferredAuthMethodId.value,
-      );
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('GatewayAgentBindingsCompanion(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('gatewaySourceId: $gatewaySourceId, ')
-          ..write('agentId: $agentId, ')
-          ..write('preferredAuthMethodId: $preferredAuthMethodId, ')
+    return (StringBuffer('PairedDevicesCompanion(')
+          ..write('code: $code, ')
+          ..write('deviceName: $deviceName, ')
+          ..write('pairedAt: $pairedAt, ')
+          ..write('lastConnectedAt: $lastConnectedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1359,12 +343,12 @@ class $SessionCacheTable extends SessionCache
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _serverIdMeta = const VerificationMeta(
-    'serverId',
+  static const VerificationMeta _deviceCodeMeta = const VerificationMeta(
+    'deviceCode',
   );
   @override
-  late final GeneratedColumn<String> serverId = GeneratedColumn<String>(
-    'server_id',
+  late final GeneratedColumn<String> deviceCode = GeneratedColumn<String>(
+    'device_code',
     aliasedName,
     false,
     type: DriftSqlType.string,
@@ -1384,23 +368,23 @@ class $SessionCacheTable extends SessionCache
   late final GeneratedColumn<String> cwd = GeneratedColumn<String>(
     'cwd',
     aliasedName,
-    true,
+    false,
     type: DriftSqlType.string,
-    requiredDuringInsert: false,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
   @override
-  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+  late final GeneratedColumn<double> updatedAt = GeneratedColumn<double>(
     'updated_at',
     aliasedName,
-    true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, serverId, title, cwd, updatedAt];
+  List<GeneratedColumn> get $columns => [id, deviceCode, title, cwd, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1418,13 +402,13 @@ class $SessionCacheTable extends SessionCache
     } else if (isInserting) {
       context.missing(_idMeta);
     }
-    if (data.containsKey('server_id')) {
+    if (data.containsKey('device_code')) {
       context.handle(
-        _serverIdMeta,
-        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
+        _deviceCodeMeta,
+        deviceCode.isAcceptableOrUnknown(data['device_code']!, _deviceCodeMeta),
       );
     } else if (isInserting) {
-      context.missing(_serverIdMeta);
+      context.missing(_deviceCodeMeta);
     }
     if (data.containsKey('title')) {
       context.handle(
@@ -1437,12 +421,16 @@ class $SessionCacheTable extends SessionCache
         _cwdMeta,
         cwd.isAcceptableOrUnknown(data['cwd']!, _cwdMeta),
       );
+    } else if (isInserting) {
+      context.missing(_cwdMeta);
     }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
     }
     return context;
   }
@@ -1457,9 +445,9 @@ class $SessionCacheTable extends SessionCache
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
-      serverId: attachedDatabase.typeMapping.read(
+      deviceCode: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}server_id'],
+        data['${effectivePrefix}device_code'],
       )!,
       title: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -1468,11 +456,11 @@ class $SessionCacheTable extends SessionCache
       cwd: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}cwd'],
-      ),
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.double,
         data['${effectivePrefix}updated_at'],
-      ),
+      )!,
     );
   }
 
@@ -1485,45 +473,39 @@ class $SessionCacheTable extends SessionCache
 class SessionCacheData extends DataClass
     implements Insertable<SessionCacheData> {
   final String id;
-  final String serverId;
+  final String deviceCode;
   final String? title;
-  final String? cwd;
-  final int? updatedAt;
+  final String cwd;
+  final double updatedAt;
   const SessionCacheData({
     required this.id,
-    required this.serverId,
+    required this.deviceCode,
     this.title,
-    this.cwd,
-    this.updatedAt,
+    required this.cwd,
+    required this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
-    map['server_id'] = Variable<String>(serverId);
+    map['device_code'] = Variable<String>(deviceCode);
     if (!nullToAbsent || title != null) {
       map['title'] = Variable<String>(title);
     }
-    if (!nullToAbsent || cwd != null) {
-      map['cwd'] = Variable<String>(cwd);
-    }
-    if (!nullToAbsent || updatedAt != null) {
-      map['updated_at'] = Variable<int>(updatedAt);
-    }
+    map['cwd'] = Variable<String>(cwd);
+    map['updated_at'] = Variable<double>(updatedAt);
     return map;
   }
 
   SessionCacheCompanion toCompanion(bool nullToAbsent) {
     return SessionCacheCompanion(
       id: Value(id),
-      serverId: Value(serverId),
+      deviceCode: Value(deviceCode),
       title: title == null && nullToAbsent
           ? const Value.absent()
           : Value(title),
-      cwd: cwd == null && nullToAbsent ? const Value.absent() : Value(cwd),
-      updatedAt: updatedAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(updatedAt),
+      cwd: Value(cwd),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -1534,10 +516,10 @@ class SessionCacheData extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return SessionCacheData(
       id: serializer.fromJson<String>(json['id']),
-      serverId: serializer.fromJson<String>(json['serverId']),
+      deviceCode: serializer.fromJson<String>(json['deviceCode']),
       title: serializer.fromJson<String?>(json['title']),
-      cwd: serializer.fromJson<String?>(json['cwd']),
-      updatedAt: serializer.fromJson<int?>(json['updatedAt']),
+      cwd: serializer.fromJson<String>(json['cwd']),
+      updatedAt: serializer.fromJson<double>(json['updatedAt']),
     );
   }
   @override
@@ -1545,30 +527,32 @@ class SessionCacheData extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
-      'serverId': serializer.toJson<String>(serverId),
+      'deviceCode': serializer.toJson<String>(deviceCode),
       'title': serializer.toJson<String?>(title),
-      'cwd': serializer.toJson<String?>(cwd),
-      'updatedAt': serializer.toJson<int?>(updatedAt),
+      'cwd': serializer.toJson<String>(cwd),
+      'updatedAt': serializer.toJson<double>(updatedAt),
     };
   }
 
   SessionCacheData copyWith({
     String? id,
-    String? serverId,
+    String? deviceCode,
     Value<String?> title = const Value.absent(),
-    Value<String?> cwd = const Value.absent(),
-    Value<int?> updatedAt = const Value.absent(),
+    String? cwd,
+    double? updatedAt,
   }) => SessionCacheData(
     id: id ?? this.id,
-    serverId: serverId ?? this.serverId,
+    deviceCode: deviceCode ?? this.deviceCode,
     title: title.present ? title.value : this.title,
-    cwd: cwd.present ? cwd.value : this.cwd,
-    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    cwd: cwd ?? this.cwd,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   SessionCacheData copyWithCompanion(SessionCacheCompanion data) {
     return SessionCacheData(
       id: data.id.present ? data.id.value : this.id,
-      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      deviceCode: data.deviceCode.present
+          ? data.deviceCode.value
+          : this.deviceCode,
       title: data.title.present ? data.title.value : this.title,
       cwd: data.cwd.present ? data.cwd.value : this.cwd,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -1579,7 +563,7 @@ class SessionCacheData extends DataClass
   String toString() {
     return (StringBuffer('SessionCacheData(')
           ..write('id: $id, ')
-          ..write('serverId: $serverId, ')
+          ..write('deviceCode: $deviceCode, ')
           ..write('title: $title, ')
           ..write('cwd: $cwd, ')
           ..write('updatedAt: $updatedAt')
@@ -1588,13 +572,13 @@ class SessionCacheData extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(id, serverId, title, cwd, updatedAt);
+  int get hashCode => Object.hash(id, deviceCode, title, cwd, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SessionCacheData &&
           other.id == this.id &&
-          other.serverId == this.serverId &&
+          other.deviceCode == this.deviceCode &&
           other.title == this.title &&
           other.cwd == this.cwd &&
           other.updatedAt == this.updatedAt);
@@ -1602,14 +586,14 @@ class SessionCacheData extends DataClass
 
 class SessionCacheCompanion extends UpdateCompanion<SessionCacheData> {
   final Value<String> id;
-  final Value<String> serverId;
+  final Value<String> deviceCode;
   final Value<String?> title;
-  final Value<String?> cwd;
-  final Value<int?> updatedAt;
+  final Value<String> cwd;
+  final Value<double> updatedAt;
   final Value<int> rowid;
   const SessionCacheCompanion({
     this.id = const Value.absent(),
-    this.serverId = const Value.absent(),
+    this.deviceCode = const Value.absent(),
     this.title = const Value.absent(),
     this.cwd = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1617,24 +601,26 @@ class SessionCacheCompanion extends UpdateCompanion<SessionCacheData> {
   });
   SessionCacheCompanion.insert({
     required String id,
-    required String serverId,
+    required String deviceCode,
     this.title = const Value.absent(),
-    this.cwd = const Value.absent(),
-    this.updatedAt = const Value.absent(),
+    required String cwd,
+    required double updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
-       serverId = Value(serverId);
+       deviceCode = Value(deviceCode),
+       cwd = Value(cwd),
+       updatedAt = Value(updatedAt);
   static Insertable<SessionCacheData> custom({
     Expression<String>? id,
-    Expression<String>? serverId,
+    Expression<String>? deviceCode,
     Expression<String>? title,
     Expression<String>? cwd,
-    Expression<int>? updatedAt,
+    Expression<double>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
-      if (serverId != null) 'server_id': serverId,
+      if (deviceCode != null) 'device_code': deviceCode,
       if (title != null) 'title': title,
       if (cwd != null) 'cwd': cwd,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1644,15 +630,15 @@ class SessionCacheCompanion extends UpdateCompanion<SessionCacheData> {
 
   SessionCacheCompanion copyWith({
     Value<String>? id,
-    Value<String>? serverId,
+    Value<String>? deviceCode,
     Value<String?>? title,
-    Value<String?>? cwd,
-    Value<int?>? updatedAt,
+    Value<String>? cwd,
+    Value<double>? updatedAt,
     Value<int>? rowid,
   }) {
     return SessionCacheCompanion(
       id: id ?? this.id,
-      serverId: serverId ?? this.serverId,
+      deviceCode: deviceCode ?? this.deviceCode,
       title: title ?? this.title,
       cwd: cwd ?? this.cwd,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1666,8 +652,8 @@ class SessionCacheCompanion extends UpdateCompanion<SessionCacheData> {
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
-    if (serverId.present) {
-      map['server_id'] = Variable<String>(serverId.value);
+    if (deviceCode.present) {
+      map['device_code'] = Variable<String>(deviceCode.value);
     }
     if (title.present) {
       map['title'] = Variable<String>(title.value);
@@ -1676,7 +662,7 @@ class SessionCacheCompanion extends UpdateCompanion<SessionCacheData> {
       map['cwd'] = Variable<String>(cwd.value);
     }
     if (updatedAt.present) {
-      map['updated_at'] = Variable<int>(updatedAt.value);
+      map['updated_at'] = Variable<double>(updatedAt.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1688,10 +674,483 @@ class SessionCacheCompanion extends UpdateCompanion<SessionCacheData> {
   String toString() {
     return (StringBuffer('SessionCacheCompanion(')
           ..write('id: $id, ')
-          ..write('serverId: $serverId, ')
+          ..write('deviceCode: $deviceCode, ')
           ..write('title: $title, ')
           ..write('cwd: $cwd, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ChatMessagesTable extends ChatMessages
+    with TableInfo<$ChatMessagesTable, ChatMessage> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ChatMessagesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
+  @override
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+    'role',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _segmentsJsonMeta = const VerificationMeta(
+    'segmentsJson',
+  );
+  @override
+  late final GeneratedColumn<String> segmentsJson = GeneratedColumn<String>(
+    'segments_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isStreamingMeta = const VerificationMeta(
+    'isStreaming',
+  );
+  @override
+  late final GeneratedColumn<int> isStreaming = GeneratedColumn<int>(
+    'is_streaming',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<double> createdAt = GeneratedColumn<double>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    sessionId,
+    role,
+    content,
+    segmentsJson,
+    isStreaming,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'chat_messages';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ChatMessage> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sessionIdMeta);
+    }
+    if (data.containsKey('role')) {
+      context.handle(
+        _roleMeta,
+        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_roleMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('segments_json')) {
+      context.handle(
+        _segmentsJsonMeta,
+        segmentsJson.isAcceptableOrUnknown(
+          data['segments_json']!,
+          _segmentsJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_streaming')) {
+      context.handle(
+        _isStreamingMeta,
+        isStreaming.isAcceptableOrUnknown(
+          data['is_streaming']!,
+          _isStreamingMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_isStreamingMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ChatMessage map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ChatMessage(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      )!,
+      role: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}role'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      segmentsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}segments_json'],
+      ),
+      isStreaming: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}is_streaming'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ChatMessagesTable createAlias(String alias) {
+    return $ChatMessagesTable(attachedDatabase, alias);
+  }
+}
+
+class ChatMessage extends DataClass implements Insertable<ChatMessage> {
+  final String id;
+  final String sessionId;
+  final String role;
+  final String content;
+  final String? segmentsJson;
+  final int isStreaming;
+  final double createdAt;
+  const ChatMessage({
+    required this.id,
+    required this.sessionId,
+    required this.role,
+    required this.content,
+    this.segmentsJson,
+    required this.isStreaming,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['session_id'] = Variable<String>(sessionId);
+    map['role'] = Variable<String>(role);
+    map['content'] = Variable<String>(content);
+    if (!nullToAbsent || segmentsJson != null) {
+      map['segments_json'] = Variable<String>(segmentsJson);
+    }
+    map['is_streaming'] = Variable<int>(isStreaming);
+    map['created_at'] = Variable<double>(createdAt);
+    return map;
+  }
+
+  ChatMessagesCompanion toCompanion(bool nullToAbsent) {
+    return ChatMessagesCompanion(
+      id: Value(id),
+      sessionId: Value(sessionId),
+      role: Value(role),
+      content: Value(content),
+      segmentsJson: segmentsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(segmentsJson),
+      isStreaming: Value(isStreaming),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory ChatMessage.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ChatMessage(
+      id: serializer.fromJson<String>(json['id']),
+      sessionId: serializer.fromJson<String>(json['sessionId']),
+      role: serializer.fromJson<String>(json['role']),
+      content: serializer.fromJson<String>(json['content']),
+      segmentsJson: serializer.fromJson<String?>(json['segmentsJson']),
+      isStreaming: serializer.fromJson<int>(json['isStreaming']),
+      createdAt: serializer.fromJson<double>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sessionId': serializer.toJson<String>(sessionId),
+      'role': serializer.toJson<String>(role),
+      'content': serializer.toJson<String>(content),
+      'segmentsJson': serializer.toJson<String?>(segmentsJson),
+      'isStreaming': serializer.toJson<int>(isStreaming),
+      'createdAt': serializer.toJson<double>(createdAt),
+    };
+  }
+
+  ChatMessage copyWith({
+    String? id,
+    String? sessionId,
+    String? role,
+    String? content,
+    Value<String?> segmentsJson = const Value.absent(),
+    int? isStreaming,
+    double? createdAt,
+  }) => ChatMessage(
+    id: id ?? this.id,
+    sessionId: sessionId ?? this.sessionId,
+    role: role ?? this.role,
+    content: content ?? this.content,
+    segmentsJson: segmentsJson.present ? segmentsJson.value : this.segmentsJson,
+    isStreaming: isStreaming ?? this.isStreaming,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  ChatMessage copyWithCompanion(ChatMessagesCompanion data) {
+    return ChatMessage(
+      id: data.id.present ? data.id.value : this.id,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      role: data.role.present ? data.role.value : this.role,
+      content: data.content.present ? data.content.value : this.content,
+      segmentsJson: data.segmentsJson.present
+          ? data.segmentsJson.value
+          : this.segmentsJson,
+      isStreaming: data.isStreaming.present
+          ? data.isStreaming.value
+          : this.isStreaming,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChatMessage(')
+          ..write('id: $id, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('role: $role, ')
+          ..write('content: $content, ')
+          ..write('segmentsJson: $segmentsJson, ')
+          ..write('isStreaming: $isStreaming, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    sessionId,
+    role,
+    content,
+    segmentsJson,
+    isStreaming,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ChatMessage &&
+          other.id == this.id &&
+          other.sessionId == this.sessionId &&
+          other.role == this.role &&
+          other.content == this.content &&
+          other.segmentsJson == this.segmentsJson &&
+          other.isStreaming == this.isStreaming &&
+          other.createdAt == this.createdAt);
+}
+
+class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
+  final Value<String> id;
+  final Value<String> sessionId;
+  final Value<String> role;
+  final Value<String> content;
+  final Value<String?> segmentsJson;
+  final Value<int> isStreaming;
+  final Value<double> createdAt;
+  final Value<int> rowid;
+  const ChatMessagesCompanion({
+    this.id = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.role = const Value.absent(),
+    this.content = const Value.absent(),
+    this.segmentsJson = const Value.absent(),
+    this.isStreaming = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ChatMessagesCompanion.insert({
+    required String id,
+    required String sessionId,
+    required String role,
+    required String content,
+    this.segmentsJson = const Value.absent(),
+    required int isStreaming,
+    required double createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sessionId = Value(sessionId),
+       role = Value(role),
+       content = Value(content),
+       isStreaming = Value(isStreaming),
+       createdAt = Value(createdAt);
+  static Insertable<ChatMessage> custom({
+    Expression<String>? id,
+    Expression<String>? sessionId,
+    Expression<String>? role,
+    Expression<String>? content,
+    Expression<String>? segmentsJson,
+    Expression<int>? isStreaming,
+    Expression<double>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sessionId != null) 'session_id': sessionId,
+      if (role != null) 'role': role,
+      if (content != null) 'content': content,
+      if (segmentsJson != null) 'segments_json': segmentsJson,
+      if (isStreaming != null) 'is_streaming': isStreaming,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ChatMessagesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? sessionId,
+    Value<String>? role,
+    Value<String>? content,
+    Value<String?>? segmentsJson,
+    Value<int>? isStreaming,
+    Value<double>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return ChatMessagesCompanion(
+      id: id ?? this.id,
+      sessionId: sessionId ?? this.sessionId,
+      role: role ?? this.role,
+      content: content ?? this.content,
+      segmentsJson: segmentsJson ?? this.segmentsJson,
+      isStreaming: isStreaming ?? this.isStreaming,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (segmentsJson.present) {
+      map['segments_json'] = Variable<String>(segmentsJson.value);
+    }
+    if (isStreaming.present) {
+      map['is_streaming'] = Variable<int>(isStreaming.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<double>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ChatMessagesCompanion(')
+          ..write('id: $id, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('role: $role, ')
+          ..write('content: $content, ')
+          ..write('segmentsJson: $segmentsJson, ')
+          ..write('isStreaming: $isStreaming, ')
+          ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1720,9 +1179,9 @@ class $SessionSettingsTable extends SessionSettings
   late final GeneratedColumn<String> cwd = GeneratedColumn<String>(
     'cwd',
     aliasedName,
-    true,
+    false,
     type: DriftSqlType.string,
-    requiredDuringInsert: false,
+    requiredDuringInsert: true,
   );
   @override
   List<GeneratedColumn> get $columns => [targetId, cwd];
@@ -1751,6 +1210,8 @@ class $SessionSettingsTable extends SessionSettings
         _cwdMeta,
         cwd.isAcceptableOrUnknown(data['cwd']!, _cwdMeta),
       );
+    } else if (isInserting) {
+      context.missing(_cwdMeta);
     }
     return context;
   }
@@ -1768,7 +1229,7 @@ class $SessionSettingsTable extends SessionSettings
       cwd: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}cwd'],
-      ),
+      )!,
     );
   }
 
@@ -1780,23 +1241,18 @@ class $SessionSettingsTable extends SessionSettings
 
 class SessionSetting extends DataClass implements Insertable<SessionSetting> {
   final String targetId;
-  final String? cwd;
-  const SessionSetting({required this.targetId, this.cwd});
+  final String cwd;
+  const SessionSetting({required this.targetId, required this.cwd});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['target_id'] = Variable<String>(targetId);
-    if (!nullToAbsent || cwd != null) {
-      map['cwd'] = Variable<String>(cwd);
-    }
+    map['cwd'] = Variable<String>(cwd);
     return map;
   }
 
   SessionSettingsCompanion toCompanion(bool nullToAbsent) {
-    return SessionSettingsCompanion(
-      targetId: Value(targetId),
-      cwd: cwd == null && nullToAbsent ? const Value.absent() : Value(cwd),
-    );
+    return SessionSettingsCompanion(targetId: Value(targetId), cwd: Value(cwd));
   }
 
   factory SessionSetting.fromJson(
@@ -1806,7 +1262,7 @@ class SessionSetting extends DataClass implements Insertable<SessionSetting> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return SessionSetting(
       targetId: serializer.fromJson<String>(json['targetId']),
-      cwd: serializer.fromJson<String?>(json['cwd']),
+      cwd: serializer.fromJson<String>(json['cwd']),
     );
   }
   @override
@@ -1814,17 +1270,12 @@ class SessionSetting extends DataClass implements Insertable<SessionSetting> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'targetId': serializer.toJson<String>(targetId),
-      'cwd': serializer.toJson<String?>(cwd),
+      'cwd': serializer.toJson<String>(cwd),
     };
   }
 
-  SessionSetting copyWith({
-    String? targetId,
-    Value<String?> cwd = const Value.absent(),
-  }) => SessionSetting(
-    targetId: targetId ?? this.targetId,
-    cwd: cwd.present ? cwd.value : this.cwd,
-  );
+  SessionSetting copyWith({String? targetId, String? cwd}) =>
+      SessionSetting(targetId: targetId ?? this.targetId, cwd: cwd ?? this.cwd);
   SessionSetting copyWithCompanion(SessionSettingsCompanion data) {
     return SessionSetting(
       targetId: data.targetId.present ? data.targetId.value : this.targetId,
@@ -1853,7 +1304,7 @@ class SessionSetting extends DataClass implements Insertable<SessionSetting> {
 
 class SessionSettingsCompanion extends UpdateCompanion<SessionSetting> {
   final Value<String> targetId;
-  final Value<String?> cwd;
+  final Value<String> cwd;
   final Value<int> rowid;
   const SessionSettingsCompanion({
     this.targetId = const Value.absent(),
@@ -1862,9 +1313,10 @@ class SessionSettingsCompanion extends UpdateCompanion<SessionSetting> {
   });
   SessionSettingsCompanion.insert({
     required String targetId,
-    this.cwd = const Value.absent(),
+    required String cwd,
     this.rowid = const Value.absent(),
-  }) : targetId = Value(targetId);
+  }) : targetId = Value(targetId),
+       cwd = Value(cwd);
   static Insertable<SessionSetting> custom({
     Expression<String>? targetId,
     Expression<String>? cwd,
@@ -1879,7 +1331,7 @@ class SessionSettingsCompanion extends UpdateCompanion<SessionSetting> {
 
   SessionSettingsCompanion copyWith({
     Value<String>? targetId,
-    Value<String?>? cwd,
+    Value<String>? cwd,
     Value<int>? rowid,
   }) {
     return SessionSettingsCompanion(
@@ -1915,560 +1367,185 @@ class SessionSettingsCompanion extends UpdateCompanion<SessionSetting> {
   }
 }
 
-class $ChatMessagesTable extends ChatMessages
-    with TableInfo<$ChatMessagesTable, ChatMessage> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $ChatMessagesTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
-    'sessionId',
-  );
-  @override
-  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
-    'session_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _messageJsonMeta = const VerificationMeta(
-    'messageJson',
-  );
-  @override
-  late final GeneratedColumn<String> messageJson = GeneratedColumn<String>(
-    'message_json',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
-  @override
-  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
-  @override
-  List<GeneratedColumn> get $columns => [id, sessionId, messageJson, createdAt];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'chat_messages';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<ChatMessage> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('session_id')) {
-      context.handle(
-        _sessionIdMeta,
-        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_sessionIdMeta);
-    }
-    if (data.containsKey('message_json')) {
-      context.handle(
-        _messageJsonMeta,
-        messageJson.isAcceptableOrUnknown(
-          data['message_json']!,
-          _messageJsonMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_messageJsonMeta);
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  ChatMessage map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return ChatMessage(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      sessionId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}session_id'],
-      )!,
-      messageJson: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}message_json'],
-      )!,
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}created_at'],
-      )!,
-    );
-  }
-
-  @override
-  $ChatMessagesTable createAlias(String alias) {
-    return $ChatMessagesTable(attachedDatabase, alias);
-  }
-}
-
-class ChatMessage extends DataClass implements Insertable<ChatMessage> {
-  final String id;
-  final String sessionId;
-  final String messageJson;
-  final int createdAt;
-  const ChatMessage({
-    required this.id,
-    required this.sessionId,
-    required this.messageJson,
-    required this.createdAt,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['session_id'] = Variable<String>(sessionId);
-    map['message_json'] = Variable<String>(messageJson);
-    map['created_at'] = Variable<int>(createdAt);
-    return map;
-  }
-
-  ChatMessagesCompanion toCompanion(bool nullToAbsent) {
-    return ChatMessagesCompanion(
-      id: Value(id),
-      sessionId: Value(sessionId),
-      messageJson: Value(messageJson),
-      createdAt: Value(createdAt),
-    );
-  }
-
-  factory ChatMessage.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return ChatMessage(
-      id: serializer.fromJson<String>(json['id']),
-      sessionId: serializer.fromJson<String>(json['sessionId']),
-      messageJson: serializer.fromJson<String>(json['messageJson']),
-      createdAt: serializer.fromJson<int>(json['createdAt']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'sessionId': serializer.toJson<String>(sessionId),
-      'messageJson': serializer.toJson<String>(messageJson),
-      'createdAt': serializer.toJson<int>(createdAt),
-    };
-  }
-
-  ChatMessage copyWith({
-    String? id,
-    String? sessionId,
-    String? messageJson,
-    int? createdAt,
-  }) => ChatMessage(
-    id: id ?? this.id,
-    sessionId: sessionId ?? this.sessionId,
-    messageJson: messageJson ?? this.messageJson,
-    createdAt: createdAt ?? this.createdAt,
-  );
-  ChatMessage copyWithCompanion(ChatMessagesCompanion data) {
-    return ChatMessage(
-      id: data.id.present ? data.id.value : this.id,
-      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
-      messageJson: data.messageJson.present
-          ? data.messageJson.value
-          : this.messageJson,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('ChatMessage(')
-          ..write('id: $id, ')
-          ..write('sessionId: $sessionId, ')
-          ..write('messageJson: $messageJson, ')
-          ..write('createdAt: $createdAt')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(id, sessionId, messageJson, createdAt);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is ChatMessage &&
-          other.id == this.id &&
-          other.sessionId == this.sessionId &&
-          other.messageJson == this.messageJson &&
-          other.createdAt == this.createdAt);
-}
-
-class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
-  final Value<String> id;
-  final Value<String> sessionId;
-  final Value<String> messageJson;
-  final Value<int> createdAt;
-  final Value<int> rowid;
-  const ChatMessagesCompanion({
-    this.id = const Value.absent(),
-    this.sessionId = const Value.absent(),
-    this.messageJson = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  ChatMessagesCompanion.insert({
-    required String id,
-    required String sessionId,
-    required String messageJson,
-    required int createdAt,
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       sessionId = Value(sessionId),
-       messageJson = Value(messageJson),
-       createdAt = Value(createdAt);
-  static Insertable<ChatMessage> custom({
-    Expression<String>? id,
-    Expression<String>? sessionId,
-    Expression<String>? messageJson,
-    Expression<int>? createdAt,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (sessionId != null) 'session_id': sessionId,
-      if (messageJson != null) 'message_json': messageJson,
-      if (createdAt != null) 'created_at': createdAt,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  ChatMessagesCompanion copyWith({
-    Value<String>? id,
-    Value<String>? sessionId,
-    Value<String>? messageJson,
-    Value<int>? createdAt,
-    Value<int>? rowid,
-  }) {
-    return ChatMessagesCompanion(
-      id: id ?? this.id,
-      sessionId: sessionId ?? this.sessionId,
-      messageJson: messageJson ?? this.messageJson,
-      createdAt: createdAt ?? this.createdAt,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (sessionId.present) {
-      map['session_id'] = Variable<String>(sessionId.value);
-    }
-    if (messageJson.present) {
-      map['message_json'] = Variable<String>(messageJson.value);
-    }
-    if (createdAt.present) {
-      map['created_at'] = Variable<int>(createdAt.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('ChatMessagesCompanion(')
-          ..write('id: $id, ')
-          ..write('sessionId: $sessionId, ')
-          ..write('messageJson: $messageJson, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
-  late final $ServerConfigsTable serverConfigs = $ServerConfigsTable(this);
-  late final $GatewaySourcesTable gatewaySources = $GatewaySourcesTable(this);
-  late final $GatewayAgentBindingsTable gatewayAgentBindings =
-      $GatewayAgentBindingsTable(this);
+  late final $PairedDevicesTable pairedDevices = $PairedDevicesTable(this);
   late final $SessionCacheTable sessionCache = $SessionCacheTable(this);
+  late final $ChatMessagesTable chatMessages = $ChatMessagesTable(this);
   late final $SessionSettingsTable sessionSettings = $SessionSettingsTable(
     this,
   );
-  late final $ChatMessagesTable chatMessages = $ChatMessagesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
-    serverConfigs,
-    gatewaySources,
-    gatewayAgentBindings,
+    pairedDevices,
     sessionCache,
-    sessionSettings,
     chatMessages,
+    sessionSettings,
   ];
 }
 
-typedef $$ServerConfigsTableCreateCompanionBuilder =
-    ServerConfigsCompanion Function({
-      required String id,
-      required String name,
-      required String scheme,
-      required String host,
-      required String token,
-      Value<String?> preferredAuthMethodId,
-      required String type,
+typedef $$PairedDevicesTableCreateCompanionBuilder =
+    PairedDevicesCompanion Function({
+      required String code,
+      required String deviceName,
+      required double pairedAt,
+      required double lastConnectedAt,
       Value<int> rowid,
     });
-typedef $$ServerConfigsTableUpdateCompanionBuilder =
-    ServerConfigsCompanion Function({
-      Value<String> id,
-      Value<String> name,
-      Value<String> scheme,
-      Value<String> host,
-      Value<String> token,
-      Value<String?> preferredAuthMethodId,
-      Value<String> type,
+typedef $$PairedDevicesTableUpdateCompanionBuilder =
+    PairedDevicesCompanion Function({
+      Value<String> code,
+      Value<String> deviceName,
+      Value<double> pairedAt,
+      Value<double> lastConnectedAt,
       Value<int> rowid,
     });
 
-class $$ServerConfigsTableFilterComposer
-    extends Composer<_$AppDatabase, $ServerConfigsTable> {
-  $$ServerConfigsTableFilterComposer({
+class $$PairedDevicesTableFilterComposer
+    extends Composer<_$AppDatabase, $PairedDevicesTable> {
+  $$PairedDevicesTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
+  ColumnFilters<String> get code => $composableBuilder(
+    column: $table.code,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
+  ColumnFilters<String> get deviceName => $composableBuilder(
+    column: $table.deviceName,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get scheme => $composableBuilder(
-    column: $table.scheme,
+  ColumnFilters<double> get pairedAt => $composableBuilder(
+    column: $table.pairedAt,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get host => $composableBuilder(
-    column: $table.host,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get token => $composableBuilder(
-    column: $table.token,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get preferredAuthMethodId => $composableBuilder(
-    column: $table.preferredAuthMethodId,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get type => $composableBuilder(
-    column: $table.type,
+  ColumnFilters<double> get lastConnectedAt => $composableBuilder(
+    column: $table.lastConnectedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
 
-class $$ServerConfigsTableOrderingComposer
-    extends Composer<_$AppDatabase, $ServerConfigsTable> {
-  $$ServerConfigsTableOrderingComposer({
+class $$PairedDevicesTableOrderingComposer
+    extends Composer<_$AppDatabase, $PairedDevicesTable> {
+  $$PairedDevicesTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
+  ColumnOrderings<String> get code => $composableBuilder(
+    column: $table.code,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
+  ColumnOrderings<String> get deviceName => $composableBuilder(
+    column: $table.deviceName,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get scheme => $composableBuilder(
-    column: $table.scheme,
+  ColumnOrderings<double> get pairedAt => $composableBuilder(
+    column: $table.pairedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get host => $composableBuilder(
-    column: $table.host,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get token => $composableBuilder(
-    column: $table.token,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get preferredAuthMethodId => $composableBuilder(
-    column: $table.preferredAuthMethodId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get type => $composableBuilder(
-    column: $table.type,
+  ColumnOrderings<double> get lastConnectedAt => $composableBuilder(
+    column: $table.lastConnectedAt,
     builder: (column) => ColumnOrderings(column),
   );
 }
 
-class $$ServerConfigsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $ServerConfigsTable> {
-  $$ServerConfigsTableAnnotationComposer({
+class $$PairedDevicesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PairedDevicesTable> {
+  $$PairedDevicesTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
+  GeneratedColumn<String> get code =>
+      $composableBuilder(column: $table.code, builder: (column) => column);
 
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<String> get scheme =>
-      $composableBuilder(column: $table.scheme, builder: (column) => column);
-
-  GeneratedColumn<String> get host =>
-      $composableBuilder(column: $table.host, builder: (column) => column);
-
-  GeneratedColumn<String> get token =>
-      $composableBuilder(column: $table.token, builder: (column) => column);
-
-  GeneratedColumn<String> get preferredAuthMethodId => $composableBuilder(
-    column: $table.preferredAuthMethodId,
+  GeneratedColumn<String> get deviceName => $composableBuilder(
+    column: $table.deviceName,
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get type =>
-      $composableBuilder(column: $table.type, builder: (column) => column);
+  GeneratedColumn<double> get pairedAt =>
+      $composableBuilder(column: $table.pairedAt, builder: (column) => column);
+
+  GeneratedColumn<double> get lastConnectedAt => $composableBuilder(
+    column: $table.lastConnectedAt,
+    builder: (column) => column,
+  );
 }
 
-class $$ServerConfigsTableTableManager
+class $$PairedDevicesTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $ServerConfigsTable,
-          ServerConfig,
-          $$ServerConfigsTableFilterComposer,
-          $$ServerConfigsTableOrderingComposer,
-          $$ServerConfigsTableAnnotationComposer,
-          $$ServerConfigsTableCreateCompanionBuilder,
-          $$ServerConfigsTableUpdateCompanionBuilder,
+          $PairedDevicesTable,
+          PairedDevice,
+          $$PairedDevicesTableFilterComposer,
+          $$PairedDevicesTableOrderingComposer,
+          $$PairedDevicesTableAnnotationComposer,
+          $$PairedDevicesTableCreateCompanionBuilder,
+          $$PairedDevicesTableUpdateCompanionBuilder,
           (
-            ServerConfig,
-            BaseReferences<_$AppDatabase, $ServerConfigsTable, ServerConfig>,
+            PairedDevice,
+            BaseReferences<_$AppDatabase, $PairedDevicesTable, PairedDevice>,
           ),
-          ServerConfig,
+          PairedDevice,
           PrefetchHooks Function()
         > {
-  $$ServerConfigsTableTableManager(_$AppDatabase db, $ServerConfigsTable table)
+  $$PairedDevicesTableTableManager(_$AppDatabase db, $PairedDevicesTable table)
     : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$ServerConfigsTableFilterComposer($db: db, $table: table),
+              $$PairedDevicesTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$ServerConfigsTableOrderingComposer($db: db, $table: table),
+              $$PairedDevicesTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$ServerConfigsTableAnnotationComposer($db: db, $table: table),
+              $$PairedDevicesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<String> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<String> scheme = const Value.absent(),
-                Value<String> host = const Value.absent(),
-                Value<String> token = const Value.absent(),
-                Value<String?> preferredAuthMethodId = const Value.absent(),
-                Value<String> type = const Value.absent(),
+                Value<String> code = const Value.absent(),
+                Value<String> deviceName = const Value.absent(),
+                Value<double> pairedAt = const Value.absent(),
+                Value<double> lastConnectedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => ServerConfigsCompanion(
-                id: id,
-                name: name,
-                scheme: scheme,
-                host: host,
-                token: token,
-                preferredAuthMethodId: preferredAuthMethodId,
-                type: type,
+              }) => PairedDevicesCompanion(
+                code: code,
+                deviceName: deviceName,
+                pairedAt: pairedAt,
+                lastConnectedAt: lastConnectedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                required String id,
-                required String name,
-                required String scheme,
-                required String host,
-                required String token,
-                Value<String?> preferredAuthMethodId = const Value.absent(),
-                required String type,
+                required String code,
+                required String deviceName,
+                required double pairedAt,
+                required double lastConnectedAt,
                 Value<int> rowid = const Value.absent(),
-              }) => ServerConfigsCompanion.insert(
-                id: id,
-                name: name,
-                scheme: scheme,
-                host: host,
-                token: token,
-                preferredAuthMethodId: preferredAuthMethodId,
-                type: type,
+              }) => PairedDevicesCompanion.insert(
+                code: code,
+                deviceName: deviceName,
+                pairedAt: pairedAt,
+                lastConnectedAt: lastConnectedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -2479,509 +1556,39 @@ class $$ServerConfigsTableTableManager
       );
 }
 
-typedef $$ServerConfigsTableProcessedTableManager =
+typedef $$PairedDevicesTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $ServerConfigsTable,
-      ServerConfig,
-      $$ServerConfigsTableFilterComposer,
-      $$ServerConfigsTableOrderingComposer,
-      $$ServerConfigsTableAnnotationComposer,
-      $$ServerConfigsTableCreateCompanionBuilder,
-      $$ServerConfigsTableUpdateCompanionBuilder,
+      $PairedDevicesTable,
+      PairedDevice,
+      $$PairedDevicesTableFilterComposer,
+      $$PairedDevicesTableOrderingComposer,
+      $$PairedDevicesTableAnnotationComposer,
+      $$PairedDevicesTableCreateCompanionBuilder,
+      $$PairedDevicesTableUpdateCompanionBuilder,
       (
-        ServerConfig,
-        BaseReferences<_$AppDatabase, $ServerConfigsTable, ServerConfig>,
+        PairedDevice,
+        BaseReferences<_$AppDatabase, $PairedDevicesTable, PairedDevice>,
       ),
-      ServerConfig,
-      PrefetchHooks Function()
-    >;
-typedef $$GatewaySourcesTableCreateCompanionBuilder =
-    GatewaySourcesCompanion Function({
-      required String id,
-      required String name,
-      required String scheme,
-      required String host,
-      required String gatewayCredential,
-      Value<DateTime?> gatewayCredentialExpiresAt,
-      Value<String?> gatewayRemoteMode,
-      Value<int> rowid,
-    });
-typedef $$GatewaySourcesTableUpdateCompanionBuilder =
-    GatewaySourcesCompanion Function({
-      Value<String> id,
-      Value<String> name,
-      Value<String> scheme,
-      Value<String> host,
-      Value<String> gatewayCredential,
-      Value<DateTime?> gatewayCredentialExpiresAt,
-      Value<String?> gatewayRemoteMode,
-      Value<int> rowid,
-    });
-
-class $$GatewaySourcesTableFilterComposer
-    extends Composer<_$AppDatabase, $GatewaySourcesTable> {
-  $$GatewaySourcesTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get scheme => $composableBuilder(
-    column: $table.scheme,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get host => $composableBuilder(
-    column: $table.host,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get gatewayCredential => $composableBuilder(
-    column: $table.gatewayCredential,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get gatewayCredentialExpiresAt => $composableBuilder(
-    column: $table.gatewayCredentialExpiresAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get gatewayRemoteMode => $composableBuilder(
-    column: $table.gatewayRemoteMode,
-    builder: (column) => ColumnFilters(column),
-  );
-}
-
-class $$GatewaySourcesTableOrderingComposer
-    extends Composer<_$AppDatabase, $GatewaySourcesTable> {
-  $$GatewaySourcesTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get scheme => $composableBuilder(
-    column: $table.scheme,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get host => $composableBuilder(
-    column: $table.host,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get gatewayCredential => $composableBuilder(
-    column: $table.gatewayCredential,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get gatewayCredentialExpiresAt =>
-      $composableBuilder(
-        column: $table.gatewayCredentialExpiresAt,
-        builder: (column) => ColumnOrderings(column),
-      );
-
-  ColumnOrderings<String> get gatewayRemoteMode => $composableBuilder(
-    column: $table.gatewayRemoteMode,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $$GatewaySourcesTableAnnotationComposer
-    extends Composer<_$AppDatabase, $GatewaySourcesTable> {
-  $$GatewaySourcesTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<String> get scheme =>
-      $composableBuilder(column: $table.scheme, builder: (column) => column);
-
-  GeneratedColumn<String> get host =>
-      $composableBuilder(column: $table.host, builder: (column) => column);
-
-  GeneratedColumn<String> get gatewayCredential => $composableBuilder(
-    column: $table.gatewayCredential,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<DateTime> get gatewayCredentialExpiresAt =>
-      $composableBuilder(
-        column: $table.gatewayCredentialExpiresAt,
-        builder: (column) => column,
-      );
-
-  GeneratedColumn<String> get gatewayRemoteMode => $composableBuilder(
-    column: $table.gatewayRemoteMode,
-    builder: (column) => column,
-  );
-}
-
-class $$GatewaySourcesTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $GatewaySourcesTable,
-          GatewaySource,
-          $$GatewaySourcesTableFilterComposer,
-          $$GatewaySourcesTableOrderingComposer,
-          $$GatewaySourcesTableAnnotationComposer,
-          $$GatewaySourcesTableCreateCompanionBuilder,
-          $$GatewaySourcesTableUpdateCompanionBuilder,
-          (
-            GatewaySource,
-            BaseReferences<_$AppDatabase, $GatewaySourcesTable, GatewaySource>,
-          ),
-          GatewaySource,
-          PrefetchHooks Function()
-        > {
-  $$GatewaySourcesTableTableManager(
-    _$AppDatabase db,
-    $GatewaySourcesTable table,
-  ) : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$GatewaySourcesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$GatewaySourcesTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$GatewaySourcesTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<String> scheme = const Value.absent(),
-                Value<String> host = const Value.absent(),
-                Value<String> gatewayCredential = const Value.absent(),
-                Value<DateTime?> gatewayCredentialExpiresAt =
-                    const Value.absent(),
-                Value<String?> gatewayRemoteMode = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => GatewaySourcesCompanion(
-                id: id,
-                name: name,
-                scheme: scheme,
-                host: host,
-                gatewayCredential: gatewayCredential,
-                gatewayCredentialExpiresAt: gatewayCredentialExpiresAt,
-                gatewayRemoteMode: gatewayRemoteMode,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String name,
-                required String scheme,
-                required String host,
-                required String gatewayCredential,
-                Value<DateTime?> gatewayCredentialExpiresAt =
-                    const Value.absent(),
-                Value<String?> gatewayRemoteMode = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => GatewaySourcesCompanion.insert(
-                id: id,
-                name: name,
-                scheme: scheme,
-                host: host,
-                gatewayCredential: gatewayCredential,
-                gatewayCredentialExpiresAt: gatewayCredentialExpiresAt,
-                gatewayRemoteMode: gatewayRemoteMode,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $$GatewaySourcesTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $GatewaySourcesTable,
-      GatewaySource,
-      $$GatewaySourcesTableFilterComposer,
-      $$GatewaySourcesTableOrderingComposer,
-      $$GatewaySourcesTableAnnotationComposer,
-      $$GatewaySourcesTableCreateCompanionBuilder,
-      $$GatewaySourcesTableUpdateCompanionBuilder,
-      (
-        GatewaySource,
-        BaseReferences<_$AppDatabase, $GatewaySourcesTable, GatewaySource>,
-      ),
-      GatewaySource,
-      PrefetchHooks Function()
-    >;
-typedef $$GatewayAgentBindingsTableCreateCompanionBuilder =
-    GatewayAgentBindingsCompanion Function({
-      required String id,
-      required String name,
-      required String gatewaySourceId,
-      required String agentId,
-      Value<String?> preferredAuthMethodId,
-      Value<int> rowid,
-    });
-typedef $$GatewayAgentBindingsTableUpdateCompanionBuilder =
-    GatewayAgentBindingsCompanion Function({
-      Value<String> id,
-      Value<String> name,
-      Value<String> gatewaySourceId,
-      Value<String> agentId,
-      Value<String?> preferredAuthMethodId,
-      Value<int> rowid,
-    });
-
-class $$GatewayAgentBindingsTableFilterComposer
-    extends Composer<_$AppDatabase, $GatewayAgentBindingsTable> {
-  $$GatewayAgentBindingsTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get gatewaySourceId => $composableBuilder(
-    column: $table.gatewaySourceId,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get agentId => $composableBuilder(
-    column: $table.agentId,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get preferredAuthMethodId => $composableBuilder(
-    column: $table.preferredAuthMethodId,
-    builder: (column) => ColumnFilters(column),
-  );
-}
-
-class $$GatewayAgentBindingsTableOrderingComposer
-    extends Composer<_$AppDatabase, $GatewayAgentBindingsTable> {
-  $$GatewayAgentBindingsTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get gatewaySourceId => $composableBuilder(
-    column: $table.gatewaySourceId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get agentId => $composableBuilder(
-    column: $table.agentId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get preferredAuthMethodId => $composableBuilder(
-    column: $table.preferredAuthMethodId,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $$GatewayAgentBindingsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $GatewayAgentBindingsTable> {
-  $$GatewayAgentBindingsTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<String> get gatewaySourceId => $composableBuilder(
-    column: $table.gatewaySourceId,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get agentId =>
-      $composableBuilder(column: $table.agentId, builder: (column) => column);
-
-  GeneratedColumn<String> get preferredAuthMethodId => $composableBuilder(
-    column: $table.preferredAuthMethodId,
-    builder: (column) => column,
-  );
-}
-
-class $$GatewayAgentBindingsTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $GatewayAgentBindingsTable,
-          GatewayAgentBinding,
-          $$GatewayAgentBindingsTableFilterComposer,
-          $$GatewayAgentBindingsTableOrderingComposer,
-          $$GatewayAgentBindingsTableAnnotationComposer,
-          $$GatewayAgentBindingsTableCreateCompanionBuilder,
-          $$GatewayAgentBindingsTableUpdateCompanionBuilder,
-          (
-            GatewayAgentBinding,
-            BaseReferences<
-              _$AppDatabase,
-              $GatewayAgentBindingsTable,
-              GatewayAgentBinding
-            >,
-          ),
-          GatewayAgentBinding,
-          PrefetchHooks Function()
-        > {
-  $$GatewayAgentBindingsTableTableManager(
-    _$AppDatabase db,
-    $GatewayAgentBindingsTable table,
-  ) : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$GatewayAgentBindingsTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$GatewayAgentBindingsTableOrderingComposer(
-                $db: db,
-                $table: table,
-              ),
-          createComputedFieldComposer: () =>
-              $$GatewayAgentBindingsTableAnnotationComposer(
-                $db: db,
-                $table: table,
-              ),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<String> gatewaySourceId = const Value.absent(),
-                Value<String> agentId = const Value.absent(),
-                Value<String?> preferredAuthMethodId = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => GatewayAgentBindingsCompanion(
-                id: id,
-                name: name,
-                gatewaySourceId: gatewaySourceId,
-                agentId: agentId,
-                preferredAuthMethodId: preferredAuthMethodId,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String name,
-                required String gatewaySourceId,
-                required String agentId,
-                Value<String?> preferredAuthMethodId = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => GatewayAgentBindingsCompanion.insert(
-                id: id,
-                name: name,
-                gatewaySourceId: gatewaySourceId,
-                agentId: agentId,
-                preferredAuthMethodId: preferredAuthMethodId,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $$GatewayAgentBindingsTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $GatewayAgentBindingsTable,
-      GatewayAgentBinding,
-      $$GatewayAgentBindingsTableFilterComposer,
-      $$GatewayAgentBindingsTableOrderingComposer,
-      $$GatewayAgentBindingsTableAnnotationComposer,
-      $$GatewayAgentBindingsTableCreateCompanionBuilder,
-      $$GatewayAgentBindingsTableUpdateCompanionBuilder,
-      (
-        GatewayAgentBinding,
-        BaseReferences<
-          _$AppDatabase,
-          $GatewayAgentBindingsTable,
-          GatewayAgentBinding
-        >,
-      ),
-      GatewayAgentBinding,
+      PairedDevice,
       PrefetchHooks Function()
     >;
 typedef $$SessionCacheTableCreateCompanionBuilder =
     SessionCacheCompanion Function({
       required String id,
-      required String serverId,
+      required String deviceCode,
       Value<String?> title,
-      Value<String?> cwd,
-      Value<int?> updatedAt,
+      required String cwd,
+      required double updatedAt,
       Value<int> rowid,
     });
 typedef $$SessionCacheTableUpdateCompanionBuilder =
     SessionCacheCompanion Function({
       Value<String> id,
-      Value<String> serverId,
+      Value<String> deviceCode,
       Value<String?> title,
-      Value<String?> cwd,
-      Value<int?> updatedAt,
+      Value<String> cwd,
+      Value<double> updatedAt,
       Value<int> rowid,
     });
 
@@ -2999,8 +1606,8 @@ class $$SessionCacheTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get serverId => $composableBuilder(
-    column: $table.serverId,
+  ColumnFilters<String> get deviceCode => $composableBuilder(
+    column: $table.deviceCode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3014,7 +1621,7 @@ class $$SessionCacheTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get updatedAt => $composableBuilder(
+  ColumnFilters<double> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
@@ -3034,8 +1641,8 @@ class $$SessionCacheTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get serverId => $composableBuilder(
-    column: $table.serverId,
+  ColumnOrderings<String> get deviceCode => $composableBuilder(
+    column: $table.deviceCode,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3049,7 +1656,7 @@ class $$SessionCacheTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get updatedAt => $composableBuilder(
+  ColumnOrderings<double> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
@@ -3067,8 +1674,10 @@ class $$SessionCacheTableAnnotationComposer
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<String> get serverId =>
-      $composableBuilder(column: $table.serverId, builder: (column) => column);
+  GeneratedColumn<String> get deviceCode => $composableBuilder(
+    column: $table.deviceCode,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
@@ -3076,7 +1685,7 @@ class $$SessionCacheTableAnnotationComposer
   GeneratedColumn<String> get cwd =>
       $composableBuilder(column: $table.cwd, builder: (column) => column);
 
-  GeneratedColumn<int> get updatedAt =>
+  GeneratedColumn<double> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
@@ -3112,14 +1721,14 @@ class $$SessionCacheTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
-                Value<String> serverId = const Value.absent(),
+                Value<String> deviceCode = const Value.absent(),
                 Value<String?> title = const Value.absent(),
-                Value<String?> cwd = const Value.absent(),
-                Value<int?> updatedAt = const Value.absent(),
+                Value<String> cwd = const Value.absent(),
+                Value<double> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SessionCacheCompanion(
                 id: id,
-                serverId: serverId,
+                deviceCode: deviceCode,
                 title: title,
                 cwd: cwd,
                 updatedAt: updatedAt,
@@ -3128,14 +1737,14 @@ class $$SessionCacheTableTableManager
           createCompanionCallback:
               ({
                 required String id,
-                required String serverId,
+                required String deviceCode,
                 Value<String?> title = const Value.absent(),
-                Value<String?> cwd = const Value.absent(),
-                Value<int?> updatedAt = const Value.absent(),
+                required String cwd,
+                required double updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => SessionCacheCompanion.insert(
                 id: id,
-                serverId: serverId,
+                deviceCode: deviceCode,
                 title: title,
                 cwd: cwd,
                 updatedAt: updatedAt,
@@ -3166,16 +1775,258 @@ typedef $$SessionCacheTableProcessedTableManager =
       SessionCacheData,
       PrefetchHooks Function()
     >;
+typedef $$ChatMessagesTableCreateCompanionBuilder =
+    ChatMessagesCompanion Function({
+      required String id,
+      required String sessionId,
+      required String role,
+      required String content,
+      Value<String?> segmentsJson,
+      required int isStreaming,
+      required double createdAt,
+      Value<int> rowid,
+    });
+typedef $$ChatMessagesTableUpdateCompanionBuilder =
+    ChatMessagesCompanion Function({
+      Value<String> id,
+      Value<String> sessionId,
+      Value<String> role,
+      Value<String> content,
+      Value<String?> segmentsJson,
+      Value<int> isStreaming,
+      Value<double> createdAt,
+      Value<int> rowid,
+    });
+
+class $$ChatMessagesTableFilterComposer
+    extends Composer<_$AppDatabase, $ChatMessagesTable> {
+  $$ChatMessagesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get segmentsJson => $composableBuilder(
+    column: $table.segmentsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get isStreaming => $composableBuilder(
+    column: $table.isStreaming,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ChatMessagesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ChatMessagesTable> {
+  $$ChatMessagesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get segmentsJson => $composableBuilder(
+    column: $table.segmentsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get isStreaming => $composableBuilder(
+    column: $table.isStreaming,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ChatMessagesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ChatMessagesTable> {
+  $$ChatMessagesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get segmentsJson => $composableBuilder(
+    column: $table.segmentsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get isStreaming => $composableBuilder(
+    column: $table.isStreaming,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$ChatMessagesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ChatMessagesTable,
+          ChatMessage,
+          $$ChatMessagesTableFilterComposer,
+          $$ChatMessagesTableOrderingComposer,
+          $$ChatMessagesTableAnnotationComposer,
+          $$ChatMessagesTableCreateCompanionBuilder,
+          $$ChatMessagesTableUpdateCompanionBuilder,
+          (
+            ChatMessage,
+            BaseReferences<_$AppDatabase, $ChatMessagesTable, ChatMessage>,
+          ),
+          ChatMessage,
+          PrefetchHooks Function()
+        > {
+  $$ChatMessagesTableTableManager(_$AppDatabase db, $ChatMessagesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ChatMessagesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ChatMessagesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ChatMessagesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> sessionId = const Value.absent(),
+                Value<String> role = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<String?> segmentsJson = const Value.absent(),
+                Value<int> isStreaming = const Value.absent(),
+                Value<double> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ChatMessagesCompanion(
+                id: id,
+                sessionId: sessionId,
+                role: role,
+                content: content,
+                segmentsJson: segmentsJson,
+                isStreaming: isStreaming,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String sessionId,
+                required String role,
+                required String content,
+                Value<String?> segmentsJson = const Value.absent(),
+                required int isStreaming,
+                required double createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ChatMessagesCompanion.insert(
+                id: id,
+                sessionId: sessionId,
+                role: role,
+                content: content,
+                segmentsJson: segmentsJson,
+                isStreaming: isStreaming,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ChatMessagesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ChatMessagesTable,
+      ChatMessage,
+      $$ChatMessagesTableFilterComposer,
+      $$ChatMessagesTableOrderingComposer,
+      $$ChatMessagesTableAnnotationComposer,
+      $$ChatMessagesTableCreateCompanionBuilder,
+      $$ChatMessagesTableUpdateCompanionBuilder,
+      (
+        ChatMessage,
+        BaseReferences<_$AppDatabase, $ChatMessagesTable, ChatMessage>,
+      ),
+      ChatMessage,
+      PrefetchHooks Function()
+    >;
 typedef $$SessionSettingsTableCreateCompanionBuilder =
     SessionSettingsCompanion Function({
       required String targetId,
-      Value<String?> cwd,
+      required String cwd,
       Value<int> rowid,
     });
 typedef $$SessionSettingsTableUpdateCompanionBuilder =
     SessionSettingsCompanion Function({
       Value<String> targetId,
-      Value<String?> cwd,
+      Value<String> cwd,
       Value<int> rowid,
     });
 
@@ -3273,7 +2124,7 @@ class $$SessionSettingsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> targetId = const Value.absent(),
-                Value<String?> cwd = const Value.absent(),
+                Value<String> cwd = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SessionSettingsCompanion(
                 targetId: targetId,
@@ -3283,7 +2134,7 @@ class $$SessionSettingsTableTableManager
           createCompanionCallback:
               ({
                 required String targetId,
-                Value<String?> cwd = const Value.absent(),
+                required String cwd,
                 Value<int> rowid = const Value.absent(),
               }) => SessionSettingsCompanion.insert(
                 targetId: targetId,
@@ -3315,203 +2166,16 @@ typedef $$SessionSettingsTableProcessedTableManager =
       SessionSetting,
       PrefetchHooks Function()
     >;
-typedef $$ChatMessagesTableCreateCompanionBuilder =
-    ChatMessagesCompanion Function({
-      required String id,
-      required String sessionId,
-      required String messageJson,
-      required int createdAt,
-      Value<int> rowid,
-    });
-typedef $$ChatMessagesTableUpdateCompanionBuilder =
-    ChatMessagesCompanion Function({
-      Value<String> id,
-      Value<String> sessionId,
-      Value<String> messageJson,
-      Value<int> createdAt,
-      Value<int> rowid,
-    });
-
-class $$ChatMessagesTableFilterComposer
-    extends Composer<_$AppDatabase, $ChatMessagesTable> {
-  $$ChatMessagesTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get sessionId => $composableBuilder(
-    column: $table.sessionId,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get messageJson => $composableBuilder(
-    column: $table.messageJson,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
-}
-
-class $$ChatMessagesTableOrderingComposer
-    extends Composer<_$AppDatabase, $ChatMessagesTable> {
-  $$ChatMessagesTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get sessionId => $composableBuilder(
-    column: $table.sessionId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get messageJson => $composableBuilder(
-    column: $table.messageJson,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-}
-
-class $$ChatMessagesTableAnnotationComposer
-    extends Composer<_$AppDatabase, $ChatMessagesTable> {
-  $$ChatMessagesTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get sessionId =>
-      $composableBuilder(column: $table.sessionId, builder: (column) => column);
-
-  GeneratedColumn<String> get messageJson => $composableBuilder(
-    column: $table.messageJson,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-}
-
-class $$ChatMessagesTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $ChatMessagesTable,
-          ChatMessage,
-          $$ChatMessagesTableFilterComposer,
-          $$ChatMessagesTableOrderingComposer,
-          $$ChatMessagesTableAnnotationComposer,
-          $$ChatMessagesTableCreateCompanionBuilder,
-          $$ChatMessagesTableUpdateCompanionBuilder,
-          (
-            ChatMessage,
-            BaseReferences<_$AppDatabase, $ChatMessagesTable, ChatMessage>,
-          ),
-          ChatMessage,
-          PrefetchHooks Function()
-        > {
-  $$ChatMessagesTableTableManager(_$AppDatabase db, $ChatMessagesTable table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$ChatMessagesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$ChatMessagesTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$ChatMessagesTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> sessionId = const Value.absent(),
-                Value<String> messageJson = const Value.absent(),
-                Value<int> createdAt = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => ChatMessagesCompanion(
-                id: id,
-                sessionId: sessionId,
-                messageJson: messageJson,
-                createdAt: createdAt,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String sessionId,
-                required String messageJson,
-                required int createdAt,
-                Value<int> rowid = const Value.absent(),
-              }) => ChatMessagesCompanion.insert(
-                id: id,
-                sessionId: sessionId,
-                messageJson: messageJson,
-                createdAt: createdAt,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: null,
-        ),
-      );
-}
-
-typedef $$ChatMessagesTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $ChatMessagesTable,
-      ChatMessage,
-      $$ChatMessagesTableFilterComposer,
-      $$ChatMessagesTableOrderingComposer,
-      $$ChatMessagesTableAnnotationComposer,
-      $$ChatMessagesTableCreateCompanionBuilder,
-      $$ChatMessagesTableUpdateCompanionBuilder,
-      (
-        ChatMessage,
-        BaseReferences<_$AppDatabase, $ChatMessagesTable, ChatMessage>,
-      ),
-      ChatMessage,
-      PrefetchHooks Function()
-    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
-  $$ServerConfigsTableTableManager get serverConfigs =>
-      $$ServerConfigsTableTableManager(_db, _db.serverConfigs);
-  $$GatewaySourcesTableTableManager get gatewaySources =>
-      $$GatewaySourcesTableTableManager(_db, _db.gatewaySources);
-  $$GatewayAgentBindingsTableTableManager get gatewayAgentBindings =>
-      $$GatewayAgentBindingsTableTableManager(_db, _db.gatewayAgentBindings);
+  $$PairedDevicesTableTableManager get pairedDevices =>
+      $$PairedDevicesTableTableManager(_db, _db.pairedDevices);
   $$SessionCacheTableTableManager get sessionCache =>
       $$SessionCacheTableTableManager(_db, _db.sessionCache);
-  $$SessionSettingsTableTableManager get sessionSettings =>
-      $$SessionSettingsTableTableManager(_db, _db.sessionSettings);
   $$ChatMessagesTableTableManager get chatMessages =>
       $$ChatMessagesTableTableManager(_db, _db.chatMessages);
+  $$SessionSettingsTableTableManager get sessionSettings =>
+      $$SessionSettingsTableTableManager(_db, _db.sessionSettings);
 }

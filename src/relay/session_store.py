@@ -25,6 +25,12 @@ class SessionStore:
     def set_daemon_id(self, daemon_id: str):
         self._daemon_id = daemon_id
 
+    def get_daemon_id(self) -> str:
+        return self._daemon_id
+
+    def clear_daemon_id(self):
+        self._daemon_id = ""
+
     def register(self, session_id: str, client_id: str = "", name: str = "") -> None:
         now = time.time()
         display_name = name or f"Session {time.strftime('%H:%M')}"

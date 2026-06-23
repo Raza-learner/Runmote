@@ -26,8 +26,6 @@ mixin _$ChatMessage {
   String get content => throw _privateConstructorUsedError;
   List<AssistantSegment> get segments => throw _privateConstructorUsedError;
   bool get isStreaming => throw _privateConstructorUsedError;
-  bool get isError => throw _privateConstructorUsedError;
-  List<ChatImageData> get images => throw _privateConstructorUsedError;
   int get createdAt => throw _privateConstructorUsedError;
 
   /// Serializes this ChatMessage to a JSON map.
@@ -53,8 +51,6 @@ abstract class $ChatMessageCopyWith<$Res> {
     String content,
     List<AssistantSegment> segments,
     bool isStreaming,
-    bool isError,
-    List<ChatImageData> images,
     int createdAt,
   });
 }
@@ -79,8 +75,6 @@ class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
     Object? content = null,
     Object? segments = null,
     Object? isStreaming = null,
-    Object? isError = null,
-    Object? images = null,
     Object? createdAt = null,
   }) {
     return _then(
@@ -105,14 +99,6 @@ class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
                 ? _value.isStreaming
                 : isStreaming // ignore: cast_nullable_to_non_nullable
                       as bool,
-            isError: null == isError
-                ? _value.isError
-                : isError // ignore: cast_nullable_to_non_nullable
-                      as bool,
-            images: null == images
-                ? _value.images
-                : images // ignore: cast_nullable_to_non_nullable
-                      as List<ChatImageData>,
             createdAt: null == createdAt
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
@@ -138,8 +124,6 @@ abstract class _$$ChatMessageImplCopyWith<$Res>
     String content,
     List<AssistantSegment> segments,
     bool isStreaming,
-    bool isError,
-    List<ChatImageData> images,
     int createdAt,
   });
 }
@@ -163,8 +147,6 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
     Object? content = null,
     Object? segments = null,
     Object? isStreaming = null,
-    Object? isError = null,
-    Object? images = null,
     Object? createdAt = null,
   }) {
     return _then(
@@ -189,14 +171,6 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
             ? _value.isStreaming
             : isStreaming // ignore: cast_nullable_to_non_nullable
                   as bool,
-        isError: null == isError
-            ? _value.isError
-            : isError // ignore: cast_nullable_to_non_nullable
-                  as bool,
-        images: null == images
-            ? _value._images
-            : images // ignore: cast_nullable_to_non_nullable
-                  as List<ChatImageData>,
         createdAt: null == createdAt
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
@@ -210,28 +184,22 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$ChatMessageImpl implements _ChatMessage {
   const _$ChatMessageImpl({
-    this.id = '',
-    this.role = ChatMessageRole.user,
-    this.content = '',
-    final List<AssistantSegment> segments = const <AssistantSegment>[],
+    required this.id,
+    required this.role,
+    required this.content,
+    final List<AssistantSegment> segments = const [],
     this.isStreaming = false,
-    this.isError = false,
-    final List<ChatImageData> images = const <ChatImageData>[],
-    this.createdAt = 0,
-  }) : _segments = segments,
-       _images = images;
+    required this.createdAt,
+  }) : _segments = segments;
 
   factory _$ChatMessageImpl.fromJson(Map<String, dynamic> json) =>
       _$$ChatMessageImplFromJson(json);
 
   @override
-  @JsonKey()
   final String id;
   @override
-  @JsonKey()
   final ChatMessageRole role;
   @override
-  @JsonKey()
   final String content;
   final List<AssistantSegment> _segments;
   @override
@@ -246,24 +214,11 @@ class _$ChatMessageImpl implements _ChatMessage {
   @JsonKey()
   final bool isStreaming;
   @override
-  @JsonKey()
-  final bool isError;
-  final List<ChatImageData> _images;
-  @override
-  @JsonKey()
-  List<ChatImageData> get images {
-    if (_images is EqualUnmodifiableListView) return _images;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_images);
-  }
-
-  @override
-  @JsonKey()
   final int createdAt;
 
   @override
   String toString() {
-    return 'ChatMessage(id: $id, role: $role, content: $content, segments: $segments, isStreaming: $isStreaming, isError: $isError, images: $images, createdAt: $createdAt)';
+    return 'ChatMessage(id: $id, role: $role, content: $content, segments: $segments, isStreaming: $isStreaming, createdAt: $createdAt)';
   }
 
   @override
@@ -277,8 +232,6 @@ class _$ChatMessageImpl implements _ChatMessage {
             const DeepCollectionEquality().equals(other._segments, _segments) &&
             (identical(other.isStreaming, isStreaming) ||
                 other.isStreaming == isStreaming) &&
-            (identical(other.isError, isError) || other.isError == isError) &&
-            const DeepCollectionEquality().equals(other._images, _images) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt));
   }
@@ -292,8 +245,6 @@ class _$ChatMessageImpl implements _ChatMessage {
     content,
     const DeepCollectionEquality().hash(_segments),
     isStreaming,
-    isError,
-    const DeepCollectionEquality().hash(_images),
     createdAt,
   );
 
@@ -313,14 +264,12 @@ class _$ChatMessageImpl implements _ChatMessage {
 
 abstract class _ChatMessage implements ChatMessage {
   const factory _ChatMessage({
-    final String id,
-    final ChatMessageRole role,
-    final String content,
+    required final String id,
+    required final ChatMessageRole role,
+    required final String content,
     final List<AssistantSegment> segments,
     final bool isStreaming,
-    final bool isError,
-    final List<ChatImageData> images,
-    final int createdAt,
+    required final int createdAt,
   }) = _$ChatMessageImpl;
 
   factory _ChatMessage.fromJson(Map<String, dynamic> json) =
@@ -336,10 +285,6 @@ abstract class _ChatMessage implements ChatMessage {
   List<AssistantSegment> get segments;
   @override
   bool get isStreaming;
-  @override
-  bool get isError;
-  @override
-  List<ChatImageData> get images;
   @override
   int get createdAt;
 

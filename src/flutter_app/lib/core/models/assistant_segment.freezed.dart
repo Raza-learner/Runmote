@@ -22,10 +22,9 @@ AssistantSegment _$AssistantSegmentFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$AssistantSegment {
   String get id => throw _privateConstructorUsedError;
-  AssistantSegmentKind get kind => throw _privateConstructorUsedError;
+  SegmentKind get kind => throw _privateConstructorUsedError;
   String get text => throw _privateConstructorUsedError;
-  ToolCallDisplay? get toolCall => throw _privateConstructorUsedError;
-  List<PlanEntry> get planEntries => throw _privateConstructorUsedError;
+  Map<String, dynamic> get metadata => throw _privateConstructorUsedError;
 
   /// Serializes this AssistantSegment to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -46,13 +45,10 @@ abstract class $AssistantSegmentCopyWith<$Res> {
   @useResult
   $Res call({
     String id,
-    AssistantSegmentKind kind,
+    SegmentKind kind,
     String text,
-    ToolCallDisplay? toolCall,
-    List<PlanEntry> planEntries,
+    Map<String, dynamic> metadata,
   });
-
-  $ToolCallDisplayCopyWith<$Res>? get toolCall;
 }
 
 /// @nodoc
@@ -73,8 +69,7 @@ class _$AssistantSegmentCopyWithImpl<$Res, $Val extends AssistantSegment>
     Object? id = null,
     Object? kind = null,
     Object? text = null,
-    Object? toolCall = freezed,
-    Object? planEntries = null,
+    Object? metadata = null,
   }) {
     return _then(
       _value.copyWith(
@@ -85,36 +80,18 @@ class _$AssistantSegmentCopyWithImpl<$Res, $Val extends AssistantSegment>
             kind: null == kind
                 ? _value.kind
                 : kind // ignore: cast_nullable_to_non_nullable
-                      as AssistantSegmentKind,
+                      as SegmentKind,
             text: null == text
                 ? _value.text
                 : text // ignore: cast_nullable_to_non_nullable
                       as String,
-            toolCall: freezed == toolCall
-                ? _value.toolCall
-                : toolCall // ignore: cast_nullable_to_non_nullable
-                      as ToolCallDisplay?,
-            planEntries: null == planEntries
-                ? _value.planEntries
-                : planEntries // ignore: cast_nullable_to_non_nullable
-                      as List<PlanEntry>,
+            metadata: null == metadata
+                ? _value.metadata
+                : metadata // ignore: cast_nullable_to_non_nullable
+                      as Map<String, dynamic>,
           )
           as $Val,
     );
-  }
-
-  /// Create a copy of AssistantSegment
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $ToolCallDisplayCopyWith<$Res>? get toolCall {
-    if (_value.toolCall == null) {
-      return null;
-    }
-
-    return $ToolCallDisplayCopyWith<$Res>(_value.toolCall!, (value) {
-      return _then(_value.copyWith(toolCall: value) as $Val);
-    });
   }
 }
 
@@ -129,14 +106,10 @@ abstract class _$$AssistantSegmentImplCopyWith<$Res>
   @useResult
   $Res call({
     String id,
-    AssistantSegmentKind kind,
+    SegmentKind kind,
     String text,
-    ToolCallDisplay? toolCall,
-    List<PlanEntry> planEntries,
+    Map<String, dynamic> metadata,
   });
-
-  @override
-  $ToolCallDisplayCopyWith<$Res>? get toolCall;
 }
 
 /// @nodoc
@@ -156,8 +129,7 @@ class __$$AssistantSegmentImplCopyWithImpl<$Res>
     Object? id = null,
     Object? kind = null,
     Object? text = null,
-    Object? toolCall = freezed,
-    Object? planEntries = null,
+    Object? metadata = null,
   }) {
     return _then(
       _$AssistantSegmentImpl(
@@ -168,19 +140,15 @@ class __$$AssistantSegmentImplCopyWithImpl<$Res>
         kind: null == kind
             ? _value.kind
             : kind // ignore: cast_nullable_to_non_nullable
-                  as AssistantSegmentKind,
+                  as SegmentKind,
         text: null == text
             ? _value.text
             : text // ignore: cast_nullable_to_non_nullable
                   as String,
-        toolCall: freezed == toolCall
-            ? _value.toolCall
-            : toolCall // ignore: cast_nullable_to_non_nullable
-                  as ToolCallDisplay?,
-        planEntries: null == planEntries
-            ? _value._planEntries
-            : planEntries // ignore: cast_nullable_to_non_nullable
-                  as List<PlanEntry>,
+        metadata: null == metadata
+            ? _value._metadata
+            : metadata // ignore: cast_nullable_to_non_nullable
+                  as Map<String, dynamic>,
       ),
     );
   }
@@ -190,39 +158,33 @@ class __$$AssistantSegmentImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$AssistantSegmentImpl implements _AssistantSegment {
   const _$AssistantSegmentImpl({
-    this.id = '',
-    this.kind = AssistantSegmentKind.message,
-    this.text = '',
-    this.toolCall,
-    final List<PlanEntry> planEntries = const <PlanEntry>[],
-  }) : _planEntries = planEntries;
+    required this.id,
+    required this.kind,
+    required this.text,
+    final Map<String, dynamic> metadata = const {},
+  }) : _metadata = metadata;
 
   factory _$AssistantSegmentImpl.fromJson(Map<String, dynamic> json) =>
       _$$AssistantSegmentImplFromJson(json);
 
   @override
-  @JsonKey()
   final String id;
   @override
-  @JsonKey()
-  final AssistantSegmentKind kind;
+  final SegmentKind kind;
   @override
-  @JsonKey()
   final String text;
-  @override
-  final ToolCallDisplay? toolCall;
-  final List<PlanEntry> _planEntries;
+  final Map<String, dynamic> _metadata;
   @override
   @JsonKey()
-  List<PlanEntry> get planEntries {
-    if (_planEntries is EqualUnmodifiableListView) return _planEntries;
+  Map<String, dynamic> get metadata {
+    if (_metadata is EqualUnmodifiableMapView) return _metadata;
     // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_planEntries);
+    return EqualUnmodifiableMapView(_metadata);
   }
 
   @override
   String toString() {
-    return 'AssistantSegment(id: $id, kind: $kind, text: $text, toolCall: $toolCall, planEntries: $planEntries)';
+    return 'AssistantSegment(id: $id, kind: $kind, text: $text, metadata: $metadata)';
   }
 
   @override
@@ -233,12 +195,7 @@ class _$AssistantSegmentImpl implements _AssistantSegment {
             (identical(other.id, id) || other.id == id) &&
             (identical(other.kind, kind) || other.kind == kind) &&
             (identical(other.text, text) || other.text == text) &&
-            (identical(other.toolCall, toolCall) ||
-                other.toolCall == toolCall) &&
-            const DeepCollectionEquality().equals(
-              other._planEntries,
-              _planEntries,
-            ));
+            const DeepCollectionEquality().equals(other._metadata, _metadata));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -248,8 +205,7 @@ class _$AssistantSegmentImpl implements _AssistantSegment {
     id,
     kind,
     text,
-    toolCall,
-    const DeepCollectionEquality().hash(_planEntries),
+    const DeepCollectionEquality().hash(_metadata),
   );
 
   /// Create a copy of AssistantSegment
@@ -271,11 +227,10 @@ class _$AssistantSegmentImpl implements _AssistantSegment {
 
 abstract class _AssistantSegment implements AssistantSegment {
   const factory _AssistantSegment({
-    final String id,
-    final AssistantSegmentKind kind,
-    final String text,
-    final ToolCallDisplay? toolCall,
-    final List<PlanEntry> planEntries,
+    required final String id,
+    required final SegmentKind kind,
+    required final String text,
+    final Map<String, dynamic> metadata,
   }) = _$AssistantSegmentImpl;
 
   factory _AssistantSegment.fromJson(Map<String, dynamic> json) =
@@ -284,13 +239,11 @@ abstract class _AssistantSegment implements AssistantSegment {
   @override
   String get id;
   @override
-  AssistantSegmentKind get kind;
+  SegmentKind get kind;
   @override
   String get text;
   @override
-  ToolCallDisplay? get toolCall;
-  @override
-  List<PlanEntry> get planEntries;
+  Map<String, dynamic> get metadata;
 
   /// Create a copy of AssistantSegment
   /// with the given fields replaced by the non-null parameter values.

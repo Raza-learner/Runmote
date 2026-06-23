@@ -23,7 +23,7 @@ mixin _$AcpConnectionState {
     required TResult Function() connecting,
     required TResult Function() connected,
     required TResult Function() reconnecting,
-    required TResult Function(String? errorMessage) failed,
+    required TResult Function(String error) failed,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
@@ -31,7 +31,7 @@ mixin _$AcpConnectionState {
     TResult? Function()? connecting,
     TResult? Function()? connected,
     TResult? Function()? reconnecting,
-    TResult? Function(String? errorMessage)? failed,
+    TResult? Function(String error)? failed,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
@@ -39,7 +39,7 @@ mixin _$AcpConnectionState {
     TResult Function()? connecting,
     TResult Function()? connected,
     TResult Function()? reconnecting,
-    TResult Function(String? errorMessage)? failed,
+    TResult Function(String error)? failed,
     required TResult orElse(),
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -138,7 +138,7 @@ class _$DisconnectedImpl implements Disconnected {
     required TResult Function() connecting,
     required TResult Function() connected,
     required TResult Function() reconnecting,
-    required TResult Function(String? errorMessage) failed,
+    required TResult Function(String error) failed,
   }) {
     return disconnected();
   }
@@ -150,7 +150,7 @@ class _$DisconnectedImpl implements Disconnected {
     TResult? Function()? connecting,
     TResult? Function()? connected,
     TResult? Function()? reconnecting,
-    TResult? Function(String? errorMessage)? failed,
+    TResult? Function(String error)? failed,
   }) {
     return disconnected?.call();
   }
@@ -162,7 +162,7 @@ class _$DisconnectedImpl implements Disconnected {
     TResult Function()? connecting,
     TResult Function()? connected,
     TResult Function()? reconnecting,
-    TResult Function(String? errorMessage)? failed,
+    TResult Function(String error)? failed,
     required TResult orElse(),
   }) {
     if (disconnected != null) {
@@ -263,7 +263,7 @@ class _$ConnectingImpl implements Connecting {
     required TResult Function() connecting,
     required TResult Function() connected,
     required TResult Function() reconnecting,
-    required TResult Function(String? errorMessage) failed,
+    required TResult Function(String error) failed,
   }) {
     return connecting();
   }
@@ -275,7 +275,7 @@ class _$ConnectingImpl implements Connecting {
     TResult? Function()? connecting,
     TResult? Function()? connected,
     TResult? Function()? reconnecting,
-    TResult? Function(String? errorMessage)? failed,
+    TResult? Function(String error)? failed,
   }) {
     return connecting?.call();
   }
@@ -287,7 +287,7 @@ class _$ConnectingImpl implements Connecting {
     TResult Function()? connecting,
     TResult Function()? connected,
     TResult Function()? reconnecting,
-    TResult Function(String? errorMessage)? failed,
+    TResult Function(String error)? failed,
     required TResult orElse(),
   }) {
     if (connecting != null) {
@@ -388,7 +388,7 @@ class _$ConnectedImpl implements Connected {
     required TResult Function() connecting,
     required TResult Function() connected,
     required TResult Function() reconnecting,
-    required TResult Function(String? errorMessage) failed,
+    required TResult Function(String error) failed,
   }) {
     return connected();
   }
@@ -400,7 +400,7 @@ class _$ConnectedImpl implements Connected {
     TResult? Function()? connecting,
     TResult? Function()? connected,
     TResult? Function()? reconnecting,
-    TResult? Function(String? errorMessage)? failed,
+    TResult? Function(String error)? failed,
   }) {
     return connected?.call();
   }
@@ -412,7 +412,7 @@ class _$ConnectedImpl implements Connected {
     TResult Function()? connecting,
     TResult Function()? connected,
     TResult Function()? reconnecting,
-    TResult Function(String? errorMessage)? failed,
+    TResult Function(String error)? failed,
     required TResult orElse(),
   }) {
     if (connected != null) {
@@ -513,7 +513,7 @@ class _$ReconnectingImpl implements Reconnecting {
     required TResult Function() connecting,
     required TResult Function() connected,
     required TResult Function() reconnecting,
-    required TResult Function(String? errorMessage) failed,
+    required TResult Function(String error) failed,
   }) {
     return reconnecting();
   }
@@ -525,7 +525,7 @@ class _$ReconnectingImpl implements Reconnecting {
     TResult? Function()? connecting,
     TResult? Function()? connected,
     TResult? Function()? reconnecting,
-    TResult? Function(String? errorMessage)? failed,
+    TResult? Function(String error)? failed,
   }) {
     return reconnecting?.call();
   }
@@ -537,7 +537,7 @@ class _$ReconnectingImpl implements Reconnecting {
     TResult Function()? connecting,
     TResult Function()? connected,
     TResult Function()? reconnecting,
-    TResult Function(String? errorMessage)? failed,
+    TResult Function(String error)? failed,
     required TResult orElse(),
   }) {
     if (reconnecting != null) {
@@ -598,7 +598,7 @@ abstract class _$$FailedImplCopyWith<$Res> {
     $Res Function(_$FailedImpl) then,
   ) = __$$FailedImplCopyWithImpl<$Res>;
   @useResult
-  $Res call({String? errorMessage});
+  $Res call({String error});
 }
 
 /// @nodoc
@@ -614,13 +614,13 @@ class __$$FailedImplCopyWithImpl<$Res>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? errorMessage = freezed}) {
+  $Res call({Object? error = null}) {
     return _then(
       _$FailedImpl(
-        freezed == errorMessage
-            ? _value.errorMessage
-            : errorMessage // ignore: cast_nullable_to_non_nullable
-                  as String?,
+        null == error
+            ? _value.error
+            : error // ignore: cast_nullable_to_non_nullable
+                  as String,
       ),
     );
   }
@@ -629,14 +629,14 @@ class __$$FailedImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$FailedImpl implements Failed {
-  const _$FailedImpl(this.errorMessage);
+  const _$FailedImpl(this.error);
 
   @override
-  final String? errorMessage;
+  final String error;
 
   @override
   String toString() {
-    return 'AcpConnectionState.failed(errorMessage: $errorMessage)';
+    return 'AcpConnectionState.failed(error: $error)';
   }
 
   @override
@@ -644,12 +644,11 @@ class _$FailedImpl implements Failed {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$FailedImpl &&
-            (identical(other.errorMessage, errorMessage) ||
-                other.errorMessage == errorMessage));
+            (identical(other.error, error) || other.error == error));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, errorMessage);
+  int get hashCode => Object.hash(runtimeType, error);
 
   /// Create a copy of AcpConnectionState
   /// with the given fields replaced by the non-null parameter values.
@@ -666,9 +665,9 @@ class _$FailedImpl implements Failed {
     required TResult Function() connecting,
     required TResult Function() connected,
     required TResult Function() reconnecting,
-    required TResult Function(String? errorMessage) failed,
+    required TResult Function(String error) failed,
   }) {
-    return failed(errorMessage);
+    return failed(error);
   }
 
   @override
@@ -678,9 +677,9 @@ class _$FailedImpl implements Failed {
     TResult? Function()? connecting,
     TResult? Function()? connected,
     TResult? Function()? reconnecting,
-    TResult? Function(String? errorMessage)? failed,
+    TResult? Function(String error)? failed,
   }) {
-    return failed?.call(errorMessage);
+    return failed?.call(error);
   }
 
   @override
@@ -690,11 +689,11 @@ class _$FailedImpl implements Failed {
     TResult Function()? connecting,
     TResult Function()? connected,
     TResult Function()? reconnecting,
-    TResult Function(String? errorMessage)? failed,
+    TResult Function(String error)? failed,
     required TResult orElse(),
   }) {
     if (failed != null) {
-      return failed(errorMessage);
+      return failed(error);
     }
     return orElse();
   }
@@ -741,9 +740,9 @@ class _$FailedImpl implements Failed {
 }
 
 abstract class Failed implements AcpConnectionState {
-  const factory Failed(final String? errorMessage) = _$FailedImpl;
+  const factory Failed(final String error) = _$FailedImpl;
 
-  String? get errorMessage;
+  String get error;
 
   /// Create a copy of AcpConnectionState
   /// with the given fields replaced by the non-null parameter values.

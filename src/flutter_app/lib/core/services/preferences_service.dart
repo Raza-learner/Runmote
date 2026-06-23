@@ -1,38 +1,35 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PreferencesService {
-  static const _keyRelayUrl = 'relay_url';
+  static const _keyPairingCode = 'pairing_code';
+  static const _keyDeviceName = 'device_name';
+  static const _keyDefaultCwd = 'default_cwd';
   static const _keyThemeMode = 'theme_mode';
-  static const _keyLastCwd = 'last_cwd';
-  static const _keyTelemetryEnabled = 'telemetry_enabled';
-  static const _keyConsentDismissed = 'consent_dismissed';
 
   final SharedPreferences _prefs;
 
   PreferencesService(this._prefs);
 
-  String get relayUrl => _prefs.getString(_keyRelayUrl) ?? 'ws://localhost:8000/app';
-  set relayUrl(String value) => _prefs.setString(_keyRelayUrl, value);
+  String? getPairingCode() => _prefs.getString(_keyPairingCode);
+  Future<void> setPairingCode(String code) =>
+      _prefs.setString(_keyPairingCode, code);
+  Future<void> clearPairingCode() => _prefs.remove(_keyPairingCode);
 
-  String get themeMode => _prefs.getString(_keyThemeMode) ?? 'system';
-  set themeMode(String value) => _prefs.setString(_keyThemeMode, value);
+  String? getDeviceName() => _prefs.getString(_keyDeviceName);
+  Future<void> setDeviceName(String name) =>
+      _prefs.setString(_keyDeviceName, name);
+  Future<void> clearDeviceName() => _prefs.remove(_keyDeviceName);
 
-  String? get lastCwd => _prefs.getString(_keyLastCwd);
-  set lastCwd(String? value) {
-    if (value != null) {
-      _prefs.setString(_keyLastCwd, value);
-    } else {
-      _prefs.remove(_keyLastCwd);
-    }
+  String? getDefaultCwd() => _prefs.getString(_keyDefaultCwd);
+  Future<void> setDefaultCwd(String cwd) =>
+      _prefs.setString(_keyDefaultCwd, cwd);
+
+  String getThemeMode() => _prefs.getString(_keyThemeMode) ?? 'system';
+  Future<void> setThemeMode(String mode) =>
+      _prefs.setString(_keyThemeMode, mode);
+
+  Future<void> clearAll() async {
+    await clearPairingCode();
+    await clearDeviceName();
   }
-
-  bool get telemetryEnabled =>
-      _prefs.getBool(_keyTelemetryEnabled) ?? false;
-  set telemetryEnabled(bool value) =>
-      _prefs.setBool(_keyTelemetryEnabled, value);
-
-  bool get consentDismissed =>
-      _prefs.getBool(_keyConsentDismissed) ?? false;
-  set consentDismissed(bool value) =>
-      _prefs.setBool(_keyConsentDismissed, value);
 }

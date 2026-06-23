@@ -15,12 +15,19 @@ final _privateConstructorUsedError = UnsupportedError(
   'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
 );
 
+AgentCapabilities _$AgentCapabilitiesFromJson(Map<String, dynamic> json) {
+  return _AgentCapabilities.fromJson(json);
+}
+
 /// @nodoc
 mixin _$AgentCapabilities {
   bool get canSendImages => throw _privateConstructorUsedError;
   bool get supportsEmbeddedContext => throw _privateConstructorUsedError;
   bool get supportsSessionList => throw _privateConstructorUsedError;
   bool get supportsLoadSession => throw _privateConstructorUsedError;
+
+  /// Serializes this AgentCapabilities to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
   /// Create a copy of AgentCapabilities
   /// with the given fields replaced by the non-null parameter values.
@@ -148,7 +155,7 @@ class __$$AgentCapabilitiesImplCopyWithImpl<$Res>
 }
 
 /// @nodoc
-
+@JsonSerializable()
 class _$AgentCapabilitiesImpl implements _AgentCapabilities {
   const _$AgentCapabilitiesImpl({
     this.canSendImages = false,
@@ -156,6 +163,9 @@ class _$AgentCapabilitiesImpl implements _AgentCapabilities {
     this.supportsSessionList = false,
     this.supportsLoadSession = false,
   });
+
+  factory _$AgentCapabilitiesImpl.fromJson(Map<String, dynamic> json) =>
+      _$$AgentCapabilitiesImplFromJson(json);
 
   @override
   @JsonKey()
@@ -193,6 +203,7 @@ class _$AgentCapabilitiesImpl implements _AgentCapabilities {
                 other.supportsLoadSession == supportsLoadSession));
   }
 
+  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
     runtimeType,
@@ -212,6 +223,11 @@ class _$AgentCapabilitiesImpl implements _AgentCapabilities {
         this,
         _$identity,
       );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$AgentCapabilitiesImplToJson(this);
+  }
 }
 
 abstract class _AgentCapabilities implements AgentCapabilities {
@@ -221,6 +237,9 @@ abstract class _AgentCapabilities implements AgentCapabilities {
     final bool supportsSessionList,
     final bool supportsLoadSession,
   }) = _$AgentCapabilitiesImpl;
+
+  factory _AgentCapabilities.fromJson(Map<String, dynamic> json) =
+      _$AgentCapabilitiesImpl.fromJson;
 
   @override
   bool get canSendImages;

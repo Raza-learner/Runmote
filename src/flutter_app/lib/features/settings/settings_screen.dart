@@ -1,40 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/providers/preferences_provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../core/providers/connection_provider.dart';
 import '../../core/providers/database_provider.dart';
 
-class SettingsScreen extends ConsumerStatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  late TextEditingController _relayUrlController;
-  bool _isRelayChanged = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _relayUrlController = TextEditingController();
-    _loadRelayUrl();
-  }
-
-  @override
-  void dispose() {
-    _relayUrlController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadRelayUrl() async {
-    final prefs = await ref.read(preferencesServiceProvider.future);
-    _relayUrlController.text = prefs.relayUrl;
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final connection = ref.watch(connectionProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -43,260 +21,178 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _sectionHeader('Connection', theme),
+          Text('General', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
           Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Relay URL', style: theme.textTheme.titleSmall),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _relayUrlController,
-                    decoration: InputDecoration(
-                      hintText: 'ws://localhost:8000/app',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      suffixIcon: _isRelayChanged
-                          ? IconButton(
-                              icon: Icon(Icons.check, color: theme.colorScheme.primary),
-                              onPressed: _saveRelayUrl,
-                            )
-                          : null,
-                    ),
-                    onChanged: (_) {
-                      if (!_isRelayChanged) setState(() => _isRelayChanged = true);
-                    },
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _saveRelayUrl(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          _sectionHeader('Appearance', theme),
-          Card(
-            child: _ThemeSelector(
-              onChanged: (mode) {
-                final prefs = ref.read(preferencesServiceProvider).value;
-                if (prefs != null) {
-                  prefs.themeMode = mode;
-                  ref.invalidate(preferencesServiceProvider);
-                }
-              },
-            ),
-          ),
-          const SizedBox(height: 16),
-          _sectionHeader('Privacy', theme),
-          Card(
-            child: _buildTelemetryToggle(theme),
-          ),
-          const SizedBox(height: 16),
-          _sectionHeader('Data', theme),
-          Card(
-            child: _buildClearDataButton(theme),
-          ),
-          const SizedBox(height: 16),
-          _sectionHeader('About', theme),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.smart_toy, color: theme.colorScheme.primary),
-                      const SizedBox(width: 8),
-                      Text(
-                        'ACP Remote',
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Version 2.0.0',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'A cross-platform remote client for the Anthropic Computer Protocol (ACP). '
-                    'Connect to ACP agents and gateways over a relay service.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Icon(Icons.code, size: 14, color: theme.colorScheme.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Text(
-                        'github.com/arafatamim/ferngeist-acp',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontFamily: 'monospace',
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionHeader(String title, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        title,
-        style: theme.textTheme.titleSmall?.copyWith(
-          color: theme.colorScheme.primary,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTelemetryToggle(ThemeData theme) {
-    return ref.watch(preferencesServiceProvider).when(
-      data: (prefs) => SwitchListTile(
-        title: const Text('Telemetry'),
-        subtitle: Text(
-          'Send anonymous usage data to improve the app',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        value: prefs.telemetryEnabled,
-        onChanged: (v) {
-          prefs.telemetryEnabled = v;
-          ref.invalidate(preferencesServiceProvider);
-        },
-      ),
-      loading: () => const ListTile(title: Text('Telemetry'), trailing: CircularProgressIndicator()),
-      error: (_, _) => const ListTile(title: Text('Telemetry')),
-    );
-  }
-
-  Widget _buildClearDataButton(ThemeData theme) {
-    return ListTile(
-      leading: Icon(Icons.delete_sweep, color: theme.colorScheme.error),
-      title: Text('Clear All Local Data', style: TextStyle(color: theme.colorScheme.error)),
-      subtitle: Text(
-        'Remove all servers, gateways, and sessions',
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-      onTap: _confirmClearData,
-    );
-  }
-
-  Future<void> _saveRelayUrl() async {
-    final url = _relayUrlController.text.trim();
-    if (url.isEmpty) return;
-    final prefs = await ref.read(preferencesServiceProvider.future);
-    prefs.relayUrl = url;
-    ref.invalidate(preferencesServiceProvider);
-    setState(() => _isRelayChanged = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Relay URL saved')),
-      );
-    }
-  }
-
-  Future<void> _confirmClearData() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Clear All Data'),
-        content: const Text(
-          'This will permanently delete all servers, gateways, and sessions. '
-          'This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Clear', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await _clearData();
-    }
-  }
-
-  Future<void> _clearData() async {
-    final db = ref.read(databaseProvider);
-    await db.delete(db.serverConfigs).go();
-    await db.delete(db.gatewaySources).go();
-    await db.delete(db.gatewayAgentBindings).go();
-    await db.delete(db.sessionCache).go();
-    await db.delete(db.sessionSettings).go();
-    ref.invalidate(preferencesServiceProvider);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All local data cleared')),
-      );
-    }
-  }
-}
-
-class _ThemeSelector extends StatelessWidget {
-  final ValueChanged<String> onChanged;
-
-  const _ThemeSelector({required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer(builder: (context, ref, _) {
-      final asyncPrefs = ref.watch(preferencesServiceProvider);
-      return asyncPrefs.when(
-        data: (prefs) {
-          final current = prefs.themeMode;
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Theme', style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 12),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'system', label: Text('System'), icon: Icon(Icons.settings_suggest)),
-                    ButtonSegment(value: 'light', label: Text('Light'), icon: Icon(Icons.light_mode)),
-                    ButtonSegment(value: 'dark', label: Text('Dark'), icon: Icon(Icons.dark_mode)),
-                  ],
-                  selected: {current},
-                  onSelectionChanged: (v) {
-                    final mode = v.first;
-                    prefs.themeMode = mode;
-                    ref.invalidate(preferencesServiceProvider);
-                    onChanged(mode);
-                  },
+                ListTile(
+                  title: const Text('Default working directory'),
+                  subtitle: Text(
+                    connection.pairingCode ?? '/home',
+                    style: const TextStyle(fontFamily: 'monospace'),
+                  ),
+                  trailing: const Icon(Icons.edit),
+                  onTap: () => _editDefaultCwd(context, ref),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Theme'),
+                  subtitle: const Text('System'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showThemePicker(context, ref),
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 24),
+          Text('Data', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  title: const Text('Clear local data'),
+                  subtitle: const Text(
+                      'Remove all cached messages and settings'),
+                  trailing: Icon(Icons.delete_outline,
+                      color: theme.colorScheme.error),
+                  onTap: () => _confirmClearData(context, ref),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Unpair device'),
+                  subtitle: Text(
+                    connection.pairingCode != null
+                        ? '${connection.pairingCode!.substring(0, 3)}-${connection.pairingCode!.substring(3)}'
+                        : 'Not paired',
+                  ),
+                  trailing: Icon(Icons.link_off,
+                      color: theme.colorScheme.error),
+                  onTap: () => _confirmUnpair(context, ref),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: Text(
+              'ACP Remote v2.0.0',
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editDefaultCwd(BuildContext context, WidgetRef ref) {
+    final db = ref.read(databaseProvider);
+    final controller = TextEditingController(
+      text: ref.read(connectionProvider).pairingCode ?? '/home',
+    );
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Default working directory'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: '/home/user',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              await db.setDefaultCwd(controller.text);
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showThemePicker(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Select Theme'),
+        children: ['System', 'Light', 'Dark'].map((mode) {
+          return SimpleDialogOption(
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('theme_mode', mode.toLowerCase());
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            },
+            child: Text(mode),
           );
-        },
-        loading: () => const SizedBox.shrink(),
-        error: (_, _) => const SizedBox.shrink(),
-      );
-    });
+        }).toList(),
+      ),
+    );
+  }
+
+  void _confirmClearData(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear local data?'),
+        content: const Text(
+          'This will remove all cached messages and sessions. '
+          'Your pairing will be preserved.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              ref.read(databaseProvider).clearAll();
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Local data cleared')),
+              );
+            },
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmUnpair(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Unpair device?'),
+        content: const Text(
+          'You will need to enter the pairing code again to reconnect.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              ref.read(connectionProvider.notifier).disconnect();
+              Navigator.of(ctx).pop();
+              context.go('/');
+            },
+            child: const Text('Unpair'),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -1,69 +1,170 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:drift/drift.dart';
-import 'package:uuid/uuid.dart';
-import '../models/session_summary.dart';
-import '../database/app_database.dart';
+
+import 'connection_provider.dart';
 import 'database_provider.dart';
 
-class SessionListNotifier extends StateNotifier<List<SessionSummary>> {
-  final AppDatabase _db;
-  final String _serverId;
+class AcpSession {
+  final String id;
+  final String? title;
+  final String cwd;
+  final double updatedAt;
 
-  SessionListNotifier(this._db, this._serverId) : super([]);
+  const AcpSession({
+    required this.id,
+    this.title,
+    required this.cwd,
+    required this.updatedAt,
+  });
+
+  factory AcpSession.fromJson(Map<String, dynamic> json) {
+    return AcpSession(
+      id: json['id'] as String,
+      title: json['title'] as String?,
+      cwd: json['cwd'] as String? ?? '',
+      updatedAt: (json['updatedAt'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
+class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
+  final Ref _ref;
+
+  SessionListNotifier(this._ref) : super(const AsyncValue.loading());
 
   Future<void> loadSessions() async {
-    final rows = await (_db.select(_db.sessionCache)
-          ..where((t) => t.serverId.equals(_serverId))
-          ..orderBy([(t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc)]))
-        .get();
-    state = rows
-        .map((r) => SessionSummary(
-              id: r.id,
-              title: r.title,
-              cwd: r.cwd,
-              updatedAt: r.updatedAt != null
-                  ? DateTime.fromMillisecondsSinceEpoch(r.updatedAt!)
-                  : null,
-            ))
-        .toList();
+    state = const AsyncValue.loading();
+    try {
+      final connection = _ref.read(connectionProvider);
+      if (connection.channel == null) {
+        state = const AsyncValue.data([]);
+        return;
+      }
+
+      final notifier = _ref.read(connectionProvider.notifier);
+      final db = _ref.read(databaseProvider);
+      final pairingCode = connection.pairingCode ?? '';
+
+      final completer = Completer<List<AcpSession>>();
+      int? requestId;
+      StreamSubscription<Map<String, dynamic>>? sub;
+
+      sub = notifier.messages.listen((msg) {
+        if (msg['id'] == requestId) {
+          final result = msg['result'] as Map<String, dynamic>?;
+          if (result != null) {
+            final sessions = (result['sessions'] as List<dynamic>?)
+                    ?.map((e) => AcpSession.fromJson(e as Map<String, dynamic>))
+                    .toList() ??
+                [];
+            completer.complete(sessions);
+          } else {
+            completer.complete([]);
+          }
+        }
+      });
+
+      requestId = DateTime.now().millisecondsSinceEpoch;
+      notifier.sendRaw({
+        'jsonrpc': '2.0',
+        'id': requestId,
+        'method': 'session/list',
+        'params': {},
+      });
+
+      final sessions = await completer.future.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => [],
+      );
+
+      await sub.cancel();
+
+      for (final session in sessions) {
+        await db.cacheSession(
+          id: session.id,
+          deviceCode: pairingCode,
+          title: session.title,
+          cwd: session.cwd,
+          updatedAt: session.updatedAt,
+        );
+      }
+
+      state = AsyncValue.data(sessions);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 
-  Future<SessionSummary> createSession({String? title}) async {
-    final id = const Uuid().v4();
-    final now = DateTime.now();
-    final session = SessionSummary(
-      id: id,
-      title: title ?? 'Session ${now.hour}:${now.minute.toString().padLeft(2, '0')}',
-      updatedAt: now,
-    );
-    await _db.into(_db.sessionCache).insert(
-          SessionCacheCompanion.insert(
-            id: id,
-            serverId: _serverId,
-            title: Value(session.title),
-            updatedAt: Value(now.millisecondsSinceEpoch),
-          ),
+  Future<AcpSession?> createSession(String cwd) async {
+    try {
+      final connection = _ref.read(connectionProvider);
+      if (connection.channel == null) return null;
+
+      final notifier = _ref.read(connectionProvider.notifier);
+
+      final completer = Completer<AcpSession?>();
+      int? requestId;
+      StreamSubscription<Map<String, dynamic>>? sub;
+
+      sub = notifier.messages.listen((msg) {
+        if (msg['id'] == requestId) {
+          final result = msg['result'] as Map<String, dynamic>?;
+          if (result != null) {
+            final sessionId = result['sessionId'] as String;
+            completer.complete(AcpSession(
+              id: sessionId,
+              cwd: cwd,
+              updatedAt: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            ));
+          } else {
+            completer.complete(null);
+          }
+        }
+      });
+
+      requestId = DateTime.now().millisecondsSinceEpoch;
+      notifier.sendRaw({
+        'jsonrpc': '2.0',
+        'id': requestId,
+        'method': 'session/new',
+        'params': {'cwd': cwd},
+      });
+
+      final session = await completer.future.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => null,
+      );
+
+      await sub.cancel();
+
+      if (session != null) {
+        final db = _ref.read(databaseProvider);
+        await db.cacheSession(
+          id: session.id,
+          deviceCode: connection.pairingCode ?? '',
+          title: session.title,
+          cwd: session.cwd,
+          updatedAt: session.updatedAt,
         );
-    await loadSessions();
-    return session;
+        await loadSessions();
+      }
+
+      return session;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> deleteSession(String id) async {
-    await (_db.delete(_db.sessionCache)..where((t) => t.id.equals(id))).go();
-    await loadSessions();
-  }
-
-  Future<void> renameSession(String id, String title) async {
-    await (_db.update(_db.sessionCache)..where((t) => t.id.equals(id)))
-        .write(SessionCacheCompanion(title: Value(title)));
+    final db = _ref.read(databaseProvider);
+    await db.removeCachedSession(id);
     await loadSessions();
   }
 }
 
 final sessionListProvider =
-    StateNotifierProvider.family<SessionListNotifier, List<SessionSummary>, String>(
-  (ref, serverId) {
-    final db = ref.watch(databaseProvider);
-    return SessionListNotifier(db, serverId);
-  },
-);
+    StateNotifierProvider<SessionListNotifier, AsyncValue<List<AcpSession>>>(
+        (ref) {
+  return SessionListNotifier(ref);
+});

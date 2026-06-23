@@ -1,144 +1,149 @@
+import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-import 'package:drift/drift.dart';
+
+import '../../core/database/app_database.dart' as db;
 import '../../core/models/chat_message.dart';
 import '../../core/models/assistant_segment.dart';
 import '../../core/providers/connection_provider.dart';
 import '../../core/providers/database_provider.dart';
-import '../../core/database/app_database.dart' hide ChatMessage;
 
-final chatProvider =
-    StateNotifierProvider.family<ChatNotifier, List<ChatMessage>, String>(
-  (ref, sessionId) => ChatNotifier(ref, sessionId),
-);
-
-class ChatNotifier extends StateNotifier<List<ChatMessage>> {
+class ChatNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> {
   final Ref _ref;
   final String _sessionId;
+  final _uuid = const Uuid();
+  StreamSubscription<Map<String, dynamic>>? _sub;
 
-  ChatNotifier(this._ref, this._sessionId) : super([]) {
-    _loadFromDb();
+  ChatNotifier(this._ref, this._sessionId)
+      : super(const AsyncValue.loading()) {
+    _loadMessages();
+    _listenToRelay();
   }
 
-  Future<void> _loadFromDb() async {
+  Future<void> _loadMessages() async {
     try {
       final db = _ref.read(databaseProvider);
-      final rows = await (db.select(db.chatMessages)
-            ..where((t) => t.sessionId.equals(_sessionId))
-            ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc)]))
-          .get();
-      state = rows
-          .map((r) => ChatMessage.fromJson(
-              jsonDecode(r.messageJson) as Map<String, dynamic>))
-          .toList();
-    } catch (_) {}
+      final rows = await db.getMessages(_sessionId);
+      final messages = rows.map(_dbRowToMessage).toList();
+      state = AsyncValue.data(messages);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 
-  Future<void> _saveMessage(ChatMessage msg) async {
-    try {
-      final db = _ref.read(databaseProvider);
-      await db.into(db.chatMessages).insert(
-            ChatMessagesCompanion.insert(
-              id: msg.id,
-              sessionId: _sessionId,
-              messageJson: jsonEncode(msg.toJson()),
-              createdAt: msg.createdAt,
-            ),
-          );
-    } catch (_) {}
+  ChatMessage _dbRowToMessage(db.ChatMessage row) {
+    List<AssistantSegment> segments = [];
+    if (row.segmentsJson != null && row.segmentsJson!.isNotEmpty) {
+      try {
+        final list = jsonDecode(row.segmentsJson!) as List<dynamic>;
+        segments =
+            list.map((e) => AssistantSegment.fromJson(e as Map<String, dynamic>)).toList();
+      } catch (_) {}
+    }
+    return ChatMessage(
+      id: row.id,
+      role: row.role == 'user' ? ChatMessageRole.user : ChatMessageRole.assistant,
+      content: row.content,
+      segments: segments,
+      isStreaming: row.isStreaming == 1,
+      createdAt: row.createdAt.toInt(),
+    );
   }
 
-  Future<void> _updateMessage(String id, ChatMessage msg) async {
-    try {
-      final db = _ref.read(databaseProvider);
-      await (db.update(db.chatMessages)..where((t) => t.id.equals(id)))
-          .write(ChatMessagesCompanion(
-            messageJson: Value(jsonEncode(msg.toJson())),
-          ));
-    } catch (_) {}
+  void _listenToRelay() {
+    final notifier = _ref.read(connectionProvider.notifier);
+    _sub = notifier.messages.listen((msg) {
+      final method = msg['method'] as String?;
+      final params = msg['params'] as Map<String, dynamic>?;
+
+      if (method == 'session/notification' && params != null) {
+        final msgSessionId = params['sessionId'] as String?;
+        if (msgSessionId == _sessionId) {
+          _handleNotification(params);
+        }
+      }
+    });
   }
 
-  void sendMessage(String text) {
-    final msg = ChatMessage(
-      id: const Uuid().v4(),
+  void _handleNotification(Map<String, dynamic> params) {
+    final isStreaming = params['isStreaming'] as bool? ?? false;
+    final content = params['content'] as List<dynamic>? ?? [];
+
+    if (!isStreaming) {
+      state.whenData((messages) {
+        final updated = messages.map((m) {
+          return m.isStreaming ? m.copyWith(isStreaming: false) : m;
+        }).toList();
+        state = AsyncValue.data(updated);
+      });
+      return;
+    }
+
+    for (final block in content) {
+      final type = block['type'] as String?;
+      final text = block['text'] as String? ?? '';
+
+      if (type == 'text') {
+        state.whenData((messages) {
+          final lastIdx = messages.length - 1;
+          if (lastIdx >= 0 &&
+              messages[lastIdx].isStreaming &&
+              messages[lastIdx].role == ChatMessageRole.assistant) {
+            final updated = messages.map((m) {
+              return m.isStreaming ? m.copyWith(content: m.content + text) : m;
+            }).toList();
+            state = AsyncValue.data(updated);
+          } else {
+            final newMsg = ChatMessage(
+              id: _uuid.v4(),
+              role: ChatMessageRole.assistant,
+              content: text,
+              isStreaming: true,
+              createdAt: DateTime.now().millisecondsSinceEpoch,
+            );
+            state = AsyncValue.data([...messages, newMsg]);
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> sendMessage(String text) async {
+    final notifier = _ref.read(connectionProvider.notifier);
+
+    final userMsg = ChatMessage(
+      id: _uuid.v4(),
       role: ChatMessageRole.user,
       content: text,
       createdAt: DateTime.now().millisecondsSinceEpoch,
     );
-    state = [...state, msg];
-    _saveMessage(msg);
 
-    try {
-      _ref.read(connectionProvider.notifier).sendRelaySessionMessage(_sessionId, text);
-    } catch (_) {}
+    state.whenData((messages) {
+      state = AsyncValue.data([...messages, userMsg]);
+    });
+
+    final db = _ref.read(databaseProvider);
+    await db.saveMessage(
+      id: userMsg.id,
+      sessionId: _sessionId,
+      role: 'user',
+      content: text,
+      isStreaming: false,
+    );
+
+    await notifier.sendSessionMessage(_sessionId, text);
   }
 
-  void handleRelayMessage(Map<String, dynamic> params) {
-    final content = params['content'] as String? ?? '';
-    final rawSegments = params['segments'] as List<dynamic>? ?? [];
-    final isStreaming = params['isStreaming'] as bool? ?? false;
-
-    final segments = rawSegments
-        .map((s) => AssistantSegment.fromJson(s as Map<String, dynamic>))
-        .toList();
-
-    final lastMsg = state.isNotEmpty ? state.last : null;
-    if (lastMsg != null && lastMsg.role == ChatMessageRole.assistant && lastMsg.isStreaming) {
-      final updated = lastMsg.copyWith(
-        content: content,
-        segments: segments,
-        isStreaming: isStreaming,
-      );
-      state = [
-        ...state.take(state.length - 1),
-        updated,
-      ];
-      _updateMessage(lastMsg.id, updated);
-    } else {
-      final msg = ChatMessage(
-        id: const Uuid().v4(),
-        role: ChatMessageRole.assistant,
-        content: content,
-        segments: segments,
-        isStreaming: isStreaming,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-      );
-      state = [...state, msg];
-      if (!isStreaming) _saveMessage(msg);
-    }
-  }
-
-  void addLocalMessage(ChatMessage message) {
-    state = [...state, message];
-    _saveMessage(message);
-  }
-
-  void updateMessage(int index, ChatMessage message) {
-    final list = [...state];
-    list[index] = message;
-    state = list;
-  }
-
-  void removeMessageAt(int index) {
-    if (index < 0 || index >= state.length) return;
-    final msg = state[index];
-    final list = [...state];
-    list.removeAt(index);
-    state = list;
-    try {
-      final db = _ref.read(databaseProvider);
-      (db.delete(db.chatMessages)..where((t) => t.id.equals(msg.id))).go();
-    } catch (_) {}
-  }
-
-  Future<void> clear() async {
-    state = [];
-    try {
-      final db = _ref.read(databaseProvider);
-      await (db.delete(db.chatMessages)
-            ..where((t) => t.sessionId.equals(_sessionId)))
-          .go();
-    } catch (_) {}
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 }
+
+final chatProvider = StateNotifierProvider.family<
+    ChatNotifier, AsyncValue<List<ChatMessage>>, String>(
+  (ref, sessionId) => ChatNotifier(ref, sessionId),
+);

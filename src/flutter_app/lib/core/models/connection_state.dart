@@ -8,5 +8,5 @@ sealed class AcpConnectionState with _$AcpConnectionState {
   const factory AcpConnectionState.connecting() = Connecting;
   const factory AcpConnectionState.connected() = Connected;
   const factory AcpConnectionState.reconnecting() = Reconnecting;
-  const factory AcpConnectionState.failed(String? errorMessage) = Failed;
+  const factory AcpConnectionState.failed(String error) = Failed;
 }

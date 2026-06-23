@@ -1,14 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../services/preferences_service.dart';
+import 'database_provider.dart';
 
-final sharedPreferencesProvider = FutureProvider<SharedPreferences>(
-  (ref) => SharedPreferences.getInstance(),
-);
+final defaultCwdProvider = FutureProvider<String?>((ref) async {
+  final prefs = await ref.watch(preferencesServiceProvider.future);
+  return prefs.getDefaultCwd();
+});
 
-final preferencesServiceProvider = FutureProvider<PreferencesService>(
-  (ref) async {
-    final prefs = await ref.watch(sharedPreferencesProvider.future);
-    return PreferencesService(prefs);
-  },
-);
+final themeModeProvider = FutureProvider<String>((ref) async {
+  final prefs = await ref.watch(preferencesServiceProvider.future);
+  return prefs.getThemeMode();
+});
+
+final pairingCodeProvider = FutureProvider<String?>((ref) async {
+  final prefs = await ref.watch(preferencesServiceProvider.future);
+  return prefs.getPairingCode();
+});
+
+final clearAllDataProvider = FutureProvider<void>((ref) async {
+  final prefs = await ref.watch(preferencesServiceProvider.future);
+  final db = ref.read(databaseProvider);
+  await db.clearAll();
+  await prefs.clearAll();
+});

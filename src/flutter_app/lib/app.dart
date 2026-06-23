@@ -1,62 +1,33 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'core/theme/app_theme.dart';
-import 'core/models/server_config.dart' as model;
-import 'core/providers/preferences_provider.dart';
-import 'features/servers/server_list_screen.dart';
-import 'features/servers/add_server_screen.dart';
-import 'features/servers/pair_gateway_screen.dart';
-import 'features/servers/gateway_list_screen.dart';
-import 'features/servers/gateway_agents_screen.dart';
+
+import 'features/pair/pair_screen.dart';
+import 'features/agents/agent_list_screen.dart';
 import 'features/sessions/session_list_screen.dart';
 import 'features/chat/chat_screen.dart';
 import 'features/settings/settings_screen.dart';
 
-final _router = GoRouter(
+final goRouter = GoRouter(
   initialLocation: '/',
   routes: [
     GoRoute(
       path: '/',
-      builder: (context, state) => const ServerListScreen(),
+      builder: (context, state) => const PairScreen(),
     ),
     GoRoute(
-      path: '/servers/add',
-      builder: (context, state) => const AddServerScreen(),
+      path: '/agents',
+      builder: (context, state) => const AgentListScreen(),
     ),
     GoRoute(
-      path: '/servers/edit',
-      builder: (context, state) => AddServerScreen(
-        server: state.extra as model.ServerConfig?,
-      ),
-    ),
-    GoRoute(
-      path: '/gateways/pair',
-      builder: (context, state) => const PairGatewayScreen(),
-    ),
-    GoRoute(
-      path: '/gateways',
-      builder: (context, state) => const GatewayListScreen(),
-    ),
-    GoRoute(
-      path: '/gateways/:id/agents',
-      builder: (context, state) => GatewayAgentsScreen(
-        gatewayId: state.pathParameters['id']!,
-      ),
-    ),
-    GoRoute(
-      path: '/sessions/:serverId',
-      builder: (context, state) => SessionListScreen(
-        serverId: state.pathParameters['serverId']!,
-        serverName: state.extra as String? ?? 'Agent',
-      ),
+      path: '/sessions',
+      builder: (context, state) => const SessionListScreen(),
     ),
     GoRoute(
       path: '/chat/:sessionId',
-      builder: (context, state) => ChatScreen(
-        sessionId: state.pathParameters['sessionId']!,
-        title: state.extra as String? ?? 'Chat',
-      ),
+      builder: (context, state) {
+        final sessionId = state.pathParameters['sessionId']!;
+        return ChatScreen(sessionId: sessionId);
+      },
     ),
     GoRoute(
       path: '/settings',
@@ -65,28 +36,26 @@ final _router = GoRouter(
   ],
 );
 
-class AcpRemoteApp extends ConsumerWidget {
-  const AcpRemoteApp({super.key});
+class App extends StatelessWidget {
+  const App({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(preferencesServiceProvider).when(
-      data: (prefs) => switch (prefs.themeMode) {
-        'light' => ThemeMode.light,
-        'dark' => ThemeMode.dark,
-        _ => ThemeMode.system,
-      },
-      loading: () => ThemeMode.system,
-      error: (_, _) => ThemeMode.system,
-    );
-
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'ACP Remote',
+      routerConfig: goRouter,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: themeMode,
-      routerConfig: _router,
+      theme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        useMaterial3: true,
+        brightness: Brightness.light,
+      ),
+      darkTheme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        useMaterial3: true,
+        brightness: Brightness.dark,
+      ),
+      themeMode: ThemeMode.system,
     );
   }
 }

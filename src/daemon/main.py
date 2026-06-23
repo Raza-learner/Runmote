@@ -2,7 +2,7 @@ import asyncio
 import json
 import signal
 import sys
-from config import RELAY_URL, AGENT_COMMAND, DAEMON_ID, RECONNECT_DELAY
+from config import RELAY_URL, AGENT_COMMAND, DAEMON_ID, DAEMON_TOKEN, RECONNECT_DELAY
 from websockets.asyncio.client import connect
 
 
@@ -17,20 +17,54 @@ async def run_daemon():
             async with connect(RELAY_URL) as websocket:
                 log("Connected to relay!")
 
-                # Identify to the relay so sessions are tagged
+                # Handshake: identify → get pairing code
+                identify_id = "daemon_ident"
                 identify = json.dumps({
                     "jsonrpc": "2.0",
+                    "id": identify_id,
                     "method": "daemon/identify",
-                    "params": {"daemonId": DAEMON_ID},
+                    "params": {"daemonId": DAEMON_ID, "token": DAEMON_TOKEN},
                 })
                 await websocket.send(identify)
                 log(f"→ sent identify: {DAEMON_ID}")
+
+                pairing_code = ""
+                async for msg in websocket:
+                    try:
+                        data = json.loads(msg)
+                        if data.get("id") == identify_id:
+                            result = data.get("result") or {}
+                            pairing_code = result.get("pairingCode", "")
+                            if pairing_code:
+                                log(f"← pairing code: {pairing_code}")
+                                banner = (
+                                    "\n"
+                                    "╔═══════════════════════════════════════╗\n"
+                                    f"║        Device Code:  {pairing_code:<18}║\n"
+                                    "╚═══════════════════════════════════════╝\n"
+                                )
+                                print(banner, flush=True)
+                            break
+                    except json.JSONDecodeError:
+                        pass
+
                 proc = await asyncio.create_subprocess_exec(
                     *AGENT_COMMAND,
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
+
+                # Sync existing sessions from opencode
+                sess_req = json.dumps({
+                    "jsonrpc": "2.0",
+                    "method": "session/list",
+                    "id": "init_sess_sync",
+                    "params": {},
+                })
+                proc.stdin.write(sess_req.encode() + b"\n")
+                await proc.stdin.drain()
+                log("→ requested session list from agent")
 
                 async def relay_to_agent():
                     async for message in websocket:
