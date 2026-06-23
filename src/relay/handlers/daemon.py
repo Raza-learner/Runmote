@@ -24,6 +24,28 @@ def _paired_clients():
             yield cid, ws
 
 
+def _register_session(session: dict) -> str:
+    sid = session.get("sessionId") or session.get("id") or ""
+    if not sid:
+        return ""
+
+    name = session.get("name") or session.get("title") or ""
+    cwd = session.get("cwd") or ""
+    updated_at = session.get("updatedAt") or session.get("createdAt")
+    if not isinstance(updated_at, (int, float)):
+        updated_at = None
+
+    state.store.register(
+        sid,
+        client_id=session.get("clientId", ""),
+        name=name,
+        cwd=cwd,
+        agent_id=session.get("agentId", ""),
+        updated_at=updated_at,
+    )
+    return sid
+
+
 @router.websocket("/daemon")
 async def daemon_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -83,22 +105,20 @@ async def daemon_endpoint(websocket: WebSocket):
 
                 result = data.get("result")
                 if isinstance(result, dict):
-                    if "sessionId" in result:
-                        state.store.register(result["sessionId"])
-                        print(f"  → registered session {result['sessionId'][:20]}...")
-                    if "sessions" in result:
-                        sessions = result["sessions"]
-                        if isinstance(sessions, list):
-                            for s in sessions:
-                                if isinstance(s, dict):
-                                    sid = s.get("sessionId", "")
-                                    if sid:
-                                        state.store.register(
-                                            sid,
-                                            client_id=s.get("clientId", ""),
-                                            name=s.get("name", ""),
-                                        )
-                            print(f"  → synced {len(sessions)} sessions from opencode")
+                    sid = _register_session(result)
+                    if sid:
+                        print(f"  → registered session {sid[:20]}...")
+
+                    sessions = result.get("sessions")
+                    if isinstance(sessions, list):
+                        synced = 0
+                        for s in sessions:
+                            if isinstance(s, dict):
+                                sid = _register_session(s)
+                                if sid:
+                                    synced += 1
+                                    print(f"  → registered session {sid[:20]}...")
+                        print(f"  → synced {synced} sessions from opencode")
 
                 error = data.get("error")
                 if isinstance(error, dict):
@@ -106,8 +126,8 @@ async def daemon_endpoint(websocket: WebSocket):
                     if sid:
                         state.store.remove(sid)
                         print(f"  → removed session {sid[:20]}...")
-            except json.JSONDecodeError:
-                pass
+            except Exception as e:
+                print(f"  → failed to process daemon message: {e}")
 
             for cid, client in _paired_clients():
                 try:

@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import 'chat_provider.dart';
 import '../../core/providers/connection_provider.dart';
-import '../../core/models/chat_message.dart';
-import '../../core/models/assistant_segment.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../shared/widgets/message_bubble.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String sessionId;
@@ -19,6 +19,20 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
+  bool _showScrollButton = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final currentScroll = _scrollController.position.pixels;
+      final show = maxScroll - currentScroll > 200;
+      if (show != _showScrollButton) {
+        setState(() => _showScrollButton = show);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -32,7 +46,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (text.isEmpty) return;
     _textController.clear();
     ref.read(chatProvider(widget.sessionId).notifier).sendMessage(text);
-    Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+    Future.delayed(const Duration(milliseconds: 150), _scrollToBottom);
   }
 
   void _scrollToBottom() {
@@ -48,7 +62,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final messagesAsync = ref.watch(chatProvider(widget.sessionId));
+    final chatState = ref.watch(chatProvider(widget.sessionId));
     final connection = ref.watch(connectionProvider);
 
     return Scaffold(
@@ -61,32 +75,90 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/sessions'),
         ),
+        actions: chatState.whenOrNull(
+              data: (cs) {
+                final modelConfig = cs.configOptions
+                    .where((c) => c.category == 'model')
+                    .firstOrNull;
+                if (modelConfig == null) return null;
+                return [
+                  IconButton(
+                    icon: const Icon(Icons.tune),
+                    tooltip: 'Model & Mode',
+                    onPressed: () => _showConfigSheet(context, cs),
+                  ),
+                ];
+              },
+            ) ??
+            [],
       ),
       body: Column(
         children: [
           Expanded(
-            child: messagesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+            child: chatState.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
-              data: (messages) {
+              data: (cs) {
+                final messages = cs.messages;
                 if (messages.isEmpty) {
                   return Center(
-                    child: Text(
-                      'Start a conversation',
-                      style: TextStyle(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.chat_bubble_outline,
+                              size: 64,
+                              color: theme.colorScheme.onSurfaceVariant),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Start a conversation',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Type a message below to begin chatting with the agent.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
                   );
                 }
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final msg = messages[index];
-                    return _MessageBubble(message: msg);
-                  },
+                return Stack(
+                  children: [
+                    ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = messages[index];
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            top: index == 0 ? 0 : 0,
+                            bottom: 4,
+                          ),
+                          child: MessageBubble(message: msg),
+                        );
+                      },
+                    ),
+                    if (_showScrollButton)
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: FloatingActionButton.small(
+                          onPressed: _scrollToBottom,
+                          child:
+                              const Icon(Icons.keyboard_arrow_down),
+                        ),
+                      ),
+                  ],
                 );
               },
             ),
@@ -135,174 +207,68 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
     );
   }
-}
 
-class _MessageBubble extends StatelessWidget {
-  final ChatMessage message;
-
-  const _MessageBubble({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isUser = message.role == ChatMessageRole.user;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment:
-            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.8,
-            ),
-            decoration: BoxDecoration(
-              color: isUser
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isUser ? 16 : 4),
-                bottomRight: Radius.circular(isUser ? 4 : 16),
-              ),
-            ),
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ...message.segments.map((seg) => _buildSegment(seg, theme)),
-                Text(
-                  message.content,
-                  style: TextStyle(
-                    color: isUser
-                        ? theme.colorScheme.onPrimary
-                        : theme.colorScheme.onSurface,
+  void _showConfigSheet(BuildContext context, ChatState cs) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final theme = Theme.of(context);
+        return Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurfaceVariant
+                        .withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                if (message.isStreaming)
-                  const SizedBox(
-                    width: 16,
-                    child: Row(
-                      children: [
-                        _TypingDot(delay: 0),
-                        _TypingDot(delay: 200),
-                        _TypingDot(delay: 400),
-                      ],
-                    ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              ...cs.configOptions.map((opt) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(opt.name,
+                          style: theme.textTheme.labelMedium
+                              ?.copyWith(
+                                  color: theme
+                                      .colorScheme.onSurfaceVariant)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        children: opt.options.map((v) {
+                          final selected =
+                              v.value == opt.currentValue;
+                          return ChoiceChip(
+                            label: Text(v.name),
+                            selected: selected,
+                            onSelected: (_) {
+                              ref
+                                  .read(chatProvider(widget.sessionId)
+                                      .notifier)
+                                  .setConfigOption(opt.id, v.value);
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
                   ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
-            child: Text(
-              _formatTime(message.createdAt),
-              style: TextStyle(
-                fontSize: 11,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSegment(AssistantSegment seg, ThemeData theme) {
-    switch (seg.kind) {
-      case SegmentKind.thought:
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Text(
-            seg.text,
-            style: TextStyle(
-              fontStyle: FontStyle.italic,
-              color: theme.colorScheme.onSurfaceVariant,
-              fontSize: 13,
-            ),
-          ),
-        );
-      case SegmentKind.toolCall:
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                seg.text,
-                style: const TextStyle(fontSize: 13),
-              ),
+                );
+              }),
+              const SizedBox(height: AppSpacing.md),
             ],
-          ),
-        );
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  String _formatTime(int ms) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
-    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-}
-
-class _TypingDot extends StatefulWidget {
-  final int delay;
-  const _TypingDot({required this.delay});
-
-  @override
-  State<_TypingDot> createState() => _TypingDotState();
-}
-
-class _TypingDotState extends State<_TypingDot>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-    _animation = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      _controller.repeat(reverse: true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Opacity(
-          opacity: _animation.value,
-          child: Container(
-            width: 6,
-            height: 6,
-            margin: const EdgeInsets.only(right: 3),
-            decoration: const BoxDecoration(
-              color: Colors.grey,
-              shape: BoxShape.circle,
-            ),
           ),
         );
       },

@@ -16,10 +16,15 @@ class SessionStore:
             for s in self._db.load_all_sessions():
                 self._sessions[s["session_id"]] = {
                     "sessionId": s["session_id"],
+                    "id": s["session_id"],
                     "clientId": s["client_id"],
                     "name": s["name"],
+                    "title": s["name"],
+                    "cwd": "",
+                    "agentId": "",
                     "daemonId": s["daemon_id"],
                     "createdAt": s["created_at"],
+                    "updatedAt": s["created_at"],
                 }
 
     def set_daemon_id(self, daemon_id: str):
@@ -31,18 +36,35 @@ class SessionStore:
     def clear_daemon_id(self):
         self._daemon_id = ""
 
-    def register(self, session_id: str, client_id: str = "", name: str = "") -> None:
+    def register(
+        self,
+        session_id: str,
+        client_id: str = "",
+        name: str = "",
+        cwd: str = "",
+        agent_id: str = "",
+        updated_at: float | None = None,
+    ) -> None:
         now = time.time()
         display_name = name or f"Session {time.strftime('%H:%M')}"
+        timestamp = updated_at or now
         self._sessions[session_id] = {
             "sessionId": session_id,
+            "id": session_id,
             "clientId": client_id,
             "name": display_name,
+            "title": display_name,
+            "cwd": cwd,
+            "agentId": agent_id,
             "daemonId": self._daemon_id,
-            "createdAt": now,
+            "createdAt": timestamp,
+            "updatedAt": timestamp,
         }
         if self._db:
-            self._db.insert_session(session_id, client_id, display_name, self._daemon_id, now)
+            try:
+                self._db.insert_session(session_id, client_id, display_name, self._daemon_id, timestamp)
+            except Exception as e:
+                print(f"DB write failed: {e}")
 
     def remove(self, session_id: str) -> None:
         self._sessions.pop(session_id, None)
@@ -63,13 +85,19 @@ class SessionStore:
     def rename(self, session_id: str, name: str) -> bool:
         if session_id in self._sessions:
             self._sessions[session_id]["name"] = name
+            self._sessions[session_id]["title"] = name
             if self._db:
                 self._db.update_name(session_id, name)
             return True
         return False
 
-    def list_sessions(self) -> list[dict]:
-        return list(self._sessions.values())
+    def list_sessions(self, agent_id: str = "") -> list[dict]:
+        if not agent_id:
+            return list(self._sessions.values())
+        return [
+            session for session in self._sessions.values()
+            if session.get("agentId") == agent_id
+        ]
 
     def get(self, session_id: str) -> dict | None:
         return self._sessions.get(session_id)

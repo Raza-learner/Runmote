@@ -101,10 +101,15 @@ async def app_endpoint(websocket: WebSocket):
                     continue
 
                 if method == "session/list":
+                    if state.daemon_websocket is not None:
+                        await state.daemon_websocket.send_text(message)
+                        continue
+
+                    agent_id = (data.get("params") or {}).get("agentId", "")
                     await websocket.send_text(json.dumps({
                         "jsonrpc": "2.0",
                         "id": msg_id,
-                        "result": {"sessions": state.store.list_sessions()},
+                        "result": {"sessions": state.store.list_sessions(agent_id)},
                     }))
                     continue
 

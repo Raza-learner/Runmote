@@ -1,61 +1,52 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'features/pair/pair_screen.dart';
-import 'features/agents/agent_list_screen.dart';
-import 'features/sessions/session_list_screen.dart';
-import 'features/chat/chat_screen.dart';
-import 'features/settings/settings_screen.dart';
+import 'core/router/app_router.dart';
+import 'core/theme/app_theme.dart';
+import 'core/providers/preferences_provider.dart';
 
-final goRouter = GoRouter(
-  initialLocation: '/',
-  routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const PairScreen(),
-    ),
-    GoRoute(
-      path: '/agents',
-      builder: (context, state) => const AgentListScreen(),
-    ),
-    GoRoute(
-      path: '/sessions',
-      builder: (context, state) => const SessionListScreen(),
-    ),
-    GoRoute(
-      path: '/chat/:sessionId',
-      builder: (context, state) {
-        final sessionId = state.pathParameters['sessionId']!;
-        return ChatScreen(sessionId: sessionId);
-      },
-    ),
-    GoRoute(
-      path: '/settings',
-      builder: (context, state) => const SettingsScreen(),
-    ),
-  ],
-);
-
-class App extends StatelessWidget {
+class App extends ConsumerStatefulWidget {
   const App({super.key});
 
   @override
+  ConsumerState<App> createState() => _AppState();
+}
+
+class _AppState extends ConsumerState<App> {
+  @override
+  void initState() {
+    super.initState();
+    _loadThemeMode();
+  }
+
+  Future<void> _loadThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mode = prefs.getString('theme_mode') ?? 'system';
+    ref.read(themeModeStateProvider.notifier).state = _parseThemeMode(mode);
+  }
+
+  ThemeMode _parseThemeMode(String mode) {
+    switch (mode) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeStateProvider);
     return MaterialApp.router(
       title: 'ACP Remote',
       routerConfig: goRouter,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
-        useMaterial3: true,
-        brightness: Brightness.light,
-      ),
-      darkTheme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
-        useMaterial3: true,
-        brightness: Brightness.dark,
-      ),
-      themeMode: ThemeMode.system,
+      theme: buildLightTheme(),
+      darkTheme: buildDarkTheme(),
+      themeMode: themeMode,
     );
   }
 }

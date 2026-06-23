@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multicast_dns/multicast_dns.dart';
 
@@ -43,11 +44,13 @@ class RelayDiscoveryNotifier extends StateNotifier<RelayDiscoveryState> {
 
   Future<void> startDiscovery() async {
     if (state.searching) return;
+    debugPrint('[ACP-DISC] Starting mDNS discovery...');
     state = state.copyWith(searching: true, clearAddress: true, error: null);
 
     try {
       _client = MDnsClient();
       await _client!.start();
+      debugPrint('[ACP-DISC] MDnsClient started');
 
       await for (final ptr
           in _client!
@@ -55,30 +58,36 @@ class RelayDiscoveryNotifier extends StateNotifier<RelayDiscoveryState> {
                 ResourceRecordQuery.serverPointer('_acp-relay._tcp.local'),
               )
               .timeout(const Duration(seconds: 5))) {
+        debugPrint('[ACP-DISC] Found PTR: ${ptr.domainName}');
         await for (final srv
             in _client!.lookup<SrvResourceRecord>(
               ResourceRecordQuery.service(ptr.domainName),
             )) {
+          debugPrint('[ACP-DISC] Found SRV: target=${srv.target} port=${srv.port}');
           await for (final ip
               in _client!.lookup<IPAddressResourceRecord>(
                 ResourceRecordQuery.addressIPv4(srv.target),
               )) {
+            debugPrint('[ACP-DISC] Found IP: ${ip.address}');
             state = RelayDiscoveryState(
               searching: false,
               address: ip.address,
               port: srv.port,
             );
             _client?.stop();
+            debugPrint('[ACP-DISC] Relay discovered at ${ip.address}:${srv.port}');
             return;
           }
         }
       }
 
+      debugPrint('[ACP-DISC] No relay found (timeout)');
       state = state.copyWith(
         searching: false,
         error: 'No relay found on network',
       );
     } catch (e) {
+      debugPrint('[ACP-DISC] Discovery error: $e');
       state = state.copyWith(
         searching: false,
         error: 'Discovery failed: $e',

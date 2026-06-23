@@ -13,6 +13,7 @@ _$AgentCapabilitiesImpl _$$AgentCapabilitiesImplFromJson(
   supportsEmbeddedContext: json['supportsEmbeddedContext'] as bool? ?? false,
   supportsSessionList: json['supportsSessionList'] as bool? ?? false,
   supportsLoadSession: json['supportsLoadSession'] as bool? ?? false,
+  supportsDelete: json['supportsDelete'] as bool? ?? false,
 );
 
 Map<String, dynamic> _$$AgentCapabilitiesImplToJson(
@@ -22,4 +23,5 @@ Map<String, dynamic> _$$AgentCapabilitiesImplToJson(
   'supportsEmbeddedContext': instance.supportsEmbeddedContext,
   'supportsSessionList': instance.supportsSessionList,
   'supportsLoadSession': instance.supportsLoadSession,
+  'supportsDelete': instance.supportsDelete,
 };

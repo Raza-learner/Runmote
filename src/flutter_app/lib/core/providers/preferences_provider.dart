@@ -1,4 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'database_provider.dart';
 
 final defaultCwdProvider = FutureProvider<String?>((ref) async {
@@ -9,6 +11,10 @@ final defaultCwdProvider = FutureProvider<String?>((ref) async {
 final themeModeProvider = FutureProvider<String>((ref) async {
   final prefs = await ref.watch(preferencesServiceProvider.future);
   return prefs.getThemeMode();
+});
+
+final themeModeStateProvider = StateProvider<ThemeMode>((ref) {
+  return ThemeMode.system;
 });
 
 final pairingCodeProvider = FutureProvider<String?>((ref) async {

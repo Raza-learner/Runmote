@@ -25,6 +25,7 @@ mixin _$AgentCapabilities {
   bool get supportsEmbeddedContext => throw _privateConstructorUsedError;
   bool get supportsSessionList => throw _privateConstructorUsedError;
   bool get supportsLoadSession => throw _privateConstructorUsedError;
+  bool get supportsDelete => throw _privateConstructorUsedError;
 
   /// Serializes this AgentCapabilities to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -48,6 +49,7 @@ abstract class $AgentCapabilitiesCopyWith<$Res> {
     bool supportsEmbeddedContext,
     bool supportsSessionList,
     bool supportsLoadSession,
+    bool supportsDelete,
   });
 }
 
@@ -70,6 +72,7 @@ class _$AgentCapabilitiesCopyWithImpl<$Res, $Val extends AgentCapabilities>
     Object? supportsEmbeddedContext = null,
     Object? supportsSessionList = null,
     Object? supportsLoadSession = null,
+    Object? supportsDelete = null,
   }) {
     return _then(
       _value.copyWith(
@@ -88,6 +91,10 @@ class _$AgentCapabilitiesCopyWithImpl<$Res, $Val extends AgentCapabilities>
             supportsLoadSession: null == supportsLoadSession
                 ? _value.supportsLoadSession
                 : supportsLoadSession // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            supportsDelete: null == supportsDelete
+                ? _value.supportsDelete
+                : supportsDelete // ignore: cast_nullable_to_non_nullable
                       as bool,
           )
           as $Val,
@@ -109,6 +116,7 @@ abstract class _$$AgentCapabilitiesImplCopyWith<$Res>
     bool supportsEmbeddedContext,
     bool supportsSessionList,
     bool supportsLoadSession,
+    bool supportsDelete,
   });
 }
 
@@ -130,6 +138,7 @@ class __$$AgentCapabilitiesImplCopyWithImpl<$Res>
     Object? supportsEmbeddedContext = null,
     Object? supportsSessionList = null,
     Object? supportsLoadSession = null,
+    Object? supportsDelete = null,
   }) {
     return _then(
       _$AgentCapabilitiesImpl(
@@ -149,6 +158,10 @@ class __$$AgentCapabilitiesImplCopyWithImpl<$Res>
             ? _value.supportsLoadSession
             : supportsLoadSession // ignore: cast_nullable_to_non_nullable
                   as bool,
+        supportsDelete: null == supportsDelete
+            ? _value.supportsDelete
+            : supportsDelete // ignore: cast_nullable_to_non_nullable
+                  as bool,
       ),
     );
   }
@@ -162,6 +175,7 @@ class _$AgentCapabilitiesImpl implements _AgentCapabilities {
     this.supportsEmbeddedContext = false,
     this.supportsSessionList = false,
     this.supportsLoadSession = false,
+    this.supportsDelete = false,
   });
 
   factory _$AgentCapabilitiesImpl.fromJson(Map<String, dynamic> json) =>
@@ -179,10 +193,13 @@ class _$AgentCapabilitiesImpl implements _AgentCapabilities {
   @override
   @JsonKey()
   final bool supportsLoadSession;
+  @override
+  @JsonKey()
+  final bool supportsDelete;
 
   @override
   String toString() {
-    return 'AgentCapabilities(canSendImages: $canSendImages, supportsEmbeddedContext: $supportsEmbeddedContext, supportsSessionList: $supportsSessionList, supportsLoadSession: $supportsLoadSession)';
+    return 'AgentCapabilities(canSendImages: $canSendImages, supportsEmbeddedContext: $supportsEmbeddedContext, supportsSessionList: $supportsSessionList, supportsLoadSession: $supportsLoadSession, supportsDelete: $supportsDelete)';
   }
 
   @override
@@ -200,7 +217,9 @@ class _$AgentCapabilitiesImpl implements _AgentCapabilities {
             (identical(other.supportsSessionList, supportsSessionList) ||
                 other.supportsSessionList == supportsSessionList) &&
             (identical(other.supportsLoadSession, supportsLoadSession) ||
-                other.supportsLoadSession == supportsLoadSession));
+                other.supportsLoadSession == supportsLoadSession) &&
+            (identical(other.supportsDelete, supportsDelete) ||
+                other.supportsDelete == supportsDelete));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -211,6 +230,7 @@ class _$AgentCapabilitiesImpl implements _AgentCapabilities {
     supportsEmbeddedContext,
     supportsSessionList,
     supportsLoadSession,
+    supportsDelete,
   );
 
   /// Create a copy of AgentCapabilities
@@ -236,6 +256,7 @@ abstract class _AgentCapabilities implements AgentCapabilities {
     final bool supportsEmbeddedContext,
     final bool supportsSessionList,
     final bool supportsLoadSession,
+    final bool supportsDelete,
   }) = _$AgentCapabilitiesImpl;
 
   factory _AgentCapabilities.fromJson(Map<String, dynamic> json) =
@@ -249,6 +270,8 @@ abstract class _AgentCapabilities implements AgentCapabilities {
   bool get supportsSessionList;
   @override
   bool get supportsLoadSession;
+  @override
+  bool get supportsDelete;
 
   /// Create a copy of AgentCapabilities
   /// with the given fields replaced by the non-null parameter values.

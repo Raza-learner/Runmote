@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers/connection_provider.dart';
 import '../../core/providers/discovery_provider.dart';
 import '../../core/models/connection_state.dart';
+import '../../core/theme/app_spacing.dart';
 
 class PairScreen extends ConsumerStatefulWidget {
   const PairScreen({super.key});
@@ -22,17 +25,17 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   @override
   void initState() {
     super.initState();
-    _codeController.addListener(_formatCode);
+    _codeController.addListener(_onCodeChanged);
   }
 
   @override
   void dispose() {
-    _codeController.removeListener(_formatCode);
+    _codeController.removeListener(_onCodeChanged);
     _codeController.dispose();
     super.dispose();
   }
 
-  void _formatCode() {
+  void _onCodeChanged() {
     final text = _codeController.text;
     final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length > 6) return;
@@ -48,6 +51,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         selection: TextSelection.collapsed(offset: formatted.length),
       );
     }
+    setState(() {});
   }
 
   Future<void> _connect() async {
@@ -70,6 +74,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final discovery = ref.watch(relayDiscoveryProvider);
+    final isDark = theme.brightness == Brightness.dark;
 
     if (!_discoveryStarted && !discovery.searching) {
       _discoveryStarted = true;
@@ -90,129 +95,254 @@ class _PairScreenState extends ConsumerState<PairScreen> {
       }
     });
 
+    final bgColors = isDark
+        ? [const Color(0xFF0D0D2B), const Color(0xFF1A1A4E)]
+        : [const Color(0xFF1A237E), const Color(0xFF283593)];
+
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.cast_connected,
-                  size: 80,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'ACP Remote',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Connect to your AI agents',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                if (discovery.searching) ...[
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Searching for relay on your network...',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ] else if (discovery.error != null) ...[
-                  Icon(Icons.wifi_off, size: 48, color: theme.colorScheme.error),
-                  const SizedBox(height: 12),
-                  Text(
-                    discovery.error!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: theme.colorScheme.error),
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      ref.read(relayDiscoveryProvider.notifier).startDiscovery();
-                    },
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-                ] else ...[
-                  Icon(Icons.wifi, size: 28, color: theme.colorScheme.primary),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Relay found!',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _codeController,
-                    textInputAction: TextInputAction.go,
-                    onSubmitted: (_) => _connect(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'e.g. 847-293',
-                      hintStyle: TextStyle(
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                        fontSize: 22,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 20,
-                      ),
-                    ),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      _error!,
-                      style: TextStyle(color: theme.colorScheme.error),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: FilledButton(
-                      onPressed: _isConnecting ? null : _connect,
-                      child: _isConnecting
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text('Connect', style: TextStyle(fontSize: 16)),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  TextButton(
-                    onPressed: _showHelp,
-                    child: const Text('How to get your code?'),
-                  ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: bgColors,
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLogo(theme),
+                  const SizedBox(height: 48),
+                  _buildContent(theme, discovery, isDark),
                 ],
-              ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLogo(ThemeData theme) {
+    return Column(
+      children: [
+        Container(
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: const Icon(
+            Icons.cast_connected,
+            size: 48,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'ACP Remote',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Connect to your AI agents',
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.white.withValues(alpha: 0.8),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContent(ThemeData theme, RelayDiscoveryState discovery, bool isDark) {
+    if (discovery.searching) {
+      return _buildSearching(isDark);
+    } else if (discovery.error != null) {
+      return _buildError(discovery.error!, isDark);
+    } else {
+      return _buildCodeInput(isDark);
+    }
+  }
+
+  Widget _buildSearching(bool isDark) {
+    return _GlassCard(
+      isDark: isDark,
+      child: Column(
+        children: [
+          _PulsingDots(),
+          const SizedBox(height: 20),
+          const Text(
+            'Searching for relay...',
+            style: TextStyle(color: Colors.white70, fontSize: 15),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Make sure the relay is running on your network',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.4),
+              fontSize: 13,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError(String error, bool isDark) {
+    return _GlassCard(
+      isDark: isDark,
+      child: Column(
+        children: [
+          Icon(
+            Icons.wifi_off_rounded,
+            size: 48,
+            color: Colors.white.withValues(alpha: 0.7),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            error,
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: () {
+              ref.read(relayDiscoveryProvider.notifier).startDiscovery();
+            },
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            label: const Text('Retry', style: TextStyle(color: Colors.white)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.white38),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCodeInput(bool isDark) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.wifi, size: 20, color: Colors.white.withValues(alpha: 0.7)),
+            const SizedBox(width: 8),
+            Text(
+              'Relay found!',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        _GlassCard(
+          isDark: isDark,
+          child: Column(
+            children: [
+              TextField(
+                controller: _codeController,
+                textInputAction: TextInputAction.go,
+                onSubmitted: (_) => _connect(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  letterSpacing: 4,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'XXX-XXX',
+                  hintStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 28,
+                    letterSpacing: 4,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 20,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 13),
+                ),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton(
+                  onPressed: _isConnecting ? null : _connect,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: isDark ? Colors.black87 : Colors.indigo,
+                    disabledBackgroundColor: Colors.white.withValues(alpha: 0.2),
+                  ),
+                  child: _isConnecting
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black54,
+                          ),
+                        )
+                      : const Text(
+                          'Connect',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        TextButton(
+          onPressed: _showHelp,
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white.withValues(alpha: 0.7),
+          ),
+          child: const Text('How to get your code?'),
+        ),
+      ],
     );
   }
 
@@ -225,21 +355,13 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '1. Make sure the ACP daemon is running on your PC',
-            ),
+            Text('1. Make sure the ACP daemon is running on your PC'),
             SizedBox(height: 8),
-            Text(
-              '2. Look for the pairing code in the terminal where the daemon is running',
-            ),
+            Text('2. Look for the pairing code in the terminal where the daemon is running'),
             SizedBox(height: 8),
-            Text(
-              '3. It will look like: "847293"',
-            ),
+            Text('3. It will look like: "847293"'),
             SizedBox(height: 8),
-            Text(
-              '4. Enter that code here to connect',
-            ),
+            Text('4. Enter that code here to connect'),
           ],
         ),
         actions: [
@@ -249,6 +371,87 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _GlassCard extends StatelessWidget {
+  final bool isDark;
+  final Widget child;
+
+  const _GlassCard({required this.isDark, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: (isDark ? Colors.white : Colors.black)
+                .withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.12),
+            ),
+          ),
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _PulsingDots extends StatefulWidget {
+  @override
+  State<_PulsingDots> createState() => _PulsingDotsState();
+}
+
+class _PulsingDotsState extends State<_PulsingDots>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (i) {
+            final dotT = ((t * 3 - i) % 1).abs();
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Container(
+                width: 10 + 4 * (1 - dotT),
+                height: 10 + 4 * (1 - dotT),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.3 + 0.7 * (1 - dotT)),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

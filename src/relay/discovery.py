@@ -30,7 +30,7 @@ class RelayDiscovery:
             port=self._port,
             properties={},
         )
-        await self._az.async_register_service(info)
+        await self._az.async_register_service(info, allow_name_change=True)
         print(f"mDNS: advertising _acp-relay._tcp on {ip}:{self._port}")
 
     async def stop(self):
