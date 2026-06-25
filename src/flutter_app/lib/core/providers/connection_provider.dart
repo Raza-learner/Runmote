@@ -111,7 +111,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   StreamSubscription? _sub;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
-  int? _initId;
   final Ref _ref;
 
   final _messageController = StreamController<Map<String, dynamic>>.broadcast();
@@ -130,7 +129,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     }
 
     final url = relayUrl ?? state.relayUrl ?? 'ws://localhost:8000';
-    debugPrint('[ACP] connect() called with code=$code relayUrl=$url');
 
     state = state.copyWith(
       state: const AcpConnectionState.connecting(),
@@ -142,11 +140,9 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
     try {
       final uri = Uri.parse('$url/app');
-      debugPrint('[ACP] connecting WebSocket to $uri');
       final channel = WebSocketChannel.connect(uri);
 
       await channel.ready;
-      debugPrint('[ACP] WebSocket connected!');
 
       state = state.copyWith(channel: channel);
       _reconnectAttempts = 0;
@@ -154,7 +150,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       // Send auth/pair with the pairing code
       final pairCompleter = Completer<void>();
       final pairId = _nextId;
-      debugPrint('[ACP] sending auth/pair id=$pairId');
       sendRaw({
         'jsonrpc': '2.0',
         'id': pairId,
@@ -170,12 +165,10 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       );
 
       // Wait for auth response (5s timeout)
-      debugPrint('[ACP] waiting for auth/pair response...');
       await pairCompleter.future.timeout(
         const Duration(seconds: 5),
         onTimeout: () => throw Exception('Pairing timed out'),
       );
-      debugPrint('[ACP] auth/pair succeeded!');
 
       state = state.copyWith(
         state: const AcpConnectionState.connected(),
@@ -186,7 +179,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       final p = await _ref.read(preferencesServiceProvider.future);
       await p.setPairingCode(code);
 
-      debugPrint('[ACP] sending agent/list');
       sendRaw({
         'jsonrpc': '2.0',
         'id': _nextId,
@@ -194,12 +186,16 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         'params': {},
       });
     } catch (e) {
-      debugPrint('[ACP] connect() error: $e');
+      debugPrint('[ACP] connect error: $e');
+      final msg = '$e';
+      // Don't auto-reconnect on auth errors — the pairing code is stale.
+      final isAuthError = msg.contains('Pairing') || msg.contains('code');
       state = state.copyWith(
         state: AcpConnectionState.failed('$e'),
         error: '$e',
+        paired: isAuthError ? false : state.paired,
       );
-      _scheduleReconnect();
+      if (!isAuthError) _scheduleReconnect();
     }
   }
 
@@ -207,18 +203,12 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     try {
       final json = jsonDecode(data as String) as Map<String, dynamic>;
       final method = json['method'] as String?;
-      final msgId = json['id'];
-      final hasResult = json.containsKey('result');
-      final hasError = json.containsKey('error');
-      final errorMsg = json['error'];
-      debugPrint('[ACP] ← msg: method=$method id=$msgId hasResult=$hasResult hasError=$hasError error=$errorMsg');
 
       // Handle auth/pair response
       if (json['id'] == pairId && !pairCompleter.isCompleted) {
         final result = json['result'] as Map<String, dynamic>?;
         if (result != null && result['paired'] == true) {
           final daemonId = result['daemonId'] as String?;
-          debugPrint('[ACP] auth/pair succeeded, daemonId=$daemonId');
           state = state.copyWith(daemonId: daemonId);
           pairCompleter.complete();
           return;
@@ -234,7 +224,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       if (method == 'daemon/identified') {
         final params = json['params'] as Map<String, dynamic>?;
         final di = params?['daemonId'] as String?;
-        debugPrint('[ACP] daemon/identified: daemonId=$di');
         if (di != null) {
           state = state.copyWith(daemonId: di);
         }
@@ -257,7 +246,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       if (method == 'agent/list') {
         final params = json['params'] as Map<String, dynamic>?;
         if (params != null) {
-          debugPrint('[ACP] agent/list notification with ${(params['agents'] as List?)?.length} agents');
           _handleAgentList(params);
           return;
         }
@@ -265,27 +253,18 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
       final result = json['result'] as Map<String, dynamic>?;
       if (result != null && result['agents'] is List<dynamic>) {
-        final agentsList = result['agents'] as List<dynamic>;
-        debugPrint('[ACP] agent/list response with ${agentsList.length} agents');
-        for (final a in agentsList) {
-          debugPrint('[ACP]   agent: id=${(a as Map)['id']} name=${a['name']} online=${a['online']}');
-        }
         _handleAgentList(result);
         return;
       }
 
-      // Handle initialize response (forwarded from opencode via daemon)
-      if (_initId != null && json['id'] == _initId) {
-        debugPrint('[ACP] initialize response received');
-        if (result != null) {
-          _handleInitialize(result);
-          _initId = null;
-          return;
-        }
+      // Handle initialize response (forwarded from agent via daemon)
+      // Daemon sends agent/initialize for each agent; result contains agentCapabilities
+      if (result != null && result['agentCapabilities'] is Map<String, dynamic>) {
+        _handleInitialize(result);
+        return;
       }
 
       // Route other messages to chat/session providers
-      debugPrint('[ACP] routing message to _messageController');
       _messageController.add(json);
     } catch (e) {
       debugPrint('[ACP] _handleMessage error: $e');
@@ -335,7 +314,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     state = state.copyWith(agentInfo: agentInfo, capabilities: capabilities);
   }
 
-  Future<void> sendRaw(Map<String, dynamic> message) async {
+  void sendRaw(Map<String, dynamic> message) {
     final channel = state.channel;
     if (channel == null) return;
     try {
@@ -345,26 +324,31 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     }
   }
 
-  Future<void> sendSessionMessage(String sessionId, String text) async {
-    await sendRaw({
+  int sendSessionMessage(String sessionId, String text,
+      {List<Map<String, dynamic>>? extra}) {
+    final id = _nextId;
+    final prompt = <Map<String, dynamic>>[
+      {'type': 'text', 'text': text},
+    ];
+    if (extra != null) prompt.addAll(extra);
+    sendRaw({
       'jsonrpc': '2.0',
-      'id': _nextId,
+      'id': id,
       'method': 'session/prompt',
       'params': {
         if (state.selectedAgentId != null) 'agentId': state.selectedAgentId,
         'sessionId': sessionId,
-        'prompt': [
-          {'type': 'text', 'text': text},
-        ],
+        'prompt': prompt,
       },
     });
+    return id;
   }
 
-  Future<void> loadSession(String sessionId, String cwd) async {
-    debugPrint('[ACP] sending session/load id=$sessionId cwd=$cwd');
-    await sendRaw({
+  int loadSession(String sessionId, String cwd) {
+    final id = _nextId;
+    sendRaw({
       'jsonrpc': '2.0',
-      'id': _nextId,
+      'id': id,
       'method': 'session/load',
       'params': {
         if (state.selectedAgentId != null) 'agentId': state.selectedAgentId,
@@ -373,10 +357,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         'mcpServers': <Map<String, dynamic>>[],
       },
     });
+    return id;
   }
 
-  Future<void> loadAgents() async {
-    await sendRaw({
+  void loadAgents() {
+    sendRaw({
       'jsonrpc': '2.0',
       'id': _nextId,
       'method': 'agent/list',
@@ -400,7 +385,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   void _onDisconnected(String reason) {
     _sub?.cancel();
     _sub = null;
-    _initId = null;
     state = state.copyWith(
       clearChannel: true,
       state: const AcpConnectionState.disconnected(),
@@ -429,7 +413,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     _reconnectTimer?.cancel();
     _sub?.cancel();
     _sub = null;
-    _initId = null;
     state.channel?.sink.close();
     state = const AcpConnection();
   }
@@ -438,7 +421,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   void dispose() {
     _sub?.cancel();
     _reconnectTimer?.cancel();
-    _initId = null;
     _messageController.close();
     state.channel?.sink.close();
     super.dispose();

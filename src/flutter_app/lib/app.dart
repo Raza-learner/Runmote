@@ -23,7 +23,11 @@ class _AppState extends ConsumerState<App> {
   Future<void> _loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('theme_mode') ?? 'system';
+    final accent = prefs.getInt('accent_color');
     ref.read(themeModeStateProvider.notifier).state = _parseThemeMode(mode);
+    if (accent != null) {
+      ref.read(accentColorProvider.notifier).state = Color(accent);
+    }
   }
 
   ThemeMode _parseThemeMode(String mode) {
@@ -40,12 +44,13 @@ class _AppState extends ConsumerState<App> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeStateProvider);
+    final accentColor = ref.watch(accentColorProvider);
     return MaterialApp.router(
       title: 'ACP Remote',
       routerConfig: goRouter,
       debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(),
-      darkTheme: buildDarkTheme(),
+      theme: buildLightTheme(seed: accentColor),
+      darkTheme: buildDarkTheme(seed: accentColor),
       themeMode: themeMode,
     );
   }

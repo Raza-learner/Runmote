@@ -2,15 +2,30 @@ import 'package:flutter/material.dart';
 
 class ThinkingSection extends StatefulWidget {
   final String text;
+  final bool isStreaming;
 
-  const ThinkingSection({super.key, required this.text});
+  const ThinkingSection({super.key, required this.text, this.isStreaming = true});
 
   @override
   State<ThinkingSection> createState() => _ThinkingSectionState();
 }
 
 class _ThinkingSectionState extends State<ThinkingSection> {
-  bool _expanded = false;
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.isStreaming;
+  }
+
+  @override
+  void didUpdateWidget(ThinkingSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.isStreaming && oldWidget.isStreaming) {
+      setState(() => _expanded = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +62,7 @@ class _ThinkingSectionState extends State<ThinkingSection> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  _AnimatedThinkingDots(),
+                  if (widget.isStreaming) _AnimatedThinkingDots(),
                   const Spacer(),
                   Icon(
                     _expanded

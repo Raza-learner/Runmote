@@ -3,6 +3,11 @@ import json
 import signal
 import sys
 from copy import deepcopy
+from pathlib import Path
+
+_src = Path(__file__).resolve().parent
+if str(_src) not in sys.path:
+    sys.path.insert(0, str(_src))
 
 from config import AGENT_CONFIGS, DAEMON_ID, DAEMON_TOKEN, RECONNECT_DELAY, RELAY_URL, _detect_acp_agents
 from websockets.asyncio.client import connect
@@ -58,7 +63,6 @@ class AgentProcess:
     async def stop(self):
         if self.proc is None or self.proc.returncode is not None:
             return
-        log(f"Killing stale agent process {self.id}...")
         self.proc.terminate()
         try:
             await asyncio.wait_for(self.proc.wait(), timeout=5)
@@ -179,7 +183,7 @@ async def run_daemon():
                     "method": "daemon/identify",
                     "params": {"daemonId": DAEMON_ID, "token": DAEMON_TOKEN},
                 })
-                log(f"→ sent identify: {DAEMON_ID}")
+
 
                 async for msg in websocket:
                     try:
@@ -198,7 +202,7 @@ async def run_daemon():
                                 print(banner, flush=True)
                             break
                     except json.JSONDecodeError:
-                        pass
+                        log(f"Invalid JSON from relay during identify: {msg[:200]}")
 
                 for agent in agents.values():
                     try:
@@ -211,10 +215,10 @@ async def run_daemon():
 
                 async def relay_to_agents():
                     async for message in websocket:
-                        log(f"relay → daemon: {message}")
                         try:
                             data = json.loads(message)
                         except json.JSONDecodeError:
+                            log(f"Invalid JSON from relay: {message[:200]}")
                             continue
 
                         method = data.get("method")
@@ -227,9 +231,10 @@ async def run_daemon():
                                     log(f"Agent '{aid}' no longer detected, stopping...")
                                     if aid in agent_tasks:
                                         at = agent_tasks.pop(aid)
-                                        for t in [at["relay"], at["stderr"], at.get("watch")]:
+                                        for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
                                             if t and not t.done():
                                                 t.cancel()
+                                    send_queues.pop(aid, None)
                                     await agents[aid].stop()
                                     del agents[aid]
                             for aid, cfg in detected.items():
@@ -242,11 +247,14 @@ async def run_daemon():
                                         agents[aid].online = False
                                         log(f"Failed to start new agent {aid}: {e}")
                                     if agents[aid].online:
+                                        send_q = asyncio.Queue()
+                                        send_queues[aid] = send_q
                                         agent_tasks[aid] = {
                                             "agent": agents[aid],
                                             "relay": asyncio.create_task(agent_to_relay(agents[aid])),
                                             "stderr": asyncio.create_task(log_stderr(agents[aid])),
                                             "watch": asyncio.create_task(watch_agent(agents[aid])),
+                                            "sender": asyncio.create_task(agent_sender(agents[aid], send_q)),
                                         }
                             await _send_json(websocket, _agent_list_message(agents, msg_id))
                             continue
@@ -264,23 +272,48 @@ async def run_daemon():
                             })
                             continue
 
-                        await agent.send(_message_for_agent(data))
+                        if agent.id in send_queues:
+                            await send_queues[agent.id].put(_message_for_agent(data))
+                        else:
+                            log(f"No send queue for {agent.id}, dropping message")
 
                 async def agent_to_relay(agent: AgentProcess):
                     if not agent.proc or not agent.proc.stdout:
                         return
-                    async for line in agent.proc.stdout:
-                        raw = line.decode().strip()
-                        if not raw:
-                            continue
-                        log(f"{agent.id} → relay: {raw}")
+                    buf = b''
+                    while True:
                         try:
-                            data = json.loads(raw)
-                            _capture_agent_info(data, agent)
-                            tagged = _tag_agent_response(data, agent)
-                            await _send_json(websocket, tagged)
-                        except json.JSONDecodeError:
-                            await websocket.send(raw)
+                            chunk = await agent.proc.stdout.read(65536)
+                        except Exception:
+                            break
+                        if not chunk:
+                            break
+                        buf += chunk
+                        while b'\n' in buf:
+                            line, buf = buf.split(b'\n', 1)
+                            raw = line.decode(errors='replace').strip()
+                            if not raw:
+                                continue
+                            try:
+                                data = json.loads(raw)
+                                _capture_agent_info(data, agent)
+                                tagged = _tag_agent_response(data, agent)
+                                await _send_json(websocket, tagged)
+                            except json.JSONDecodeError:
+                                await websocket.send(raw)
+                        if len(buf) > 1_048_576:
+                            log(f"{agent.id} stdout: discarding oversized buffer ({len(buf)} bytes without newline)")
+                            buf = b''
+                    if buf:
+                        raw = buf.decode(errors='replace').strip()
+                        if raw:
+                            try:
+                                data = json.loads(raw)
+                                _capture_agent_info(data, agent)
+                                tagged = _tag_agent_response(data, agent)
+                                await _send_json(websocket, tagged)
+                            except json.JSONDecodeError:
+                                await websocket.send(raw)
 
                 async def log_stderr(agent: AgentProcess):
                     if not agent.proc or not agent.proc.stderr:
@@ -301,16 +334,28 @@ async def run_daemon():
                     log(f"Agent {agent.id} exited with code {agent.proc.returncode}")
                     await _send_json(websocket, _agent_list_message(agents))
 
+                async def agent_sender(agent: AgentProcess, queue: asyncio.Queue):
+                    while True:
+                        message = await queue.get()
+                        try:
+                            await agent.send(message)
+                        except Exception:
+                            break
+
                 relay_task = asyncio.create_task(relay_to_agents())
-                agent_tasks = {
-                    agent.id: {
-                        "agent": agent,
-                        "relay": asyncio.create_task(agent_to_relay(agent)),
-                        "stderr": asyncio.create_task(log_stderr(agent)),
-                        "watch": asyncio.create_task(watch_agent(agent)),
-                    }
-                    for agent in agents.values() if agent.online
-                }
+                send_queues: dict[str, asyncio.Queue] = {}
+                agent_tasks: dict = {}
+                for agent in agents.values():
+                    if agent.online:
+                        send_q = asyncio.Queue()
+                        send_queues[agent.id] = send_q
+                        agent_tasks[agent.id] = {
+                            "agent": agent,
+                            "relay": asyncio.create_task(agent_to_relay(agent)),
+                            "stderr": asyncio.create_task(log_stderr(agent)),
+                            "watch": asyncio.create_task(watch_agent(agent)),
+                            "sender": asyncio.create_task(agent_sender(agent, send_q)),
+                        }
 
                 while agent_tasks:
                     # Wait for any agent to fail
@@ -326,8 +371,10 @@ async def run_daemon():
                     for aid, at in list(agent_tasks.items()):
                         if at["watch"].done():
                             log(f"Agent {aid} stopped, continuing others...")
-                            for t in [at["relay"], at["stderr"]]:
-                                t.cancel()
+                            for t in [at["relay"], at["stderr"], at.get("sender")]:
+                                if t and not t.done():
+                                    t.cancel()
+                            send_queues.pop(aid, None)
                             del agent_tasks[aid]
 
                     # If relay task stopped or no agents left, stop everything

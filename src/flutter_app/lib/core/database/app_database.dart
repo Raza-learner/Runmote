@@ -136,6 +136,7 @@ class AppDatabase extends _$AppDatabase {
     required String content,
     String? segmentsJson,
     required bool isStreaming,
+    int? createdAt,
   }) async {
     await into(chatMessages).insertOnConflictUpdate(
       ChatMessagesCompanion(
@@ -145,13 +146,21 @@ class AppDatabase extends _$AppDatabase {
         content: Value(content),
         segmentsJson: Value(segmentsJson),
         isStreaming: Value(isStreaming ? 1 : 0),
-        createdAt: Value(DateTime.now().millisecondsSinceEpoch.toDouble()),
+        createdAt: Value((createdAt ?? DateTime.now().millisecondsSinceEpoch).toDouble()),
       ),
     );
   }
 
   Future<List<ChatMessage>> getMessages(String sessionId) async {
     return (select(chatMessages)..where((t) => t.sessionId.equals(sessionId)))
+        .get();
+  }
+
+  Future<List<ChatMessage>> getRecentMessages(String sessionId, {int limit = 5}) async {
+    return (select(chatMessages)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)])
+          ..limit(limit))
         .get();
   }
 

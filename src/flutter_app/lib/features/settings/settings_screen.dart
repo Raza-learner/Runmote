@@ -160,9 +160,9 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   String _accentName(Color color) {
-    for (final c in AppColors.accentOptions) {
-      if (c == color) {
-        return c.toString().split('.')[1];
+    for (final opt in AppColors.accentOptions) {
+      if (opt.color == color) {
+        return opt.name;
       }
     }
     return 'Custom';
@@ -213,11 +213,11 @@ class SettingsScreen extends ConsumerWidget {
             Wrap(
               spacing: 12,
               runSpacing: 12,
-              children: AppColors.accentOptions.map((color) {
+              children: AppColors.accentOptions.map((opt) {
                 return GestureDetector(
                   onTap: () {
                     SharedPreferences.getInstance().then((prefs) {
-                      prefs.setInt('accent_color', color.toARGB32());
+                      prefs.setInt('accent_color', opt.color.toARGB32());
                     });
                     Navigator.of(ctx).pop();
                   },
@@ -225,14 +225,14 @@ class SettingsScreen extends ConsumerWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: color,
+                      color: opt.color,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.2),
                         width: 2,
                       ),
                     ),
-                    child: color == Theme.of(context).colorScheme.primary
+                    child: opt.color == Theme.of(context).colorScheme.primary
                         ? const Icon(Icons.check, color: Colors.white, size: 24)
                         : null,
                   ),

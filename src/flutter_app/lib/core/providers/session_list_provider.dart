@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'connection_provider.dart';
 import 'database_provider.dart';
+import '../models/connection_state.dart';
 
 class AcpSession {
   final String id;
@@ -54,16 +55,66 @@ class AcpSession {
 class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
   final Ref _ref;
   final _deletedIds = <String>{};
+  StreamSubscription<Map<String, dynamic>>? _messageSub;
+  ProviderSubscription<AcpConnection>? _connectionSub;
+  Timer? _debounceTimer;
+  bool _wasConnected = false;
+  bool _isLoading = false;
 
-  SessionListNotifier(this._ref) : super(const AsyncValue.loading());
+  SessionListNotifier(this._ref) : super(const AsyncValue.loading()) {
+    _listenToMessages();
+  }
+
+  void _listenToMessages() {
+    final notifier = _ref.read(connectionProvider.notifier);
+
+    _messageSub = notifier.messages.listen((msg) {
+      final method = msg['method'] as String?;
+      if (method != null && method.startsWith('session/')) {
+        _debouncedRefresh();
+      }
+    });
+
+    _connectionSub = _ref.listen<AcpConnection>(
+      connectionProvider,
+      (previous, next) {
+        final isConnected = next.state is Connected;
+        if (isConnected && !_wasConnected) {
+          _debouncedRefresh();
+        }
+        _wasConnected = isConnected;
+      },
+    );
+  }
+
+  void _debouncedRefresh() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        loadSessions();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _messageSub?.cancel();
+    _connectionSub?.close();
+    _debounceTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> loadSessions() async {
-    state = const AsyncValue.loading();
+    if (_isLoading) return;
+    _isLoading = true;
+
+    // Preserve existing data while refreshing so the list doesn't flash.
+    if (!state.hasValue) {
+      state = const AsyncValue.loading();
+    }
     try {
       final connection = _ref.read(connectionProvider);
-      debugPrint('[ACP-SESS] load: channel=${connection.channel != null} agent=${connection.selectedAgentId}');
       if (connection.channel == null) {
-        debugPrint('[ACP-SESS] load: channel is null, returning empty');
         state = const AsyncValue.data([]);
         return;
       }
@@ -73,24 +124,27 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       final selectedAgentId = connection.selectedAgentId;
       final capabilities = connection.capabilities;
       final supportsList = capabilities?.supportsSessionList ?? true;
-      debugPrint('[ACP-SESS] load: selected=$selectedAgentId supportsList=$supportsList deleted=${_deletedIds.length}');
 
       final pairingCode = _cacheDeviceCode(
         connection.pairingCode ?? '',
         selectedAgentId,
       );
 
+      // Always show cached sessions first so the list is never empty
+      // while waiting for the agent response.
+      final cachedRows = await db.getCachedSessions(pairingCode);
+      final cachedSessions = cachedRows
+          .map((s) => AcpSession(
+                id: s.id,
+                title: s.title,
+                cwd: s.cwd,
+                updatedAt: s.updatedAt,
+              ))
+          .where((s) => !_deletedIds.contains(s.id))
+          .toList();
+      state = AsyncValue.data(cachedSessions);
+
       if (!supportsList) {
-        debugPrint('[ACP-SESS] load: agent does not support session/list, using local cache');
-        final cached = await db.getCachedSessions(pairingCode);
-        final sessions = cached.map((s) => AcpSession(
-          id: s.id,
-          title: s.title,
-          cwd: s.cwd,
-          updatedAt: s.updatedAt,
-        )).where((s) => !_deletedIds.contains(s.id)).toList();
-        debugPrint('[ACP-SESS] load: ${sessions.length} cached sessions (${_deletedIds.length} deleted)');
-        state = AsyncValue.data(sessions);
         return;
       }
 
@@ -99,30 +153,26 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       StreamSubscription<Map<String, dynamic>>? sub;
 
       sub = notifier.messages.listen((msg) {
-        debugPrint('[ACP-SESS] load: stream msg id=${msg['id']} expect=$requestId');
         if (msg['id'] == requestId) {
           try {
             final result = msg['result'] as Map<String, dynamic>?;
             if (result != null) {
               final raw = result['sessions'];
-              debugPrint('[ACP-SESS] load: got result');
-              final sessions =
-                  (raw as List<dynamic>?)
+              final sessions = (raw as List<dynamic>?)
                       ?.map((e) => AcpSession.fromJson(e as Map<String, dynamic>))
                       .toList() ??
                   [];
-              debugPrint('[ACP-SESS] load: parsed ${sessions.length}');
               if (!completer.isCompleted) {
                 completer.complete(sessions);
               }
             } else {
-              debugPrint('[ACP-SESS] load: error: ${msg['error']}');
+              debugPrint('[ACP-SESS] load error: ${msg['error']}');
               if (!completer.isCompleted) {
                 completer.complete([]);
               }
             }
           } catch (e, _) {
-            debugPrint('[ACP-SESS] load: listener threw: $e');
+            debugPrint('[ACP-SESS] load listener error: $e');
             if (!completer.isCompleted) {
               completer.complete([]);
             }
@@ -131,7 +181,6 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       });
 
       requestId = DateTime.now().millisecondsSinceEpoch;
-      debugPrint('[ACP-SESS] load: sending session/list id=$requestId');
       final params = <String, dynamic>{};
       if (selectedAgentId != null) {
         params['agentId'] = selectedAgentId;
@@ -146,17 +195,28 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       final rawSessions = await completer.future.timeout(
         const Duration(seconds: 5),
         onTimeout: () {
-          debugPrint('[ACP-SESS] load: TIMEOUT');
+          debugPrint('[ACP-SESS] load TIMEOUT');
           return [];
         },
       );
 
       await sub.cancel();
 
-      final sessions = rawSessions
+      // Merge remote sessions into cached sessions. Prefer remote entries when
+      // they exist, because the agent is the source of truth for sessions it
+      // knows about. Keep cached-only sessions (e.g. created on this phone).
+      final remoteSessions = rawSessions
           .where((s) => !_deletedIds.contains(s.id))
           .toList();
-      debugPrint('[ACP-SESS] load: got ${sessions.length} (${rawSessions.length} raw, ${_deletedIds.length} deleted)');
+      final merged = <String, AcpSession>{};
+      for (final s in cachedSessions) {
+        merged[s.id] = s;
+      }
+      for (final s in remoteSessions) {
+        merged[s.id] = s;
+      }
+      final sessions = merged.values.toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
       for (final session in sessions) {
         await db.cacheSession(
@@ -170,8 +230,10 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
 
       state = AsyncValue.data(sessions);
     } catch (e, st) {
-      debugPrint('[ACP-SESS] load: error $e');
+      debugPrint('[ACP-SESS] load error: $e\n$st');
       state = AsyncValue.error(e, st);
+    } finally {
+      _isLoading = false;
     }
   }
 
@@ -184,20 +246,17 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       }
 
       final notifier = _ref.read(connectionProvider.notifier);
-      debugPrint('[ACP-SESS] create: cwd=$cwd agent=${connection.selectedAgentId}');
 
       final completer = Completer<AcpSession?>();
       int? requestId;
       StreamSubscription<Map<String, dynamic>>? sub;
 
       sub = notifier.messages.listen((msg) {
-        debugPrint('[ACP-SESS] create: stream msg id=${msg['id']} expect=$requestId');
         if (msg['id'] == requestId) {
           try {
             final result = msg['result'] as Map<String, dynamic>?;
             if (result != null) {
               final sessionId = result['sessionId'] as String;
-              debugPrint('[ACP-SESS] create: got sessionId=$sessionId');
               if (!completer.isCompleted) {
                 completer.complete(
                   AcpSession(
@@ -209,13 +268,13 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
                 );
               }
             } else {
-              debugPrint('[ACP-SESS] create: error response: ${msg['error']}');
+              debugPrint('[ACP-SESS] create error: ${msg['error']}');
               if (!completer.isCompleted) {
                 completer.complete(null);
               }
             }
           } catch (e, st) {
-            debugPrint('[ACP-SESS] create: listener threw: $e\n$st');
+            debugPrint('[ACP-SESS] create listener error: $e\n$st');
             if (!completer.isCompleted) {
               completer.complete(null);
             }
@@ -224,7 +283,6 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       });
 
       requestId = DateTime.now().millisecondsSinceEpoch;
-      debugPrint('[ACP-SESS] create: sending session/new id=$requestId');
       notifier.sendRaw({
         'jsonrpc': '2.0',
         'id': requestId,
@@ -240,7 +298,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       final session = await completer.future.timeout(
         const Duration(seconds: 5),
         onTimeout: () {
-          debugPrint('[ACP-SESS] create: TIMEOUT after 5s');
+          debugPrint('[ACP-SESS] create TIMEOUT after 5s');
           return null;
         },
       );

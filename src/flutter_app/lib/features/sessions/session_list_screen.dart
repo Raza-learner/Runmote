@@ -30,77 +30,35 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
   }
 
   void _confirmDelete(AcpSession session) {
-    final connection = ref.read(connectionProvider);
-    final supportsRemoteDelete =
-        connection.capabilities?.supportsDelete ?? false;
-
-    if (supportsRemoteDelete) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Delete session?'),
-          content: Text(
-            session.title ?? 'Untitled',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                ref
-                    .read(sessionListProvider.notifier)
-                    .deleteSession(session.id);
-              },
-              child: const Text('Phone only'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                ref
-                    .read(sessionListProvider.notifier)
-                    .deleteSession(session.id);
-                ref
-                    .read(sessionListProvider.notifier)
-                    .deleteSessionRemote(session.id);
-              },
-              child: const Text('Phone + laptop'),
-            ),
-          ],
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete session?'),
+        content: Text(
+          session.title ?? 'Untitled',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
-      );
-    } else {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Delete session?'),
-          content: Text(
-            session.title ?? 'Untitled',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                ref
-                    .read(sessionListProvider.notifier)
-                    .deleteSession(session.id);
-              },
-              child: const Text('Delete from phone'),
-            ),
-          ],
-        ),
-      );
-    }
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ref
+                  .read(sessionListProvider.notifier)
+                  .deleteSession(session.id);
+              ref
+                  .read(sessionListProvider.notifier)
+                  .deleteSessionRemote(session.id);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -289,10 +247,11 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
               cwd: session.cwd,
               timeAgo: _timeAgo(session.updatedAt),
                     onTap: () {
-                      ref
-                          .read(connectionProvider.notifier)
-                          .loadSession(session.id, session.cwd);
-                      context.go('/chat/${session.id}');
+                      final cwd = session.cwd;
+                      final path = cwd.isNotEmpty
+                          ? '/chat/${session.id}?cwd=${Uri.encodeComponent(cwd)}'
+                          : '/chat/${session.id}';
+                      context.push(path);
                     },
               onDelete: () {
                 _confirmDelete(session);

@@ -1,0 +1,16 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+
+COPY pyproject.toml .
+RUN pip install --no-cache-dir .
+
+COPY src/ ./src/
+
+EXPOSE 8000
+
+ENV ACP_RELAY_HOST=0.0.0.0
+ENV ACP_RELAY_PORT=8000
+ENV ACP_RELAY_DB=/data/acp_relay.db
+
+CMD ["python", "-m", "src.relay.main"]

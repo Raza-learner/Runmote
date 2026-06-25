@@ -18,8 +18,11 @@ class PairScreen extends ConsumerStatefulWidget {
 
 class _PairScreenState extends ConsumerState<PairScreen> {
   final _codeController = TextEditingController();
+  final _manualHostController = TextEditingController(text: '192.168.1.12');
+  final _manualPortController = TextEditingController(text: '8000');
   bool _discoveryStarted = false;
   bool _isConnecting = false;
+  bool _showManualEntry = false;
   String? _error;
 
   @override
@@ -32,7 +35,16 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   void dispose() {
     _codeController.removeListener(_onCodeChanged);
     _codeController.dispose();
+    _manualHostController.dispose();
+    _manualPortController.dispose();
     super.dispose();
+  }
+
+  String? get _manualRelayUrl {
+    final host = _manualHostController.text.trim();
+    final port = _manualPortController.text.trim();
+    if (host.isEmpty || port.isEmpty) return null;
+    return 'ws://$host:$port';
   }
 
   void _onCodeChanged() {
@@ -67,7 +79,8 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     });
 
     final discovery = ref.read(relayDiscoveryProvider);
-    ref.read(connectionProvider.notifier).connect(code, relayUrl: discovery.url);
+    final url = discovery.url ?? _manualRelayUrl;
+    ref.read(connectionProvider.notifier).connect(code, relayUrl: url);
   }
 
   @override
@@ -201,31 +214,142 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   }
 
   Widget _buildError(String error, bool isDark) {
+    return Column(
+      children: [
+        _GlassCard(
+          isDark: isDark,
+          child: Column(
+            children: [
+              Icon(
+                Icons.wifi_off_rounded,
+                size: 48,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                error,
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      ref.read(relayDiscoveryProvider.notifier).startDiscovery();
+                    },
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    label: const Text('Retry', style: TextStyle(color: Colors.white)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.white38),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() => _showManualEntry = true);
+                    },
+                    icon: const Icon(Icons.edit, color: Colors.white),
+                    label: const Text('Manual', style: TextStyle(color: Colors.white)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.white38),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (_showManualEntry) ...[
+          const SizedBox(height: 16),
+          _buildManualEntry(isDark),
+          const SizedBox(height: 16),
+          _buildCodeInput(isDark),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildManualEntry(bool isDark) {
     return _GlassCard(
       isDark: isDark,
       child: Column(
         children: [
-          Icon(
-            Icons.wifi_off_rounded,
-            size: 48,
-            color: Colors.white.withValues(alpha: 0.7),
+          const Text(
+            'Enter relay address',
+            style: TextStyle(color: Colors.white70, fontSize: 14),
           ),
-          const SizedBox(height: 16),
-          Text(
-            error,
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: () {
-              ref.read(relayDiscoveryProvider.notifier).startDiscovery();
-            },
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            label: const Text('Retry', style: TextStyle(color: Colors.white)),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.white38),
-            ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: TextField(
+                  controller: _manualHostController,
+                  decoration: InputDecoration(
+                    hintText: 'IP address',
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      fontSize: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.08),
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 1,
+                child: TextField(
+                  controller: _manualPortController,
+                  decoration: InputDecoration(
+                    hintText: 'Port',
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      fontSize: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.08),
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -434,10 +558,12 @@ class _PulsingDotsState extends State<_PulsingDots>
       animation: _controller,
       builder: (context, child) {
         final t = _controller.value;
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(3, (i) {
-            final dotT = ((t * 3 - i) % 1).abs();
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(3, (i) {
+              final phase = i / 3.0;
+              final raw = (t * 3 - phase) % 1.0;
+              final dotT = raw < 0 ? raw + 1 : raw;
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Container(

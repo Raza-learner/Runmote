@@ -17,6 +17,10 @@ final themeModeStateProvider = StateProvider<ThemeMode>((ref) {
   return ThemeMode.system;
 });
 
+final accentColorProvider = StateProvider<Color>((ref) {
+  return Colors.indigo;
+});
+
 final pairingCodeProvider = FutureProvider<String?>((ref) async {
   final prefs = await ref.watch(preferencesServiceProvider.future);
   return prefs.getPairingCode();

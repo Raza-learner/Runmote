@@ -1,16 +1,23 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'chat_provider.dart';
 import '../../core/providers/connection_provider.dart';
+import '../../core/providers/session_list_provider.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/message_bubble.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String sessionId;
+  final String cwd;
 
-  const ChatScreen({super.key, required this.sessionId});
+  const ChatScreen({super.key, required this.sessionId, required this.cwd});
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -20,18 +27,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   bool _showScrollButton = false;
+  bool _userScrolledUp = false;
+  final List<Map<String, String>> _attachments = [];
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(() {
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      final currentScroll = _scrollController.position.pixels;
-      final show = maxScroll - currentScroll > 200;
-      if (show != _showScrollButton) {
-        setState(() => _showScrollButton = show);
-      }
-    });
+    _scrollController.addListener(_onScroll);
+    _textController.addListener(() => setState(() {}));
   }
 
   @override
@@ -41,12 +44,74 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    final distance = maxScroll - currentScroll;
+    final show = distance > 160;
+    final scrolledUp = distance > 80;
+
+    if (show != _showScrollButton) {
+      setState(() => _showScrollButton = show);
+    }
+    _userScrolledUp = scrolledUp;
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      final bytes = file.bytes ?? (await _readFile(file.path));
+      if (bytes == null) return;
+      final ext = file.extension?.toLowerCase() ?? 'jpg';
+      final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
+      setState(() {
+        _attachments.add({
+          'name': file.name,
+          'data': base64Encode(bytes),
+          'mimeType': mime,
+        });
+      });
+    } catch (e) {
+      debugPrint('[ACP] file pick error: $e');
+    }
+  }
+
+  Future<Uint8List?> _readFile(String? path) async {
+    if (path == null) return null;
+    try {
+      return await File(path).readAsBytes();
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _sendMessage() {
     final text = _textController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty && _attachments.isEmpty) return;
+
     _textController.clear();
-    ref.read(chatProvider(widget.sessionId).notifier).sendMessage(text);
-    Future.delayed(const Duration(milliseconds: 150), _scrollToBottom);
+
+    List<Map<String, dynamic>>? extra;
+    if (_attachments.isNotEmpty) {
+      extra = _attachments.map((a) => <String, dynamic>{
+            'type': 'image',
+            'data': a['data'] ?? '',
+            'mimeType': a['mimeType'] ?? 'image/jpeg',
+          }).toList();
+      setState(() => _attachments.clear());
+    }
+
+    ref
+        .read(chatProvider((widget.sessionId, widget.cwd)).notifier)
+        .sendMessage(text, extra: extra);
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -59,46 +124,134 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  void _scrollToBottomIfNearEnd() {
+    if (_scrollController.hasClients && !_userScrolledUp) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  String _sessionTitle(List<AcpSession> sessions) {
+    final match = sessions.where((s) => s.id == widget.sessionId).firstOrNull;
+    if (match?.title != null && match!.title!.isNotEmpty) {
+      return match.title!;
+    }
+    if (widget.cwd.isNotEmpty && widget.cwd != '/') {
+      final parts = widget.cwd.split('/');
+      final last =
+          parts.lastWhere((p) => p.isNotEmpty, orElse: () => widget.cwd);
+      return last;
+    }
+    return 'Chat';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final chatState = ref.watch(chatProvider(widget.sessionId));
+    final chatState = ref.watch(chatProvider((widget.sessionId, widget.cwd)));
     final connection = ref.watch(connectionProvider);
+    final sessionList = ref.watch(sessionListProvider);
+
+    ref.listen(
+      chatProvider((widget.sessionId, widget.cwd)),
+      (previous, next) {
+        final prevCount = previous?.valueOrNull?.messages.length ?? 0;
+        final nextCount = next.valueOrNull?.messages.length ?? 0;
+        final wasStreaming =
+            previous?.valueOrNull?.messages.lastOrNull?.isStreaming ?? false;
+        final isStreaming =
+            next.valueOrNull?.messages.lastOrNull?.isStreaming ?? false;
+        if (nextCount > prevCount || (isStreaming && !wasStreaming)) {
+          Future.microtask(_scrollToBottomIfNearEnd);
+        }
+        if (isStreaming && !wasStreaming) {
+          Future.microtask(_scrollToBottomIfNearEnd);
+        }
+      },
+    );
+
+    final title = sessionList.whenOrNull(data: _sessionTitle) ??
+        connection.agentInfo?.name ??
+        'Chat';
+
+    final isBusy = chatState.whenOrNull(data: (cs) => cs.isBusy) ?? false;
+    final canSendImages = connection.capabilities?.canSendImages ?? false;
+
+    final modelConfig = chatState.whenOrNull(
+      data: (cs) => cs.configOptions
+          .where((c) => c.category == 'model')
+          .firstOrNull,
+    );
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          connection.agentInfo?.name ?? 'Chat',
-          style: theme.textTheme.titleSmall,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleMedium,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (connection.agentInfo?.name != null)
+              Text(
+                connection.agentInfo!.name,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/sessions'),
+          onPressed: () => context.pop(),
         ),
-        actions: chatState.whenOrNull(
-              data: (cs) {
-                final modelConfig = cs.configOptions
-                    .where((c) => c.category == 'model')
-                    .firstOrNull;
-                if (modelConfig == null) return null;
-                return [
-                  IconButton(
-                    icon: const Icon(Icons.tune),
-                    tooltip: 'Model & Mode',
-                    onPressed: () => _showConfigSheet(context, cs),
-                  ),
-                ];
-              },
-            ) ??
-            [],
       ),
       body: Column(
         children: [
           Expanded(
             child: chatState.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 56,
+                        color: theme.colorScheme.error,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Could not load chat',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        e.toString(),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.tonal(
+                        onPressed: () => ref
+                            .read(chatProvider(
+                                    (widget.sessionId, widget.cwd))
+                                .notifier)
+                            .loadMessages(),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               data: (cs) {
                 final messages = cs.messages;
                 if (messages.isEmpty) {
@@ -108,9 +261,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.chat_bubble_outline,
-                              size: 64,
-                              color: theme.colorScheme.onSurfaceVariant),
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            size: 64,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                           const SizedBox(height: 16),
                           Text(
                             'Start a conversation',
@@ -140,10 +295,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       itemBuilder: (context, index) {
                         final msg = messages[index];
                         return Padding(
-                          padding: EdgeInsets.only(
-                            top: index == 0 ? 0 : 0,
-                            bottom: 4,
-                          ),
+                          padding: const EdgeInsets.only(bottom: 4),
                           child: MessageBubble(message: msg),
                         );
                       },
@@ -154,8 +306,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         right: 8,
                         child: FloatingActionButton.small(
                           onPressed: _scrollToBottom,
-                          child:
-                              const Icon(Icons.keyboard_arrow_down),
+                          child: const Icon(Icons.keyboard_arrow_down),
                         ),
                       ),
                   ],
@@ -163,26 +314,91 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               },
             ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              border: Border(
-                top: BorderSide(
-                  color: theme.colorScheme.outlineVariant,
+          _buildInputArea(theme, isBusy, canSendImages, modelConfig),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputArea(
+    ThemeData theme,
+    bool isBusy,
+    bool canSendImages,
+    ConfigOption? modelConfig,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_attachments.isNotEmpty)
+              Container(
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _attachments.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final att = _attachments[index];
+                    return Chip(
+                      label: Text(
+                        att['name'] ?? 'file',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      deleteIcon: const Icon(Icons.close, size: 16),
+                      onDeleted: () => setState(
+                          () => _attachments.removeAt(index)),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                    );
+                  },
                 ),
               ),
-            ),
-            padding: const EdgeInsets.all(12),
-            child: SafeArea(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
               child: Row(
+                children: [
+                  if (modelConfig != null)
+                    _ModelChip(
+                      label: modelConfig.currentValue.isNotEmpty
+                          ? modelConfig.currentValue
+                          : modelConfig.name,
+                      onTap: () {
+                        final cs = ref
+                            .read(chatProvider(
+                                (widget.sessionId, widget.cwd)))
+                            .valueOrNull;
+                        if (cs != null) _showConfigSheet(context, cs);
+                      },
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _textController,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _sendMessage(),
+                      enabled: !isBusy,
+                      minLines: 1,
+                      maxLines: 5,
                       decoration: InputDecoration(
-                        hintText: 'Type a message...',
+                        hintText: isBusy
+                            ? 'Agent is responding...'
+                            : 'Type a message...',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
                         ),
@@ -195,83 +411,183 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _sendMessage,
-                    icon: const Icon(Icons.send),
-                  ),
+                  if (canSendImages && !isBusy)
+                    IconButton(
+                      onPressed: _pickFile,
+                      icon: Icon(
+                        Icons.attach_file,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      tooltip: 'Attach image',
+                    ),
+                  const SizedBox(width: 4),
+                  isBusy
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          ),
+                        )
+                      : IconButton.filled(
+                          onPressed:
+                              _textController.text.trim().isNotEmpty ||
+                                      _attachments.isNotEmpty
+                                  ? _sendMessage
+                                  : null,
+                          icon: const Icon(Icons.send),
+                        ),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   void _showConfigSheet(BuildContext context, ChatState cs) {
+    FocusScope.of(context).unfocus();
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        final theme = Theme.of(context);
+        final theme = Theme.of(ctx);
+        final bottom = MediaQuery.of(ctx).viewInsets.bottom;
         return Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              ...cs.configOptions.map((opt) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(opt.name,
-                          style: theme.textTheme.labelMedium
-                              ?.copyWith(
-                                  color: theme
-                                      .colorScheme.onSurfaceVariant)),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        children: opt.options.map((v) {
-                          final selected =
-                              v.value == opt.currentValue;
-                          return ChoiceChip(
-                            label: Text(v.name),
-                            selected: selected,
-                            onSelected: (_) {
-                              ref
-                                  .read(chatProvider(widget.sessionId)
-                                      .notifier)
-                                  .setConfigOption(opt.id, v.value);
-                            },
-                          );
-                        }).toList(),
+          padding: EdgeInsets.only(bottom: bottom),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                    ],
+                    ),
                   ),
-                );
-              }),
-              const SizedBox(height: AppSpacing.md),
-            ],
+                  const SizedBox(height: AppSpacing.lg),
+                  ...cs.configOptions.map((opt) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            opt.name,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Consumer(
+                            builder: (ctx2, ref2, _) {
+                              final live = ref2
+                                  .watch(chatProvider((
+                                          widget.sessionId, widget.cwd)))
+                                  .valueOrNull;
+                              final liveOpt = live?.configOptions
+                                  .where((o) => o.id == opt.id)
+                                  .firstOrNull;
+                              final currentValue =
+                                  liveOpt?.currentValue ?? opt.currentValue;
+                              return Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: opt.options.map((v) {
+                                  final selected =
+                                      v.value == currentValue;
+                                  return ChoiceChip(
+                                    label: Text(v.name),
+                                    selected: selected,
+                                    onSelected: (_) {
+                                      ref2
+                                          .read(chatProvider((
+                                                  widget.sessionId,
+                                                  widget.cwd))
+                                              .notifier)
+                                          .setConfigOption(
+                                              opt.id, v.value);
+                                    },
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+              ),
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+class _ModelChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _ModelChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.secondaryContainer
+                .withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.tune,
+                size: 14,
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSecondaryContainer,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

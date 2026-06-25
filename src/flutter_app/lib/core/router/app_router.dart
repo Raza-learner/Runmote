@@ -87,7 +87,9 @@ final goRouter = GoRouter(
       path: '/chat/:sessionId',
       builder: (context, state) {
         final sessionId = state.pathParameters['sessionId']!;
-        return ChatScreen(sessionId: sessionId);
+        final raw = state.uri.queryParameters['cwd'];
+        final cwd = raw != null ? Uri.decodeComponent(raw) : '';
+        return ChatScreen(sessionId: sessionId, cwd: cwd);
       },
     ),
   ],

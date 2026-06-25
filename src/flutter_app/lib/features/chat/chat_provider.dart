@@ -10,6 +10,8 @@ import '../../core/models/chat_message.dart';
 import '../../core/models/assistant_segment.dart';
 import '../../core/providers/connection_provider.dart';
 import '../../core/providers/database_provider.dart';
+import '../../core/providers/session_list_provider.dart';
+import '../../core/models/connection_state.dart';
 
 class ConfigOption {
   final String id;
@@ -69,31 +71,57 @@ class ChatState {
   final List<ConfigOption> configOptions;
   final String? currentModel;
   final String? currentMode;
+  final bool isBusy;
 
   const ChatState({
     this.messages = const [],
     this.configOptions = const [],
     this.currentModel,
     this.currentMode,
+    this.isBusy = false,
   });
 }
 
 class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   final Ref _ref;
   final String _sessionId;
+  final String _cwd;
   final _uuid = const Uuid();
   StreamSubscription<Map<String, dynamic>>? _sub;
   bool _loaded = false;
   final List<ChatMessage> _buffer = [];
+  final Set<int> _pendingIds = {};
+  int? _loadPendingId;
+  String? _timeoutMessageId;
 
-  ChatNotifier(this._ref, this._sessionId)
+  ChatNotifier(this._ref, this._sessionId, this._cwd)
       : super(const AsyncValue.loading()) {
     _listenToRelay();
-    _loadMessages();
+    _loadSessionFromAgent();
+    loadMessages();
   }
 
+  void _loadSessionFromAgent() {
+    final connection = _ref.read(connectionProvider);
+    final supportsLoad = connection.capabilities?.supportsLoadSession ?? true;
+    if (!supportsLoad) {
+      return;
+    }
+    final notifier = _ref.read(connectionProvider.notifier);
+    final id = notifier.loadSession(_sessionId, _cwd);
+    _pendingIds.add(id);
+    _loadPendingId = id;
+  }
+
+  bool get _isBusy =>
+      _pendingIds.isNotEmpty ||
+      _buffer.any((m) => m.isStreaming);
+
   void _syncState() {
-    state = AsyncValue.data(ChatState(messages: List.of(_buffer)));
+    state = AsyncValue.data(ChatState(
+      messages: List.of(_buffer),
+      isBusy: _isBusy,
+    ));
   }
 
   void _syncConfigAndState(List<ConfigOption> configs) {
@@ -104,14 +132,15 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       configOptions: configs,
       currentModel: model?.currentValue,
       currentMode: mode?.currentValue,
+      isBusy: _isBusy,
     ));
   }
 
-  Future<void> _loadMessages() async {
+  Future<void> loadMessages() async {
     try {
       final db = _ref.read(databaseProvider);
-      final rows = await db.getMessages(_sessionId);
-      final dbMessages = rows.map(_dbRowToMessage).toList();
+      final rows = await db.getRecentMessages(_sessionId, limit: 5);
+      final dbMessages = rows.reversed.map(_dbRowToMessage).toList();
       if (_buffer.isNotEmpty) {
         _buffer.insertAll(0, dbMessages);
       } else {
@@ -121,6 +150,16 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       debugPrint('[ACP-CHAT] _loadMessages error: $e');
     }
     _loaded = true;
+    if (_loadPendingId != null) {
+      Future.delayed(const Duration(seconds: 10), () {
+        if (_loadPendingId != null && _pendingIds.contains(_loadPendingId)) {
+          _pendingIds.remove(_loadPendingId);
+          _loadPendingId = null;
+          _syncState();
+        }
+      });
+      return;
+    }
     _syncState();
   }
 
@@ -147,14 +186,79 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
           row.role == 'user' ? ChatMessageRole.user : ChatMessageRole.assistant,
       content: row.content,
       segments: segments,
-      isStreaming: row.isStreaming == 1,
+      isStreaming: false,
       createdAt: row.createdAt.toInt(),
     );
   }
 
+  void _populateFromLoad(Map<String, dynamic> result) {
+    try {
+      final rawMessages = result['messages'] as List<dynamic>;
+      var added = false;
+      for (final raw in rawMessages) {
+        if (raw is! Map<String, dynamic>) continue;
+        final id = (raw['id'] as String?) ?? _uuid.v4();
+        if (_buffer.any((m) => m.id == id)) continue;
+
+        final roleStr = raw['role'] as String? ?? 'assistant';
+        final role = roleStr == 'user'
+            ? ChatMessageRole.user
+            : ChatMessageRole.assistant;
+        final content = raw['content'] as String? ?? '';
+
+        List<AssistantSegment> segments = [];
+        if (raw['segments'] is List) {
+          for (final seg in raw['segments'] as List<dynamic>) {
+            if (seg is Map<String, dynamic>) {
+              try {
+                segments.add(AssistantSegment.fromJson(seg));
+              } catch (_) {}
+            }
+          }
+        }
+
+        _buffer.add(ChatMessage(
+          id: id,
+          role: role,
+          content: content,
+          segments: segments,
+          isStreaming: false,
+          createdAt: (raw['createdAt'] as num?)?.toInt() ??
+              DateTime.now().millisecondsSinceEpoch,
+        ));
+        added = true;
+      }
+
+      if (added) {
+        _saveMessagesToDb();
+        if (_loaded) _syncState();
+      }
+    } catch (e) {
+      debugPrint('[ACP-CHAT] error parsing load response: $e');
+    }
+  }
+
+  Future<void> _saveMessagesToDb() async {
+    try {
+      final db = _ref.read(databaseProvider);
+      for (final m in _buffer) {
+        if (m.role == ChatMessageRole.user) continue;
+        await db.saveMessage(
+          id: m.id,
+          sessionId: _sessionId,
+          role: 'assistant',
+          content: m.content,
+          isStreaming: false,
+          createdAt: m.createdAt,
+        );
+      }
+    } catch (e) {
+      debugPrint('[ACP-CHAT] error saving to DB: $e');
+    }
+  }
+
   void _listenToRelay() {
     final notifier = _ref.read(connectionProvider.notifier);
-    debugPrint('[ACP-CHAT] $_sessionId listening for updates');
     _sub = notifier.messages.listen((msg) {
       final method = msg['method'] as String?;
       final params = msg['params'] as Map<String, dynamic>?;
@@ -165,6 +269,46 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
         } else if (method == 'session/notification') {
           _handleLegacyNotification(params);
         }
+      }
+
+      // Detect JSON-RPC response to a pending request (prompt/load done)
+      final msgId = msg['id'];
+      if (method == null && msgId != null && _pendingIds.remove(msgId)) {
+        final wasLoad = msgId == _loadPendingId;
+        if (wasLoad) {
+          _loadPendingId = null;
+          final result = msg['result'] as Map<String, dynamic>?;
+          if (result != null && result['messages'] is List) {
+            _populateFromLoad(result);
+          }
+        }
+
+        // If the agent says the session doesn't exist, remove it locally
+        // so the user sees why their message got no response.
+        if (!wasLoad) {
+          final error = msg['error'] as Map<String, dynamic>?;
+          final errorMsg = error?['message'] as String? ?? '';
+          if (errorMsg.contains('session not found')) {
+            _buffer.add(ChatMessage(
+              id: _uuid.v4(),
+              role: ChatMessageRole.assistant,
+              content: 'This session no longer exists on the agent side.',
+              isStreaming: false,
+              createdAt: DateTime.now().millisecondsSinceEpoch,
+            ));
+            _ref.read(sessionListProvider.notifier).deleteSession(_sessionId);
+            _finalizeStreaming();
+            return;
+          }
+        }
+
+        // Remove the "waiting" message once the agent actually responds.
+        if (_timeoutMessageId != null) {
+          _buffer.removeWhere((m) => m.id == _timeoutMessageId);
+          _timeoutMessageId = null;
+        }
+
+        _finalizeStreaming();
       }
 
       // Capture configOptions from session/new response
@@ -187,57 +331,39 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     final type = update['sessionUpdate'] as String?;
     final content = update['content'] as Map<String, dynamic>?;
     final text = content?['text'] as String? ?? '';
-    debugPrint('[ACP-CHAT] update: type=$type text=${text.length > 60 ? text.substring(0, 60) : text}');
+    final msgId = update['messageId'] as String?;
+
 
     switch (type) {
-      case 'agent_message_chunk':
-        _appendOrCreate(text, ChatMessageRole.assistant, update['messageId']);
       case 'user_message_chunk':
-        _buffer.add(ChatMessage(
-          id: update['messageId'] as String? ?? _uuid.v4(),
-          role: ChatMessageRole.user,
-          content: text,
-          createdAt: DateTime.now().millisecondsSinceEpoch,
-        ));
-        if (_loaded) _syncState();
+        _finalizeStreaming();
+        _upsertMessage(text, ChatMessageRole.user, msgId);
+      case 'agent_message_chunk':
+        _upsertMessage(text, ChatMessageRole.assistant, msgId);
+      case 'agent_thought_chunk':
+        _addThoughtChunk(text);
       case 'tool_call':
+        _ensureAssistantMessage();
         _addSegment(
           SegmentKind.toolCall,
           update['title'] as String? ?? 'tool call',
           update['toolCallId'] as String? ?? '',
         );
       case 'tool_call_update':
-        final status = update['status'] as String?;
-        if (status == 'completed') {
-          final toolOut = update['content'] as List<dynamic>?;
-          final outText = toolOut
-                  ?.map((c) => (c as Map)['text'] ?? '')
-                  .join('\n') ??
-              '';
-          final toolId = update['toolCallId'] as String? ?? '';
-          for (var i = 0; i < _buffer.length; i++) {
-            final m = _buffer[i];
-            for (final seg in m.segments) {
-              if (seg.kind == SegmentKind.toolCall &&
-                  seg.text.contains(toolId)) {
-                _buffer[i] = m.copyWith(
-                  segments: m.segments
-                      .map((s) => s == seg
-                          ? s.copyWith(metadata: {'output': outText})
-                          : s)
-                      .toList(),
-                );
-                break;
-              }
-            }
-          }
-          if (_loaded) _syncState();
-        }
+        final toolOut = update['content'] as List<dynamic>?;
+        final outText = toolOut
+                ?.map((c) => (c as Map<String, dynamic>)['text'] ?? '')
+                .join('\n') ??
+            '';
+        final toolId = update['toolCallId'] as String? ?? '';
+        final toolStatus = update['status'] as String?;
+        _updateToolOutput(toolId, outText, toolStatus);
       case 'plan':
+        _ensureAssistantMessage();
         _addSegment(
           SegmentKind.plan,
           (update['entries'] as List<dynamic>?)
-                  ?.map((e) => (e as Map)['content'] as String? ?? '')
+                  ?.map((e) => (e as Map<String, dynamic>)['content'] as String? ?? '')
                   .join('\n') ??
               'plan',
           '',
@@ -252,8 +378,109 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
           );
         }
       case 'usage_update':
-      default:
         break;
+      default:
+        debugPrint('[ACP-CHAT] unhandled update type: $type');
+        break;
+    }
+  }
+
+  void _finalizeStreaming() {
+    for (var i = 0; i < _buffer.length; i++) {
+      if (_buffer[i].isStreaming) {
+        _buffer[i] = _buffer[i].copyWith(isStreaming: false);
+      }
+    }
+    if (_loaded) _syncState();
+  }
+
+  void _upsertMessage(String text, ChatMessageRole role, String? msgId) {
+    if (msgId != null) {
+      for (var i = 0; i < _buffer.length; i++) {
+        if (_buffer[i].id == msgId) {
+          final existing = _buffer[i].content;
+          // Some agents send cumulative/full-message chunks instead of deltas.
+          final newContent = text.startsWith(existing) ? text : existing + text;
+          _buffer[i] = _buffer[i].copyWith(content: newContent);
+          if (_loaded) _syncState();
+          return;
+        }
+      }
+    }
+    _buffer.add(ChatMessage(
+      id: msgId ?? _uuid.v4(),
+      role: role,
+      content: text,
+      isStreaming: role == ChatMessageRole.assistant,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+    ));
+    if (_loaded) _syncState();
+  }
+
+  void _addThoughtChunk(String text) {
+    _ensureAssistantMessage();
+    final last = _buffer.last;
+    final existing = last.segments
+        .where((s) => s.kind == SegmentKind.thought)
+        .toList();
+    if (existing.isNotEmpty) {
+      final found = existing.last;
+      _buffer[_buffer.length - 1] = last.copyWith(
+        segments: last.segments
+            .map((s) => s == found
+                ? s.copyWith(text: s.text + text)
+                : s)
+            .toList(),
+      );
+    } else {
+      _buffer[_buffer.length - 1] = last.copyWith(
+        segments: [
+          ...last.segments,
+          AssistantSegment(
+            id: _uuid.v4(),
+            kind: SegmentKind.thought,
+            text: text,
+          ),
+        ],
+      );
+    }
+    if (_loaded) _syncState();
+  }
+
+  void _ensureAssistantMessage() {
+    if (_buffer.isEmpty || _buffer.last.role != ChatMessageRole.assistant) {
+      _buffer.add(ChatMessage(
+        id: _uuid.v4(),
+        role: ChatMessageRole.assistant,
+        content: '',
+        isStreaming: true,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        segments: [],
+      ));
+    }
+  }
+
+  void _updateToolOutput(String toolId, String outText, String? status) {
+    for (var i = 0; i < _buffer.length; i++) {
+      final m = _buffer[i];
+      for (final seg in m.segments) {
+        if (seg.kind == SegmentKind.toolCall && seg.id == toolId) {
+          final newMeta = Map<String, dynamic>.from(seg.metadata);
+          if (outText.isNotEmpty) {
+            newMeta['output'] = (newMeta['output'] ?? '') + outText;
+          }
+          if (status != null) {
+            newMeta['status'] = status;
+          }
+          _buffer[i] = m.copyWith(
+            segments: m.segments
+                .map((s) => s == seg ? s.copyWith(metadata: newMeta) : s)
+                .toList(),
+          );
+          if (_loaded) _syncState();
+          return;
+        }
+      }
     }
   }
 
@@ -275,28 +502,9 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       final type = block['type'] as String?;
       final text = block['text'] as String? ?? '';
       if (type == 'text') {
-        _appendOrCreate(text, ChatMessageRole.assistant, null);
+        _upsertMessage(text, ChatMessageRole.assistant, null);
       }
     }
-  }
-
-  void _appendOrCreate(String text, ChatMessageRole role, dynamic msgId) {
-    final last = _buffer.isNotEmpty ? _buffer.last : null;
-    if (last != null &&
-        last.isStreaming &&
-        last.role == ChatMessageRole.assistant &&
-        role == ChatMessageRole.assistant) {
-      _buffer[_buffer.length - 1] = last.copyWith(content: last.content + text);
-    } else {
-      _buffer.add(ChatMessage(
-        id: msgId as String? ?? _uuid.v4(),
-        role: role,
-        content: text,
-        isStreaming: role == ChatMessageRole.assistant,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-      ));
-    }
-    if (_loaded) _syncState();
   }
 
   void _addSegment(SegmentKind kind, String text, String toolId) {
@@ -311,7 +519,8 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     if (_loaded) _syncState();
   }
 
-  Future<void> sendMessage(String text) async {
+  Future<void> sendMessage(String text, {List<Map<String, dynamic>>? extra}) async {
+    final connection = _ref.read(connectionProvider);
     final notifier = _ref.read(connectionProvider.notifier);
 
     final userMsg = ChatMessage(
@@ -333,7 +542,37 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       isStreaming: false,
     );
 
-    await notifier.sendSessionMessage(_sessionId, text);
+    if (connection.channel == null || connection.state is! Connected) {
+      _buffer.add(ChatMessage(
+        id: _uuid.v4(),
+        role: ChatMessageRole.assistant,
+        content: 'Not connected to agent. Please check the relay/daemon.',
+        isStreaming: false,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+      ));
+      _finalizeStreaming();
+      return;
+    }
+
+    final id = notifier.sendSessionMessage(_sessionId, text, extra: extra);
+    _pendingIds.add(id);
+
+    // After 30s, show a waiting message but keep the pending ID alive so
+    // a late response is still processed (agent may be busy executing a tool).
+    _timeoutMessageId = null;
+    Future.delayed(const Duration(seconds: 30), () {
+      if (!_pendingIds.contains(id)) return;
+      final msg = ChatMessage(
+        id: _uuid.v4(),
+        role: ChatMessageRole.assistant,
+        content: 'Agent is working... (may be busy executing a tool)',
+        isStreaming: false,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      _timeoutMessageId = msg.id;
+      _buffer.add(msg);
+      _syncState();
+    });
   }
 
   Future<void> setConfigOption(String configId, String value) async {
@@ -380,6 +619,9 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
 }
 
 final chatProvider = StateNotifierProvider.family<
-    ChatNotifier, AsyncValue<ChatState>, String>(
-  (ref, sessionId) => ChatNotifier(ref, sessionId),
+    ChatNotifier, AsyncValue<ChatState>, (String, String)>(
+  (ref, key) {
+    final (sessionId, cwd) = key;
+    return ChatNotifier(ref, sessionId, cwd);
+  },
 );

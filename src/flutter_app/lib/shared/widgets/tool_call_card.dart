@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 class ToolCallCard extends StatefulWidget {
   final String name;
   final String? output;
+  final bool isCompleted;
+  final bool isStreaming;
 
   const ToolCallCard({
     super.key,
     required this.name,
     this.output,
+    this.isCompleted = false,
+    this.isStreaming = true,
   });
 
   @override
@@ -17,18 +21,31 @@ class ToolCallCard extends StatefulWidget {
 class _ToolCallCardState extends State<ToolCallCard> {
   bool _expanded = false;
 
+  IconData get _icon {
+    final lower = widget.name.toLowerCase();
+    if (lower.contains('bash') || lower.contains('shell') || lower.contains('exec')) {
+      return Icons.terminal;
+    }
+    if (lower.contains('read')) return Icons.file_open_outlined;
+    if (lower.contains('write')) return Icons.edit_note;
+    if (lower.contains('glob') || lower.contains('search')) return Icons.folder_open;
+    if (lower.contains('python')) return Icons.code;
+    return Icons.code;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasOutput = widget.output != null && widget.output!.isNotEmpty;
+    final showRunning = widget.isStreaming && !widget.isCompleted && !hasOutput;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
         ),
       ),
       child: Column(
@@ -38,107 +55,76 @@ class _ToolCallCardState extends State<ToolCallCard> {
             onTap: hasOutput ? () => setState(() => _expanded = !_expanded) : null,
             borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.code,
+                    _icon,
                     size: 14,
                     color: theme.colorScheme.primary,
                   ),
                   const SizedBox(width: 6),
-                  Flexible(
+                  Expanded(
                     child: Text(
                       widget.name,
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontFamily: 'monospace',
+                        fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (hasOutput) ...[
-                    const SizedBox(width: 4),
+                  if (showRunning)
+                    SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.colorScheme.primary,
+                      ),
+                    )
+                  else if (widget.isCompleted)
                     Icon(
-                      _expanded
-                          ? Icons.keyboard_arrow_up
-                          : Icons.keyboard_arrow_down,
+                      Icons.check_circle,
                       size: 14,
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: theme.colorScheme.tertiary,
                     ),
-                  ],
-                  if (!hasOutput) ...[
-                    const SizedBox(width: 6),
-                    _RunningIndicator(),
-                  ],
+                  if (hasOutput)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: Text(
-                widget.output!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  color: theme.colorScheme.onSurfaceVariant,
+          if (hasOutput)
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+                child: Text(
+                  widget.output!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
+              crossFadeState: _expanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
             ),
-            crossFadeState: _expanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 200),
-          ),
         ],
       ),
-    );
-  }
-}
-
-class _RunningIndicator extends StatefulWidget {
-  @override
-  State<_RunningIndicator> createState() => _RunningIndicatorState();
-}
-
-class _RunningIndicatorState extends State<_RunningIndicator>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return SizedBox(
-          width: 12,
-          height: 12,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            value: _controller.value,
-          ),
-        );
-      },
     );
   }
 }

@@ -36,11 +36,8 @@ async def app_endpoint(websocket: WebSocket):
     await websocket.accept()
     client_id = str(uuid.uuid4())[:8]
     state.app_clients[client_id] = websocket
-    print(f"Client {client_id} connected!")
-
     try:
         async for message in websocket.iter_text():
-            print(f"client → daemon: {message[:120]}")
 
             try:
                 data = json.loads(message)
@@ -60,12 +57,11 @@ async def app_endpoint(websocket: WebSocket):
                     token = state.code_to_token.get(code)
                     if token is None:
                         await _send_error(websocket, msg_id, -32002, "invalid pairing code")
-                        print(f"  → client {client_id} auth failed (invalid code)")
+                        print(f"  → client {client_id} auth failed (invalid code)", flush=True)
                     else:
                         state.app_to_token[client_id] = token
                         state.claimed_codes.add(code)
                         daemon_id = state.token_to_daemons.get(token)
-                        print(f"  → client {client_id} paired with token {token[:8]}...")
                         await websocket.send_text(json.dumps({
                             "jsonrpc": "2.0",
                             "id": msg_id,
@@ -128,28 +124,45 @@ async def app_endpoint(websocket: WebSocket):
 
                 if method == "session/delete":
                     sid = (data.get("params") or {}).get("sessionId")
-                    if sid and state.store.get(sid):
+                    agent_id = (data.get("params") or {}).get("agentId")
+                    if sid:
                         state.store.remove(sid)
-                        await websocket.send_text(json.dumps({
+                    if state.daemon_websocket is not None and sid:
+                        close_params = {"sessionId": sid}
+                        if agent_id:
+                            close_params["agentId"] = agent_id
+                        close_msg = json.dumps({
                             "jsonrpc": "2.0",
                             "id": msg_id,
-                            "result": {"sessionId": sid, "deleted": True},
-                        }))
+                            "method": "session/close",
+                            "params": close_params,
+                        })
+                        await state.daemon_websocket.send_text(close_msg)
                     else:
-                        await _send_error(websocket, msg_id, -32000, "session not found")
+                        if sid:
+                            await websocket.send_text(json.dumps({
+                                "jsonrpc": "2.0",
+                                "id": msg_id,
+                                "result": {"sessionId": sid, "deleted": True},
+                            }))
+                        else:
+                            await _send_error(websocket, msg_id, -32000, "session not found")
                     continue
 
             except json.JSONDecodeError:
-                pass
+                print(f"  → client {client_id} sent invalid JSON", flush=True)
 
             if state.daemon_websocket is None:
                 await _send_error(websocket, None, -32004, "daemon not connected")
                 continue
 
-            await state.daemon_websocket.send_text(message)
+            try:
+                await state.daemon_websocket.send_text(message)
+            except Exception as e:
+                print(f"  → failed to forward to daemon: {e}", flush=True)
+                await _send_error(websocket, None, -32005, f"daemon error: {e}")
 
     except WebSocketDisconnect:
         state.app_clients.pop(client_id, None)
         state.app_to_token.pop(client_id, None)
         state.store.remove_client(client_id)
-        print(f"Client {client_id} disconnected!")

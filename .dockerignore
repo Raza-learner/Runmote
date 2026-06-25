@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+*.db
+logs/
+.env
+
+src/flutter_app/build/
+src/flutter_app/.dart_tool/
+src/flutter_app/.packages
+src/flutter_app/.flutter-plugins*
+node_modules/
