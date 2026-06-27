@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_spacing.dart';
 
 class SessionCard extends StatelessWidget {
   final String? title;
@@ -33,13 +33,14 @@ class SessionCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(10),
+                  color: theme.colorScheme.primaryContainer
+                      .withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.chat_bubble_outline,
                   size: 20,
-                  color: theme.colorScheme.onSecondaryContainer,
+                  color: theme.colorScheme.onPrimaryContainer,
                 ),
               ),
               const SizedBox(width: AppSpacing.md),

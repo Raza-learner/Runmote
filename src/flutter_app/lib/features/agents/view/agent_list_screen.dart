@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/providers/connection_provider.dart';
-import '../../core/models/connection_state.dart';
-import '../../core/theme/app_spacing.dart';
-import '../../shared/widgets/agent_card.dart';
-import '../../shared/widgets/agent_logo.dart';
-import '../../shared/widgets/error_banner.dart';
-import '../../shared/widgets/status_badge.dart';
+import '../../../core/providers/connection_provider.dart';
+import '../../../core/models/connection_state.dart';
+import '../../../core/theme/app_spacing.dart';
+import 'widgets/agent_card.dart';
+import 'widgets/agent_logo.dart';
+import '../../../../shared/widgets/error_banner.dart';
+import '../../../../shared/widgets/status_badge.dart';
 
 class AgentListScreen extends ConsumerStatefulWidget {
   const AgentListScreen({super.key});

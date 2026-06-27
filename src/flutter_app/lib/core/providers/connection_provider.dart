@@ -118,6 +118,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
   int _msgId = 0;
 
+  // Per-agent capabilities/info, keyed by agent ID.
+  // Preserved across agent switches so selecting an agent uses its own data.
+  final _agentCapabilities = <String, AgentCapabilities>{};
+  final _agentInfos = <String, AgentInfo>{};
+
   ConnectionNotifier(this._ref) : super(const AcpConnection());
 
   int get _nextId => ++_msgId;
@@ -233,6 +238,8 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       // Handle daemon/disconnected
       if (method == 'daemon/disconnected') {
         debugPrint('[ACP] daemon/disconnected');
+        _agentCapabilities.clear();
+        _agentInfos.clear();
         state = state.copyWith(
           daemonId: null,
           agents: const [],
@@ -280,38 +287,43 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         [];
     final selectedId = state.selectedAgentId;
     final selectedStillExists = agents.any((a) => a.id == selectedId);
-    final nextSelectedId = selectedStillExists
+    final agentId = selectedStillExists
         ? selectedId
         : _firstAgentWhereOrNull(agents, (agent) => agent.online)?.id;
-    final selectedAgent = _firstAgentWhereOrNull(
-      agents,
-      (agent) => agent.id == nextSelectedId,
-    );
-
     state = state.copyWith(
       agents: agents,
-      selectedAgentId: nextSelectedId,
-      agentInfo: selectedAgent?.toAgentInfo(),
-      clearAgentInfo: selectedAgent == null,
+      selectedAgentId: agentId,
+      agentInfo: agentId != null
+          ? (_agentInfos[agentId] ??
+              _firstAgentWhereOrNull(agents, (a) => a.id == agentId)?.toAgentInfo())
+          : null,
+      capabilities: agentId != null ? _agentCapabilities[agentId] : null,
     );
   }
 
   void _handleInitialize(Map<String, dynamic> result) {
+    final agentId = result['agentId'] as String?;
+    if (agentId == null) return;
+
     final agentInfoData = result['agentInfo'] as Map<String, dynamic>?;
     final capabilitiesData =
         result['agentCapabilities'] as Map<String, dynamic>?;
 
-    AgentInfo? agentInfo;
-    AgentCapabilities? capabilities;
-
     if (agentInfoData != null) {
-      agentInfo = AgentInfo.fromJson(agentInfoData);
+      _agentInfos[agentId] = AgentInfo.fromJson(agentInfoData);
     }
     if (capabilitiesData != null) {
-      capabilities = AgentCapabilities.fromJson(capabilitiesData);
+      _agentCapabilities[agentId] =
+          AgentCapabilities.fromJson(capabilitiesData);
     }
 
-    state = state.copyWith(agentInfo: agentInfo, capabilities: capabilities);
+    // Only update the connection state if this response is for the selected agent.
+    if (agentId == state.selectedAgentId) {
+      state = state.copyWith(
+        agentInfo: _agentInfos[agentId],
+        capabilities: _agentCapabilities[agentId],
+      );
+    }
   }
 
   void sendRaw(Map<String, dynamic> message) {
@@ -369,6 +381,39 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     });
   }
 
+  int getHome() {
+    final id = _nextId;
+    sendRaw({
+      'jsonrpc': '2.0',
+      'id': id,
+      'method': 'filesystem/get_home',
+      'params': {},
+    });
+    return id;
+  }
+
+  int listDirectory(String path, {bool showHidden = false}) {
+    final id = _nextId;
+    sendRaw({
+      'jsonrpc': '2.0',
+      'id': id,
+      'method': 'filesystem/list_directory',
+      'params': {'path': path, 'showHidden': showHidden},
+    });
+    return id;
+  }
+
+  int listDrives() {
+    final id = _nextId;
+    sendRaw({
+      'jsonrpc': '2.0',
+      'id': id,
+      'method': 'filesystem/list_drives',
+      'params': {},
+    });
+    return id;
+  }
+
   void selectAgent(String agentId) {
     final selectedAgent = _firstAgentWhereOrNull(
       state.agents,
@@ -377,14 +422,16 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     if (selectedAgent == null) return;
     state = state.copyWith(
       selectedAgentId: agentId,
-      agentInfo: selectedAgent.toAgentInfo(),
-      clearCapabilities: true,
+      agentInfo: _agentInfos[agentId] ?? selectedAgent.toAgentInfo(),
+      capabilities: _agentCapabilities[agentId],
     );
   }
 
   void _onDisconnected(String reason) {
     _sub?.cancel();
     _sub = null;
+    _agentCapabilities.clear();
+    _agentInfos.clear();
     state = state.copyWith(
       clearChannel: true,
       state: const AcpConnectionState.disconnected(),
@@ -413,6 +460,8 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     _reconnectTimer?.cancel();
     _sub?.cancel();
     _sub = null;
+    _agentCapabilities.clear();
+    _agentInfos.clear();
     state.channel?.sink.close();
     state = const AcpConnection();
   }
@@ -423,6 +472,8 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     _reconnectTimer?.cancel();
     _messageController.close();
     state.channel?.sink.close();
+    _agentCapabilities.clear();
+    _agentInfos.clear();
     super.dispose();
   }
 }

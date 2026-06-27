@@ -5,13 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../core/database/app_database.dart' as db;
-import '../../core/models/chat_message.dart';
-import '../../core/models/assistant_segment.dart';
-import '../../core/providers/connection_provider.dart';
-import '../../core/providers/database_provider.dart';
-import '../../core/providers/session_list_provider.dart';
-import '../../core/models/connection_state.dart';
+import '../../../core/database/app_database.dart' as db;
+import '../../../core/models/chat_message.dart';
+import '../../../core/models/assistant_segment.dart';
+import '../../../core/providers/connection_provider.dart';
+import '../../../core/providers/database_provider.dart';
+import '../../../core/providers/session_list_provider.dart';
+import '../../../core/models/connection_state.dart';
 
 class ConfigOption {
   final String id;
@@ -194,13 +194,15 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   void _populateFromLoad(Map<String, dynamic> result) {
     try {
       final rawMessages = result['messages'] as List<dynamic>;
+      final maxMessages = rawMessages.length > 50 ? rawMessages.sublist(rawMessages.length - 50) : rawMessages;
       var added = false;
-      for (final raw in rawMessages) {
+      for (final raw in maxMessages) {
         if (raw is! Map<String, dynamic>) continue;
         final id = (raw['id'] as String?) ?? _uuid.v4();
         if (_buffer.any((m) => m.id == id)) continue;
 
         final roleStr = raw['role'] as String? ?? 'assistant';
+        if (roleStr != 'user' && roleStr != 'assistant') continue;
         final role = roleStr == 'user'
             ? ChatMessageRole.user
             : ChatMessageRole.assistant;
@@ -259,69 +261,80 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
 
   void _listenToRelay() {
     final notifier = _ref.read(connectionProvider.notifier);
-    _sub = notifier.messages.listen((msg) {
-      final method = msg['method'] as String?;
-      final params = msg['params'] as Map<String, dynamic>?;
+    _sub = notifier.messages.listen(
+      (msg) {
+        final method = msg['method'] as String?;
+        final params = msg['params'] as Map<String, dynamic>?;
 
-      if (params != null && params['sessionId'] == _sessionId) {
-        if (method == 'session/update') {
-          _handleUpdate(params);
-        } else if (method == 'session/notification') {
-          _handleLegacyNotification(params);
-        }
-      }
-
-      // Detect JSON-RPC response to a pending request (prompt/load done)
-      final msgId = msg['id'];
-      if (method == null && msgId != null && _pendingIds.remove(msgId)) {
-        final wasLoad = msgId == _loadPendingId;
-        if (wasLoad) {
-          _loadPendingId = null;
-          final result = msg['result'] as Map<String, dynamic>?;
-          if (result != null && result['messages'] is List) {
-            _populateFromLoad(result);
+        if (params != null && params['sessionId'] == _sessionId) {
+          if (method == 'session/update') {
+            _handleUpdate(params);
+          } else if (method == 'session/notification') {
+            _handleLegacyNotification(params);
           }
         }
 
-        // If the agent says the session doesn't exist, remove it locally
-        // so the user sees why their message got no response.
-        if (!wasLoad) {
-          final error = msg['error'] as Map<String, dynamic>?;
-          final errorMsg = error?['message'] as String? ?? '';
-          if (errorMsg.contains('session not found')) {
-            _buffer.add(ChatMessage(
-              id: _uuid.v4(),
-              role: ChatMessageRole.assistant,
-              content: 'This session no longer exists on the agent side.',
-              isStreaming: false,
-              createdAt: DateTime.now().millisecondsSinceEpoch,
-            ));
-            _ref.read(sessionListProvider.notifier).deleteSession(_sessionId);
-            _finalizeStreaming();
-            return;
+        // Detect JSON-RPC response to a pending request (prompt/load done)
+        final msgId = msg['id'];
+        if (method == null && msgId != null && _pendingIds.remove(msgId)) {
+          final wasLoad = msgId == _loadPendingId;
+          if (wasLoad) {
+            _loadPendingId = null;
+            final result = msg['result'] as Map<String, dynamic>?;
+            if (result != null && result['messages'] is List) {
+              _populateFromLoad(result);
+            }
+          }
+
+          // If the agent says the session doesn't exist, remove it locally
+          // so the user sees why their message got no response.
+          if (!wasLoad) {
+            final error = msg['error'] as Map<String, dynamic>?;
+            final errorMsg = error?['message'] as String? ?? '';
+            if (errorMsg.contains('session not found')) {
+              _buffer.add(ChatMessage(
+                id: _uuid.v4(),
+                role: ChatMessageRole.assistant,
+                content: 'This session no longer exists on the agent side.',
+                isStreaming: false,
+                createdAt: DateTime.now().millisecondsSinceEpoch,
+              ));
+              _ref.read(sessionListProvider.notifier).deleteSession(_sessionId);
+              _finalizeStreaming();
+              return;
+            }
+          }
+
+          // Remove the "waiting" message once the agent actually responds.
+          if (_timeoutMessageId != null) {
+            _buffer.removeWhere((m) => m.id == _timeoutMessageId);
+            _timeoutMessageId = null;
+          }
+
+          _finalizeStreaming();
+          if (!wasLoad) {
+            _ref.read(sessionListProvider.notifier).loadSessions();
           }
         }
 
-        // Remove the "waiting" message once the agent actually responds.
-        if (_timeoutMessageId != null) {
-          _buffer.removeWhere((m) => m.id == _timeoutMessageId);
-          _timeoutMessageId = null;
+        // Capture configOptions from session/new response
+        final result = msg['result'] as Map<String, dynamic>?;
+        if (result != null && result['configOptions'] is List) {
+          final configs = (result['configOptions'] as List<dynamic>)
+              .map((e) => ConfigOption.fromJson(e as Map<String, dynamic>))
+              .toList();
+          if (configs.isNotEmpty) {
+            _setConfigOptions(configs);
+          }
         }
-
-        _finalizeStreaming();
-      }
-
-      // Capture configOptions from session/new response
-      final result = msg['result'] as Map<String, dynamic>?;
-      if (result != null && result['configOptions'] is List) {
-        final configs = (result['configOptions'] as List<dynamic>)
-            .map((e) => ConfigOption.fromJson(e as Map<String, dynamic>))
-            .toList();
-        if (configs.isNotEmpty) {
-          _setConfigOptions(configs);
-        }
-      }
-    });
+      },
+      onError: (error) {
+        debugPrint('[ACP-CHAT] stream error: $error');
+      },
+      onDone: () {
+        debugPrint('[ACP-CHAT] stream closed');
+      },
+    );
   }
 
   void _handleUpdate(Map<String, dynamic> params) {

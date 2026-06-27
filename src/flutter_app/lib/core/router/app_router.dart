@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/pair/pair_screen.dart';
-import '../../features/agents/agent_list_screen.dart';
-import '../../features/sessions/session_list_screen.dart';
-import '../../features/chat/chat_screen.dart';
-import '../../features/settings/settings_screen.dart';
+import '../../features/pair/view/pair_screen.dart';
+import '../../features/agents/view/agent_list_screen.dart';
+import '../../features/sessions/view/session_list_screen.dart';
+import '../../features/chat/view/chat_screen.dart';
+import '../../features/settings/view/settings_screen.dart';
 
 class AppShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;

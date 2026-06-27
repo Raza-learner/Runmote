@@ -7,11 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'chat_provider.dart';
-import '../../core/providers/connection_provider.dart';
-import '../../core/providers/session_list_provider.dart';
-import '../../core/theme/app_spacing.dart';
-import '../../shared/widgets/message_bubble.dart';
+import '../viewmodel/chat_provider.dart';
+import '../../../core/providers/connection_provider.dart';
+import '../../../core/providers/session_list_provider.dart';
+import '../../../core/theme/app_spacing.dart';
+import 'widgets/message_bubble.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String sessionId;
@@ -29,7 +29,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _showScrollButton = false;
   bool _userScrolledUp = false;
   final List<Map<String, String>> _attachments = [];
-
   @override
   void initState() {
     super.initState();
@@ -46,11 +45,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final currentScroll = _scrollController.position.pixels;
-    final distance = maxScroll - currentScroll;
-    final show = distance > 160;
-    final scrolledUp = distance > 80;
+    final pixels = _scrollController.position.pixels;
+    final show = pixels > 160;
+    final scrolledUp = pixels > 80;
 
     if (show != _showScrollButton) {
       setState(() => _showScrollButton = show);
@@ -114,24 +111,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _scrollToBottom();
   }
 
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
+  void _scrollToBottom({bool animate = true}) {
+    if (!_scrollController.hasClients) return;
+    if (animate) {
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
+        0,
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
+    } else {
+      _scrollController.jumpTo(0);
     }
   }
 
   void _scrollToBottomIfNearEnd() {
-    if (_scrollController.hasClients && !_userScrolledUp) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      );
-    }
+    if (!_scrollController.hasClients || _userScrolledUp) return;
+    _scrollToBottom(animate: true);
   }
 
   String _sessionTitle(List<AcpSession> sessions) {
@@ -164,10 +159,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             previous?.valueOrNull?.messages.lastOrNull?.isStreaming ?? false;
         final isStreaming =
             next.valueOrNull?.messages.lastOrNull?.isStreaming ?? false;
-        if (nextCount > prevCount || (isStreaming && !wasStreaming)) {
-          Future.microtask(_scrollToBottomIfNearEnd);
-        }
-        if (isStreaming && !wasStreaming) {
+
+        final newMessageArrived = nextCount > prevCount;
+        final streamingStarted = isStreaming && !wasStreaming;
+        if (newMessageArrived || streamingStarted) {
           Future.microtask(_scrollToBottomIfNearEnd);
         }
       },
@@ -286,17 +281,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   );
                 }
+                final reversedMessages = messages.reversed.toList();
                 return Stack(
                   children: [
                     ListView.builder(
+                      reverse: true,
                       controller: _scrollController,
                       padding: const EdgeInsets.all(16),
-                      itemCount: messages.length,
+                      itemCount: reversedMessages.length,
+                      addAutomaticKeepAlives: false,
+                      addRepaintBoundaries: true,
                       itemBuilder: (context, index) {
-                        final msg = messages[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: MessageBubble(message: msg),
+                        final msg = reversedMessages[index];
+                        return RepaintBoundary(
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: MessageBubble(message: msg),
+                          ),
                         );
                       },
                     ),
@@ -328,9 +329,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   ) {
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: theme.colorScheme.surfaceContainerLow,
         border: Border(
-          top: BorderSide(color: theme.colorScheme.outlineVariant),
+          top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
       ),
       child: SafeArea(
@@ -357,7 +358,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           () => _attachments.removeAt(index)),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                     );
                   },
                 ),
@@ -379,11 +380,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         if (cs != null) _showConfigSheet(context, cs);
                       },
                     ),
+                  const Spacer(),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -399,14 +401,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         hintText: isBusy
                             ? 'Agent is responding...'
                             : 'Type a message...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 12,
+                          vertical: 14,
                         ),
-                        isDense: true,
                       ),
                     ),
                   ),
@@ -419,6 +417,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                       tooltip: 'Attach image',
+                      style: IconButton.styleFrom(
+                        backgroundColor: theme.colorScheme.surfaceContainerHigh,
+                      ),
                     ),
                   const SizedBox(width: 4),
                   isBusy
@@ -436,7 +437,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                       _attachments.isNotEmpty
                                   ? _sendMessage
                                   : null,
-                          icon: const Icon(Icons.send),
+                          icon: const Icon(Icons.arrow_upward),
                         ),
                 ],
               ),
@@ -557,23 +558,20 @@ class _ModelChip extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             color: theme.colorScheme.secondaryContainer
-                .withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-            ),
+                .withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.tune,
-                size: 14,
+                size: 13,
                 color: theme.colorScheme.onSecondaryContainer,
               ),
               const SizedBox(width: 4),
@@ -582,7 +580,10 @@ class _ModelChip extends StatelessWidget {
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSecondaryContainer,
                   fontWeight: FontWeight.w500,
+                  letterSpacing: 0.2,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

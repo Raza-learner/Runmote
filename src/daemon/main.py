@@ -1,6 +1,8 @@
 import asyncio
 import json
+import os
 import signal
+import stat
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -15,6 +17,20 @@ from websockets.asyncio.client import connect
 
 def log(msg: str):
     print(msg, flush=True)
+
+
+def _normalize_path(path: str) -> str:
+    return path.replace("\\", "/")
+
+
+def _is_hidden(entry: os.DirEntry) -> bool:
+    if entry.name.startswith("."):
+        return True
+    if sys.platform == "win32":
+        attrs = entry.stat(follow_symlinks=False).st_file_attributes
+        if attrs is not None:
+            return bool(attrs & stat.FILE_ATTRIBUTE_HIDDEN)
+    return False
 
 
 class AgentProcess:
@@ -257,6 +273,90 @@ async def run_daemon():
                                             "sender": asyncio.create_task(agent_sender(agents[aid], send_q)),
                                         }
                             await _send_json(websocket, _agent_list_message(agents, msg_id))
+                            continue
+
+                        if method == "filesystem/list_drives":
+                            try:
+                                drives = []
+                                if sys.platform == "win32":
+                                    import string
+                                    for letter in string.ascii_uppercase:
+                                        drive = f"{letter}:\\"
+                                        if os.path.exists(drive):
+                                            drives.append({
+                                                "name": f"{letter}:",
+                                                "path": _normalize_path(os.path.abspath(drive)),
+                                                "type": "directory",
+                                                "size": 0,
+                                                "isSymlink": False,
+                                            })
+                                else:
+                                    drives.append({
+                                        "name": "/",
+                                        "path": "/",
+                                        "type": "directory",
+                                        "size": 0,
+                                        "isSymlink": False,
+                                    })
+                                await _send_json(websocket, {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "result": {"entries": drives},
+                                })
+                            except Exception as e:
+                                await _send_json(websocket, {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "error": {"code": -32000, "message": f"Failed to list drives: {e}"},
+                                })
+                            continue
+
+                        if method == "filesystem/get_home":
+                            await _send_json(websocket, {
+                                "jsonrpc": "2.0",
+                                "id": msg_id,
+                                "result": {"home": _normalize_path(os.path.expanduser("~"))},
+                            })
+                            continue
+
+                        if method == "filesystem/list_directory":
+                            params = data.get("params") or {}
+                            path = os.path.expanduser(params.get("path", ".") or ".")
+                            show_hidden = params.get("showHidden", False)
+                            try:
+                                entries = []
+                                for entry in os.scandir(path):
+                                    if not show_hidden and _is_hidden(entry):
+                                        continue
+                                    try:
+                                        is_dir = entry.is_dir()
+                                        is_file = entry.is_file()
+                                        is_symlink = entry.is_symlink()
+                                        stat_info = entry.stat(follow_symlinks=False)
+                                        entries.append({
+                                            "name": entry.name,
+                                            "path": _normalize_path(os.path.abspath(entry.path)),
+                                            "type": "directory" if is_dir else "file" if is_file else "other",
+                                            "size": stat_info.st_size if is_file else 0,
+                                            "isSymlink": is_symlink,
+                                        })
+                                    except OSError:
+                                        pass
+                                entries.sort(key=lambda e: (0 if e["type"] == "directory" else 1, e["name"].lower()))
+                                await _send_json(websocket, {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "result": {
+                                        "entries": entries,
+                                        "path": _normalize_path(os.path.abspath(path)),
+                                    },
+                                })
+                            except Exception as e:
+                                await _send_json(websocket, {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "error": {"code": -32000, "message": f"Failed to list directory: {e}"},
+                                })
                             continue
 
                         agent = agents[_extract_agent_id(data, agents)]

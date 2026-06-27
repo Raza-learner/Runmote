@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/models/chat_message.dart';
-import '../../core/models/assistant_segment.dart';
+import '../../../../core/models/chat_message.dart';
+import '../../../../core/models/assistant_segment.dart';
 import 'thinking_section.dart';
 import 'tool_call_card.dart';
 
@@ -23,39 +25,49 @@ class MessageBubble extends StatelessWidget {
         children: [
           Container(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.85,
+              maxWidth: MediaQuery.of(context).size.width * 0.82,
             ),
             decoration: BoxDecoration(
               color: isUser
                   ? theme.colorScheme.primary
-                  : theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isUser ? 16 : 4),
-                bottomRight: Radius.circular(isUser ? 4 : 16),
-              ),
-            ),
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (message.content.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      message.content,
-                      style: TextStyle(
-                        color: isUser
-                            ? theme.colorScheme.onPrimary
-                            : theme.colorScheme.onSurface,
+                  : theme.colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: isUser
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
                       ),
+                    ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (message.content.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: isUser
+                          ? SelectableText(
+                              message.content,
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: theme.colorScheme.onPrimary,
+                              ),
+                            )
+                          : SelectionArea(
+                              child: SafeMarkdownBody(
+                                data: message.content,
+                                theme: theme,
+                              ),
+                            ),
                     ),
-                  ),
                 ..._buildSegments(theme),
                 if (message.isStreaming)
                   const Padding(
-                    padding: EdgeInsets.only(top: 8),
+                    padding: EdgeInsets.only(top: 6),
                     child: Row(
                       children: [
                         _TypingDot(delay: 0),
@@ -68,12 +80,12 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
+            padding: const EdgeInsets.only(top: 4, left: 6, right: 6),
             child: Text(
               _formatTime(message.createdAt),
               style: TextStyle(
                 fontSize: 11,
-                color: theme.colorScheme.onSurfaceVariant,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
               ),
             ),
           ),
@@ -131,6 +143,79 @@ class MessageBubble extends StatelessWidget {
   String _formatTime(int ms) {
     final dt = DateTime.fromMillisecondsSinceEpoch(ms);
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+MarkdownStyleSheet _markdownStyle(ThemeData theme) {
+  final cs = theme.colorScheme;
+  return MarkdownStyleSheet(
+    p: TextStyle(fontSize: 15, color: cs.onSurface, height: 1.4),
+    h1: TextStyle(
+      fontSize: 20, fontWeight: FontWeight.w600, color: cs.onSurface,
+    ),
+    h2: TextStyle(
+      fontSize: 17, fontWeight: FontWeight.w600, color: cs.onSurface,
+    ),
+    h3: TextStyle(
+      fontSize: 15, fontWeight: FontWeight.w600, color: cs.onSurface,
+    ),
+    code: TextStyle(
+      fontSize: 13, fontFamily: 'monospace', color: cs.onSurface,
+      backgroundColor: cs.surfaceContainerHighest,
+    ),
+    codeblockDecoration: BoxDecoration(
+      color: cs.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    codeblockPadding: const EdgeInsets.all(12),
+    blockquoteDecoration: BoxDecoration(
+      border: Border(left: BorderSide(color: cs.primary, width: 3)),
+      color: cs.surfaceContainerLow,
+    ),
+    listBullet: TextStyle(color: cs.onSurfaceVariant),
+    horizontalRuleDecoration: BoxDecoration(
+      border: Border(top: BorderSide(color: cs.outlineVariant)),
+    ),
+    strong: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface),
+    em: TextStyle(fontStyle: FontStyle.italic, color: cs.onSurface),
+    a: TextStyle(color: cs.primary, decoration: TextDecoration.underline),
+    blockSpacing: 8,
+  );
+}
+
+class SafeMarkdownBody extends StatelessWidget {
+  final String data;
+  final ThemeData theme;
+
+  const SafeMarkdownBody({super.key, required this.data, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    if (data.isEmpty) return const SizedBox.shrink();
+    try {
+      return MarkdownBody(
+        data: data,
+        styleSheet: _markdownStyle(theme),
+        softLineBreak: true,
+        onTapLink: (text, href, title) {
+          if (href != null) {
+            launchUrl(
+              Uri.parse(href),
+              mode: LaunchMode.externalApplication,
+            );
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint('[ACP-MD] markdown render error: $e');
+      return SelectableText(
+        data,
+        style: TextStyle(
+          fontSize: 15,
+          color: theme.colorScheme.onSurface,
+        ),
+      );
+    }
   }
 }
 
@@ -295,6 +380,7 @@ class _TypingDot extends StatefulWidget {
 class _TypingDotState extends State<_TypingDot>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late CurvedAnimation _curved;
   late Animation<double> _animation;
 
   @override
@@ -304,9 +390,8 @@ class _TypingDotState extends State<_TypingDot>
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    _animation = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _curved = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    _animation = Tween<double>(begin: 0.3, end: 1.0).animate(_curved);
     Future.delayed(Duration(milliseconds: widget.delay), () {
       if (mounted) _controller.repeat(reverse: true);
     });
@@ -314,6 +399,7 @@ class _TypingDotState extends State<_TypingDot>
 
   @override
   void dispose() {
+    _curved.dispose();
     _controller.dispose();
     super.dispose();
   }

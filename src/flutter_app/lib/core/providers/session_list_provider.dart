@@ -257,10 +257,12 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
             final result = msg['result'] as Map<String, dynamic>?;
             if (result != null) {
               final sessionId = result['sessionId'] as String;
+              final title = (result['title'] ?? result['name']) as String?;
               if (!completer.isCompleted) {
                 completer.complete(
                   AcpSession(
                     id: sessionId,
+                    title: title,
                     cwd: cwd,
                     updatedAt: DateTime.now().millisecondsSinceEpoch / 1000,
                     agentId: connection.selectedAgentId,

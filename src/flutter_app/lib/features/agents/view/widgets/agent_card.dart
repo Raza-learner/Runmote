@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_spacing.dart';
 import 'agent_logo.dart';
-import 'status_badge.dart';
+import '../../../../shared/widgets/status_badge.dart';
 
 class AgentCard extends StatelessWidget {
   final String id;

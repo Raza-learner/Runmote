@@ -12,13 +12,11 @@ abstract final class AppColors {
   static const connecting = Color(0xFFFF9800);
   static const error = Color(0xFFF44336);
 
-  static const surfaceDark = Color(0xFF121212);
-  static const surfaceContainerDark = Color(0xFF1E1E1E);
-
   static const glassLight = Color(0xCCFFFFFF);
   static const glassDark = Color(0xCC1E1E1E);
 
   static const accentOptions = [
+    AccentOption('M3 Baseline', Color(0xFF6750A4)),
     AccentOption('Indigo', Colors.indigo),
     AccentOption('Teal', Colors.teal),
     AccentOption('Blue', Colors.blue),
@@ -27,5 +25,7 @@ abstract final class AppColors {
     AccentOption('Orange', Colors.orange),
     AccentOption('Cyan', Colors.cyan),
     AccentOption('Green', Colors.green),
+    AccentOption('Slate', Color(0xFF475569)),
+    AccentOption('Amber', Colors.amber),
   ];
 }

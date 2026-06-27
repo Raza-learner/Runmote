@@ -9,6 +9,7 @@ dependencies = [
     "uvicorn>=0.49.0",
     "websockets>=16.0",
     "zeroconf>=0.150.0",
+    "agent-client-protocol>=0.8.0",
 ]
 
 [project.optional-dependencies]
@@ -17,3 +18,19 @@ dev = [
     "pytest>=8",
     "pytest-asyncio>=0.26",
 ]
+daemon = [
+    "agent-client-protocol>=0.8.0",
+]
+
+[project.scripts]
+claude-code-wrapper = "claude_daemon.agent:main"
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/claude_daemon"]

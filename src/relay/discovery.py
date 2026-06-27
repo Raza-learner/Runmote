@@ -1,4 +1,3 @@
-import asyncio
 import socket
 from zeroconf.asyncio import AsyncZeroconf
 from zeroconf import ServiceInfo

@@ -1,12 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/providers/connection_provider.dart';
-import '../../core/providers/session_list_provider.dart';
-import '../../core/providers/database_provider.dart';
-import '../../core/theme/app_spacing.dart';
-import '../../shared/widgets/session_card.dart';
+import '../../../core/providers/connection_provider.dart';
+import '../../../core/providers/session_list_provider.dart';
+import '../../../core/providers/database_provider.dart';
+import '../../../core/theme/app_spacing.dart';
+import 'widgets/session_card.dart';
+import 'widgets/directory_picker_sheet.dart';
 
 class SessionListScreen extends ConsumerStatefulWidget {
   const SessionListScreen({super.key});
@@ -69,8 +72,60 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
 
   Future<void> _createSession() async {
     final db = ref.read(databaseProvider);
-    final cwd = (await db.getDefaultCwd()) ?? '/home';
-    await ref.read(sessionListProvider.notifier).createSession(cwd);
+    final savedCwd = await db.getDefaultCwd();
+
+    // If no saved cwd, request the laptop's home directory
+    String initialPath;
+    if (savedCwd != null) {
+      initialPath = savedCwd;
+    } else {
+      final notifier = ref.read(connectionProvider.notifier);
+      final completer = Completer<String>();
+      int? reqId;
+      StreamSubscription<Map<String, dynamic>>? sub;
+      sub = notifier.messages.listen((msg) {
+        if (msg['id'] == reqId) {
+          sub?.cancel();
+          final result = msg['result'] as Map<String, dynamic>?;
+          if (result != null) {
+            completer.complete(result['home'] as String? ?? '/home');
+          } else {
+            completer.complete('/home');
+          }
+        }
+      });
+      reqId = notifier.getHome();
+      initialPath = await completer.future.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          sub?.cancel();
+          return '/home';
+        },
+      );
+    }
+
+    if (!mounted) return;
+    final pickedPath = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DirectoryPickerSheet(
+        initialPath: initialPath,
+        onSelected: (path) => Navigator.of(ctx).pop(path),
+      ),
+    );
+    if (pickedPath == null || !mounted) return;
+
+    await db.setDefaultCwd(pickedPath);
+    final session = await ref.read(sessionListProvider.notifier).createSession(pickedPath);
+    if (session == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to create session — daemon may be disconnected')),
+      );
+    }
   }
 
   String _timeAgo(double timestamp) {
