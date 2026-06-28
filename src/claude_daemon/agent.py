@@ -75,11 +75,14 @@ class ClaudeCodeAgent(Agent):
     ) -> InitializeResponse:
         bridges = detect_bridges()
         if not bridges:
-            raise RuntimeError(
+            msg = (
                 "No ACP bridge found. Install one of:\n"
                 "  pip install claude-code-acp\n"
-                "  npm install -g @agentclientprotocol/claude-agent-acp"
+                "  npm install -g @agentclientprotocol/claude-agent-acp\n"
+                "  (or install the 'claude' CLI binary)"
             )
+            log.error(msg)
+            raise RuntimeError(msg)
 
         last_error = None
         for cfg in bridges:
@@ -129,7 +132,9 @@ class ClaudeCodeAgent(Agent):
                 client_info=client_info,
             )
 
-        raise RuntimeError(f"All bridges failed. Last error: {last_error}")
+        msg = f"All bridges failed. Last error: {last_error}"
+        log.error(msg)
+        raise RuntimeError(msg)
 
     def _get_bridge(self):
         return self._native_bridge if self._is_native else self._bridge_conn

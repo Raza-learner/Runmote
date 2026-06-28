@@ -163,8 +163,12 @@ def _capture_agent_info(message: dict, agent: AgentProcess):
 
     info = result.get("agentInfo")
     if isinstance(info, dict):
+        # Prefer daemon-configured display name over agent self-reported name
+        # so codex shows "Codex" instead of "@agentclientprotocol/codex-acp".
+        display_name = agent.name or info.get("name")
+        info["name"] = display_name
         agent.info = {
-            "name": info.get("name") or agent.name,
+            "name": display_name,
             "version": info.get("version") or "",
         }
         agent.version = agent.info["version"]
@@ -479,6 +483,10 @@ async def run_daemon():
 
                     # If relay task stopped or no agents left, stop everything
                     if relay_task.done() or not agent_tasks:
+                        if relay_task.done():
+                            exc = relay_task.exception()
+                            if exc:
+                                log(f"Relay task exception: {exc}")
                         break
 
                 for t in pending:

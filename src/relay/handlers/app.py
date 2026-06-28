@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -126,7 +127,8 @@ async def app_endpoint(websocket: WebSocket):
                     sid = (data.get("params") or {}).get("sessionId")
                     agent_id = (data.get("params") or {}).get("agentId")
                     if sid:
-                        state.store.remove(sid)
+                        state.store.remove(sid, agent_id=agent_id or "")
+                        state.recently_deleted_sessions[sid] = time.time()
                     if state.daemon_websocket is not None and sid:
                         close_params = {"sessionId": sid}
                         if agent_id:

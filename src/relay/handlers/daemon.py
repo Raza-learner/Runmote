@@ -112,13 +112,18 @@ async def daemon_endpoint(websocket: WebSocket):
                     sessions = result.get("sessions")
                     if isinstance(sessions, list):
                         synced = 0
+                        skipped = 0
                         for s in sessions:
                             if isinstance(s, dict):
+                                sid = s.get("sessionId") or s.get("id") or ""
+                                if sid in state.recently_deleted_sessions:
+                                    skipped += 1
+                                    continue
                                 sid = _register_session(s)
                                 if sid:
                                     synced += 1
                                     print(f"  → registered session {sid[:20]}...")
-                        print(f"  → synced {synced} sessions from opencode")
+                        print(f"  → synced {synced} sessions" + (f" (skipped {skipped} recently deleted)" if skipped else ""))
 
                 error = data.get("error")
                 if isinstance(error, dict):
@@ -131,13 +136,24 @@ async def daemon_endpoint(websocket: WebSocket):
 
             for cid, client in _paired_clients():
                 try:
-                    await client.send_text(message)
+                    # Filter recently-deleted sessions from forwarded session/list
+                    fwd = data
+                    if state.recently_deleted_sessions and fwd.get("result") and isinstance(fwd["result"], dict):
+                        sess_list = fwd["result"].get("sessions")
+                        if isinstance(sess_list, list):
+                            fwd["result"]["sessions"] = [
+                                s for s in sess_list
+                                if not isinstance(s, dict) or
+                                   (s.get("sessionId") or s.get("id") or "") not in state.recently_deleted_sessions
+                            ]
+                    await client.send_text(json.dumps(fwd))
                 except Exception:
                     state.app_clients.pop(cid, None)
 
     except WebSocketDisconnect:
         state.daemon_websocket = None
         state.store.clear_daemon_id()
+        state.recently_deleted_sessions.clear()
         print("Daemon disconnected!")
         forward = {
             "jsonrpc": "2.0",

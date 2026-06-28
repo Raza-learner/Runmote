@@ -66,7 +66,10 @@ class SessionStore:
             except Exception as e:
                 print(f"DB write failed: {e}")
 
-    def remove(self, session_id: str) -> None:
+    def remove(self, session_id: str, agent_id: str = "") -> None:
+        existing = self._sessions.get(session_id)
+        if existing and agent_id and existing.get("agentId") != agent_id:
+            return
         self._sessions.pop(session_id, None)
         if self._db:
             self._db.delete_session(session_id)
