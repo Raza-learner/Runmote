@@ -1,6 +1,6 @@
 param()
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $taskName = "ACP Daemon"
 $logFile = "$env:TEMP\acp-daemon.log"
 

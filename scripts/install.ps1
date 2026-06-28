@@ -32,13 +32,17 @@ Environment variables:
 }
 
 $hasGit = Get-Command git -ErrorAction SilentlyContinue
-$python = Get-Command python -ErrorAction SilentlyContinue
-if (-not $python) { $python = Get-Command python3 -ErrorAction SilentlyContinue }
-if (-not $python) { Write-Host "Error: Python 3.13+ required. Download from https://python.org"; return }
-$pyVersion = & $python.Source -c "import sys; print('.'.join(map(str, sys.version_info[:2])))"
-if ([version]$pyVersion -lt [version]"3.13") { Write-Host "Error: Python 3.13+ required"; return }
 
-$hasUv = Get-Command uv -ErrorAction SilentlyContinue
+# Ensure uv is installed (auto-downloads Python 3.13+ if missing)
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    Write-Host "Installing uv (Python package manager)..."
+    iex (iwr -UseBasicParsing -Uri https://astral.sh/uv/install.ps1).Content
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","User") + ";" + $env:Path
+    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+        Write-Host "Error: uv installation failed. Install manually: https://docs.astral.sh/uv"
+        return
+    }
+}
 
 # --- Remove ---
 if ($mode -eq "remove") {
@@ -94,17 +98,12 @@ if (Test-Path $installDir) {
     }
 }
 
-# Install deps
+# Install deps (uv sync auto-downloads Python 3.13+ if missing)
 Write-Host ""
 Write-Host "Installing dependencies..."
 Push-Location $installDir
-if ($hasUv) {
-    uv sync --frozen 2>$null; if ($LASTEXITCODE -ne 0) { uv sync }
-} else {
-    & $python.Source -m venv .venv
-    $venvPip = Join-Path $installDir ".venv" "Scripts" "pip.exe"
-    & $venvPip install -e ".[daemon]"
-}
+uv sync --frozen 2>$null
+if ($LASTEXITCODE -ne 0) { uv sync }
 Pop-Location
 
 # Configure auto-start
@@ -141,4 +140,4 @@ Write-Host "|                                               |"
 Write-Host "| See all paired devices and manage sessions    |"
 Write-Host "| directly from the app.                        |"
 Write-Host "+-----------------------------------------------+"
-# force cache refresh
+

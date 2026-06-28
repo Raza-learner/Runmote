@@ -41,25 +41,35 @@ done
 
 INSTALL_DIR="$(cd "$INSTALL_DIR" 2>/dev/null && pwd)" || INSTALL_DIR="$INSTALL_DIR"
 
+ensure_uv() {
+    if command -v uv &>/dev/null; then
+        return 0
+    fi
+    echo "Installing uv (Python package manager)..."
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*)
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "iex (iwr -UseBasicParsing -Uri https://astral.sh/uv/install.ps1).Content"
+            ;;
+        *)
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            ;;
+    esac
+    # Refresh PATH
+    if [[ -f "$HOME/.cargo/env" ]]; then
+        source "$HOME/.cargo/env"
+    fi
+    if ! command -v uv &>/dev/null; then
+        echo "Error: uv installation failed. Install manually: https://docs.astral.sh/uv"
+        exit 1
+    fi
+}
+
 check_cmd() {
     if ! command -v "$1" &>/dev/null; then
         echo "Error: '$1' is required but not installed."
         case "$1" in
             git) echo "  Install: https://git-scm.com/downloads" ;;
-            python3|python) echo "  Install: https://python.org/downloads" ;;
-            uv)  echo "  Install: curl -LsSf https://astral.sh/uv/install.sh | sh" ;;
         esac
-        exit 1
-    fi
-}
-
-detect_python() {
-    if command -v python3 &>/dev/null; then
-        echo "python3"
-    elif command -v python &>/dev/null; then
-        echo "python"
-    else
-        echo "Error: Python 3.13+ is required."
         exit 1
     fi
 }
@@ -162,15 +172,7 @@ echo "Install: $INSTALL_DIR"
 echo ""
 
 check_cmd git
-PYTHON="$(detect_python)"
-
-if command -v uv &>/dev/null; then
-    INSTALLER="uv"
-elif "$PYTHON" -m pip --version &>/dev/null; then
-    INSTALLER="pip"
-else
-    INSTALLER=""
-fi
+ensure_uv
 
 # Clone or update
 if [[ -d "$INSTALL_DIR/.git" ]]; then
@@ -187,24 +189,8 @@ echo ""
 echo "Installing dependencies..."
 cd "$INSTALL_DIR"
 
-case "$INSTALLER" in
-    uv)
-        uv sync --frozen 2>/dev/null || uv sync
-        ;;
-    pip)
-        "$PYTHON" -m venv .venv
-        if [[ "$("$PYTHON" -c "import sys; print(''.join(map(str, sys.version_info[:2])))")" -ge 313 ]]; then
-            .venv/bin/pip install -e ".[daemon]"
-        else
-            echo "Error: Python 3.13+ required."
-            exit 1
-        fi
-        ;;
-    *)
-        echo "Error: neither 'uv' nor 'pip' found."
-        exit 1
-        ;;
-esac
+# uv sync auto-downloads Python 3.13+ if not found, creates .venv, installs deps
+uv sync --frozen 2>/dev/null || uv sync
 
 echo ""
 echo "Configuring auto-start..."
