@@ -25,9 +25,9 @@ for ($i = 0; $i -lt 15; $i++) {
         if ($match -and $match.Matches.Groups[1].Value) {
             $code = $match.Matches.Groups[1].Value
             Write-Host ""
-            Write-Host "╔═══════════════════════╗"
-            Write-Host "║  Device Code: $($code.PadRight(6))  ║"
-            Write-Host "╚═══════════════════════╝"
+            Write-Host "+---------------------------+"
+            Write-Host "|  Device Code: $($code.PadRight(6))  |"
+            Write-Host "+---------------------------+"
             Write-Host ""
             exit 0
         }
