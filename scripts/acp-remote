@@ -19,9 +19,8 @@ restart_daemon() {
             launchctl start com.acp.daemon 2>/dev/null || true
             ;;
         windows)
-            schtasks.exe /End /TN "ACP Daemon" 2>/dev/null || true
-            sleep 2
-            schtasks.exe /Run /TN "ACP Daemon" 2>/dev/null || true
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(dirname "$0")/acp-remote.ps1"
+            exit $?
             ;;
     esac
 }
@@ -35,7 +34,7 @@ get_code() {
             grep -oP 'Device Code:\s+\K\d+' ~/Library/Logs/acp-daemon.log 2>/dev/null | tail -1
             ;;
         windows)
-            grep -oP 'Device Code:\s+\K\d+' "$TEMP/acp-daemon.log" 2>/dev/null | tail -1
+            echo ""  # not reached — restart_daemon delegates to .ps1
             ;;
     esac
 }

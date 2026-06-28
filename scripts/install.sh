@@ -105,10 +105,13 @@ print_postinstall() {
         windows)
             echo "║                                                     ║"
             echo "║  To start now:                                       ║"
-            echo "║    Run 'Startup Tasks' and run 'ACP Daemon'         ║"
+            echo "║    schtasks /Run /TN \"ACP Daemon\"                   ║"
             echo "║                                                     ║"
             echo "║  To check status:                                    ║"
             echo "║    schtasks /Query /TN \"ACP Daemon\"                  ║"
+            echo "║                                                     ║"
+            echo "║  To restart + get pairing code:                      ║"
+            echo "║    acp-remote                                         ║"
             ;;
     esac
 
@@ -130,10 +133,19 @@ print_postinstall() {
 
 # --- Remove mode ---
 if [[ "$MODE" == "remove" ]]; then
-    if [[ -d "$INSTALL_DIR" ]] && [[ -f "$INSTALL_DIR/scripts/setup-autostart.sh" ]]; then
-        echo "Removing auto-start..."
-        bash "$INSTALL_DIR/scripts/setup-autostart.sh" --remove --dir "$INSTALL_DIR"
-    fi
+    echo "Removing auto-start..."
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*)
+            if [[ -f "$INSTALL_DIR/scripts/setup-autostart.ps1" ]]; then
+                powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTALL_DIR/scripts/setup-autostart.ps1" -Remove
+            fi
+            ;;
+        *)
+            if [[ -f "$INSTALL_DIR/scripts/setup-autostart.sh" ]]; then
+                bash "$INSTALL_DIR/scripts/setup-autostart.sh" --remove --dir "$INSTALL_DIR"
+            fi
+            ;;
+    esac
 
     echo "Removing $INSTALL_DIR..."
     rm -rf "$INSTALL_DIR"
@@ -196,6 +208,13 @@ esac
 
 echo ""
 echo "Configuring auto-start..."
-bash "$INSTALL_DIR/scripts/setup-autostart.sh" --install --dir "$INSTALL_DIR"
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTALL_DIR/scripts/setup-autostart.ps1" -Install
+        ;;
+    *)
+        bash "$INSTALL_DIR/scripts/setup-autostart.sh" --install --dir "$INSTALL_DIR"
+        ;;
+esac
 
 print_postinstall
