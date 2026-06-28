@@ -26,7 +26,7 @@ Environment variables:
   ACP_DIR            Install directory
   ACP_REMOTE         Git remote URL
 "@
-            exit 0
+            return
         }
     }
 }
@@ -34,9 +34,9 @@ Environment variables:
 $hasGit = Get-Command git -ErrorAction SilentlyContinue
 $python = Get-Command python -ErrorAction SilentlyContinue
 if (-not $python) { $python = Get-Command python3 -ErrorAction SilentlyContinue }
-if (-not $python) { Write-Host "Error: Python 3.13+ required. Download from https://python.org"; exit 1 }
+if (-not $python) { Write-Host "Error: Python 3.13+ required. Download from https://python.org"; return }
 $pyVersion = & $python.Source -c "import sys; print('.'.join(map(str, sys.version_info[:2])))"
-if ([version]$pyVersion -lt [version]"3.13") { Write-Host "Error: Python 3.13+ required"; exit 1 }
+if ([version]$pyVersion -lt [version]"3.13") { Write-Host "Error: Python 3.13+ required"; return }
 
 $hasUv = Get-Command uv -ErrorAction SilentlyContinue
 
@@ -47,7 +47,7 @@ if ($mode -eq "remove") {
     if (Test-Path $setupScript) { & $setupScript -Remove }
     if (Test-Path $installDir)  { Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue }
     Write-Host "ACP daemon uninstalled."
-    exit 0
+    return
 }
 
 # --- Install ---
