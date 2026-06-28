@@ -141,3 +141,4 @@ Write-Host "|                                               |"
 Write-Host "| See all paired devices and manage sessions    |"
 Write-Host "| directly from the app.                        |"
 Write-Host "+-----------------------------------------------+"
+# force cache refresh
