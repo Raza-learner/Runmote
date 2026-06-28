@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "$(uname -s)" in
+    Linux)             OS="linux" ;;
+    Darwin)            OS="darwin" ;;
+    MINGW*|MSYS*|CYGWIN*) OS="windows" ;;
+    *)                 echo "Error: unsupported OS"; exit 1 ;;
+esac
+
+restart_daemon() {
+    case "$OS" in
+        linux)
+            systemctl --user restart acp-daemon.service 2>/dev/null
+            ;;
+        darwin)
+            launchctl stop com.acp.daemon 2>/dev/null || true
+            sleep 1
+            launchctl start com.acp.daemon 2>/dev/null || true
+            ;;
+        windows)
+            schtasks.exe /End /TN "ACP Daemon" 2>/dev/null || true
+            sleep 2
+            schtasks.exe /Run /TN "ACP Daemon" 2>/dev/null || true
+            ;;
+    esac
+}
+
+get_code() {
+    case "$OS" in
+        linux)
+            journalctl --user -u acp-daemon.service -n 50 --no-pager 2>/dev/null | grep -oP 'Device Code:\s+\K\d+' | tail -1
+            ;;
+        darwin)
+            grep -oP 'Device Code:\s+\K\d+' ~/Library/Logs/acp-daemon.log 2>/dev/null | tail -1
+            ;;
+        windows)
+            grep -oP 'Device Code:\s+\K\d+' "$TEMP/acp-daemon.log" 2>/dev/null | tail -1
+            ;;
+    esac
+}
+
+echo "Restarting ACP daemon..."
+restart_daemon
+
+echo "Waiting for new pairing code..."
+for i in $(seq 1 15); do
+    sleep 1
+    code=$(get_code)
+    if [[ -n "$code" ]]; then
+        echo ""
+        echo "╔═══════════════════════╗"
+        printf "║  Device Code: %-6s  ║\n" "$code"
+        echo "╚═══════════════════════╝"
+        echo ""
+        exit 0
+    fi
+done
+
+echo "Error: could not retrieve pairing code within 15 seconds"
+echo "Check daemon logs for the code."
+exit 1
