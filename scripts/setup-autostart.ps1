@@ -5,7 +5,7 @@ param(
     [string]$Dir = ""
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 if (-not $Dir) {
     $Dir = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
