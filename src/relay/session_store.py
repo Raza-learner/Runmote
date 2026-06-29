@@ -11,6 +11,7 @@ class SessionStore:
         self._db = db
         self._sessions: dict[str, dict] = {}
         self._daemon_id: str = ""
+        self._deleted: set[str] = set()
 
         if self._db:
             for s in self._db.load_all_sessions():
@@ -26,6 +27,7 @@ class SessionStore:
                     "createdAt": s["created_at"],
                     "updatedAt": s["created_at"],
                 }
+            self._deleted = self._db.load_deleted_sessions()
 
     def set_daemon_id(self, daemon_id: str):
         self._daemon_id = daemon_id
@@ -73,6 +75,19 @@ class SessionStore:
         self._sessions.pop(session_id, None)
         if self._db:
             self._db.delete_session(session_id)
+            self._db.mark_deleted(session_id)
+            self._deleted.add(session_id)
+
+    def mark_deleted(self, session_id: str) -> None:
+        self._deleted.add(session_id)
+        if self._db:
+            self._db.mark_deleted(session_id)
+
+    def is_deleted(self, session_id: str) -> bool:
+        return session_id in self._deleted
+
+    def deleted_sessions(self) -> set[str]:
+        return set(self._deleted)
 
     def remove_client(self, client_id: str) -> list[str]:
         removed = [

@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import time
 
 DB_PATH = os.environ.get("ACP_RELAY_DB", "acp_relay.db")
 
@@ -18,6 +19,12 @@ class Database:
                 name TEXT NOT NULL DEFAULT '',
                 daemon_id TEXT NOT NULL DEFAULT '',
                 created_at REAL NOT NULL
+            )
+        """)
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS deleted_sessions (
+                session_id TEXT PRIMARY KEY,
+                deleted_at REAL NOT NULL
             )
         """)
         self._conn.commit()
@@ -46,6 +53,25 @@ class Database:
     def delete_client_sessions(self, client_id: str):
         self._conn.execute("DELETE FROM sessions WHERE client_id = ?", (client_id,))
         self._conn.commit()
+
+    def mark_deleted(self, session_id: str, deleted_at: float | None = None):
+        if deleted_at is None:
+            deleted_at = time.time()
+        self._conn.execute(
+            "INSERT OR REPLACE INTO deleted_sessions VALUES (?, ?)",
+            (session_id, deleted_at),
+        )
+        self._conn.commit()
+
+    def load_deleted_sessions(self) -> set[str]:
+        rows = self._conn.execute("SELECT session_id FROM deleted_sessions").fetchall()
+        return {row["session_id"] for row in rows}
+
+    def is_deleted(self, session_id: str) -> bool:
+        row = self._conn.execute(
+            "SELECT 1 FROM deleted_sessions WHERE session_id = ?", (session_id,)
+        ).fetchone()
+        return row is not None
 
     def close(self):
         self._conn.close()

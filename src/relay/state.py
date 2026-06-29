@@ -13,9 +13,9 @@ store = SessionStore(db)
 daemon_websocket: WebSocket | None = None
 app_clients: dict[str, WebSocket] = {}
 
-# Track recently deleted session IDs so session/list from agents that keep
-# stale state (e.g. codex) cannot re-register them. TTL is 60 seconds.
-recently_deleted_sessions: dict[str, float] = {}
+# Track deleted session IDs persistently so session/list from agents that keep
+# stale state (e.g. codex) cannot re-register them after daemon reconnects.
+recently_deleted_sessions: set[str] = store.deleted_sessions()
 
 # Auth state
 token_to_daemons: dict[str, str] = {}

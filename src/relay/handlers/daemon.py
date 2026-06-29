@@ -29,6 +29,11 @@ def _register_session(session: dict) -> str:
     if not sid:
         return ""
 
+    # Skip sessions that were explicitly deleted by the user — agents like
+    # codex keep returning them in session/list after reconnect.
+    if state.store.is_deleted(sid):
+        return ""
+
     name = session.get("name") or session.get("title") or ""
     cwd = session.get("cwd") or ""
     updated_at = session.get("updatedAt") or session.get("createdAt")
@@ -116,14 +121,14 @@ async def daemon_endpoint(websocket: WebSocket):
                         for s in sessions:
                             if isinstance(s, dict):
                                 sid = s.get("sessionId") or s.get("id") or ""
-                                if sid in state.recently_deleted_sessions:
+                                if state.store.is_deleted(sid):
                                     skipped += 1
                                     continue
                                 sid = _register_session(s)
                                 if sid:
                                     synced += 1
                                     print(f"  → registered session {sid[:20]}...")
-                        print(f"  → synced {synced} sessions" + (f" (skipped {skipped} recently deleted)" if skipped else ""))
+                        print(f"  → synced {synced} sessions" + (f" (skipped {skipped} deleted)" if skipped else ""))
 
                 error = data.get("error")
                 if isinstance(error, dict):
@@ -136,15 +141,15 @@ async def daemon_endpoint(websocket: WebSocket):
 
             for cid, client in _paired_clients():
                 try:
-                    # Filter recently-deleted sessions from forwarded session/list
+                    # Filter deleted sessions from forwarded session/list
                     fwd = data
-                    if state.recently_deleted_sessions and fwd.get("result") and isinstance(fwd["result"], dict):
+                    if fwd.get("result") and isinstance(fwd["result"], dict):
                         sess_list = fwd["result"].get("sessions")
                         if isinstance(sess_list, list):
                             fwd["result"]["sessions"] = [
                                 s for s in sess_list
                                 if not isinstance(s, dict) or
-                                   (s.get("sessionId") or s.get("id") or "") not in state.recently_deleted_sessions
+                                   not state.store.is_deleted(s.get("sessionId") or s.get("id") or "")
                             ]
                     await client.send_text(json.dumps(fwd))
                 except Exception:
@@ -153,7 +158,6 @@ async def daemon_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         state.daemon_websocket = None
         state.store.clear_daemon_id()
-        state.recently_deleted_sessions.clear()
         print("Daemon disconnected!")
         forward = {
             "jsonrpc": "2.0",
