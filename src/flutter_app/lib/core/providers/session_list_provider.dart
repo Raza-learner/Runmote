@@ -7,6 +7,49 @@ import 'connection_provider.dart';
 import 'database_provider.dart';
 import '../models/connection_state.dart';
 
+class ActiveSessionsNotifier extends StateNotifier<Set<String>> {
+  final Map<String, Timer> _timers = {};
+  String? _latest;
+
+  ActiveSessionsNotifier() : super(const {});
+
+  String? get latestSessionId => _latest;
+
+  void markActive(String sessionId) {
+    _timers[sessionId]?.cancel();
+    _latest = sessionId;
+    state = {...state, sessionId};
+    _timers[sessionId] = Timer(const Duration(seconds: 5), () {
+      final next = Set<String>.from(state)..remove(sessionId);
+      _timers.remove(sessionId);
+      state = next;
+    });
+  }
+
+  void clear() {
+    for (final t in _timers.values) {
+      t.cancel();
+    }
+    _timers.clear();
+    _latest = null;
+    state = const {};
+  }
+
+  @override
+  void dispose() {
+    for (final t in _timers.values) {
+      t.cancel();
+    }
+    _timers.clear();
+    super.dispose();
+  }
+}
+
+final activeSessionsProvider =
+    StateNotifierProvider<ActiveSessionsNotifier, Set<String>>((ref) {
+  return ActiveSessionsNotifier();
+});
+
 class AcpSession {
   final String id;
   final String? title;
@@ -72,6 +115,15 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       final method = msg['method'] as String?;
       if (method != null && method.startsWith('session/')) {
         _debouncedRefresh();
+      }
+
+      // Track actively streaming sessions
+      if (method == 'session/update' || method == 'session/notification') {
+        final params = msg['params'] as Map<String, dynamic>?;
+        final sessionId = params?['sessionId'] as String?;
+        if (sessionId != null) {
+          _ref.read(activeSessionsProvider.notifier).markActive(sessionId);
+        }
       }
     });
 

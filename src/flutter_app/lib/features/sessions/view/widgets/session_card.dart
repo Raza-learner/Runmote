@@ -8,6 +8,7 @@ class SessionCard extends StatelessWidget {
   final String timeAgo;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final bool isActive;
 
   const SessionCard({
     super.key,
@@ -16,6 +17,7 @@ class SessionCard extends StatelessWidget {
     required this.timeAgo,
     required this.onTap,
     required this.onDelete,
+    this.isActive = false,
   });
 
   @override
@@ -29,19 +31,40 @@ class SessionCard extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer
-                      .withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.chat_bubble_outline,
-                  size: 20,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
+              Stack(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer
+                          .withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.chat_bubble_outline,
+                      size: 20,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  if (isActive)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: theme.colorScheme.surface,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(

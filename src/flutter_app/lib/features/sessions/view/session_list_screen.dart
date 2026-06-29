@@ -8,6 +8,7 @@ import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/session_list_provider.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../shared/widgets/ongoing_session_banner.dart';
 import 'widgets/session_card.dart';
 import 'widgets/directory_picker_sheet.dart';
 
@@ -157,6 +158,8 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
       }
     }
 
+    final activeIds = ref.watch(activeSessionsProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: _showSearch
@@ -218,11 +221,12 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
 
           return Column(
             children: [
+              const OngoingSessionBanner(),
               if (!supportsSessionList && sessions.isNotEmpty)
                 _LocalOnlyBanner(),
               Expanded(
                 child: _buildSessionList(
-                  theme, filtered, sessions, _searchQuery,
+                  theme, filtered, sessions, _searchQuery, activeIds,
                 ),
               ),
             ],
@@ -241,6 +245,7 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     List<AcpSession> filtered,
     List<AcpSession> sessions,
     String searchQuery,
+    Set<String> activeIds,
   ) {
     if (sessions.isEmpty) {
       return Center(
@@ -301,6 +306,7 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
               title: session.title,
               cwd: session.cwd,
               timeAgo: _timeAgo(session.updatedAt),
+              isActive: activeIds.contains(session.id),
                     onTap: () {
                       final cwd = session.cwd;
                       final path = cwd.isNotEmpty
