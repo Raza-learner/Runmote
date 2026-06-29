@@ -36,7 +36,7 @@ $hasGit = Get-Command git -ErrorAction SilentlyContinue
 # Ensure uv is installed (auto-downloads Python 3.13+ if missing)
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     Write-Host "Installing uv (Python package manager)..."
-    iex (iwr -UseBasicParsing -Uri https://astral.sh/uv/install.ps1).Content
+    iex ((New-Object Net.WebClient).DownloadString('https://astral.sh/uv/install.ps1'))
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","User") + ";" + $env:Path
     if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
         Write-Host "Error: uv installation failed. Install manually: https://docs.astral.sh/uv"
