@@ -104,8 +104,11 @@ if (Test-Path $installDir) {
 Write-Host ""
 Write-Host "Installing dependencies..."
 Push-Location $installDir
-uv sync --frozen 2>$null
-if ($LASTEXITCODE -ne 0) { uv sync }
+uv sync --frozen
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Warning: frozen sync failed — running full sync..."
+    uv sync
+}
 Pop-Location
 
 # Configure auto-start

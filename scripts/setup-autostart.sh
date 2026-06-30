@@ -253,8 +253,8 @@ case "$OS" in
         ;;
     windows)
         case "$MODE" in
-            install) windows_install; _install_symlink ;;
-            remove)  windows_remove;  _remove_symlink  ;;
+            install) windows_install ;;
+            remove)  windows_remove  ;;
             status)  windows_status  ;;
         esac
         ;;

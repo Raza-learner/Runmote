@@ -212,7 +212,10 @@ echo "Installing dependencies..."
 cd "$INSTALL_DIR"
 
 # uv sync auto-downloads Python 3.13+ if not found, creates .venv, installs deps
-uv sync --frozen 2>/dev/null || uv sync
+if ! uv sync --frozen; then
+    echo "Warning: frozen sync failed — running full sync..."
+    uv sync
+fi
 
 echo ""
 echo "Configuring auto-start..."
