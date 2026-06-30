@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-INSTALL_DIR="$(cd "$INSTALL_DIR" 2>/dev/null && pwd)" || INSTALL_DIR="$INSTALL_DIR"
+mkdir -p "$INSTALL_DIR" 2>/dev/null || true
 
 ensure_uv() {
     if command -v uv &>/dev/null; then
