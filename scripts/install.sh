@@ -2,15 +2,18 @@
 set -euo pipefail
 
 REMOTE="${ACP_REMOTE:-https://github.com/Raza-learner/acp-remote.git}"
+REMOTE_RAW="${ACP_REMOTE_RAW:-https://raw.githubusercontent.com/Raza-learner/acp-remote}"
 BRANCH="${ACP_BRANCH:-main}"
 INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/acp}"
 MODE="install"
 
 usage() {
     cat <<EOF
-Usage: curl -sL $REMOTE/raw/$BRANCH/scripts/install.sh | bash
-
 Install ACP daemon and configure auto-start.
+
+Usage:
+  curl -fsSL $REMOTE_RAW/$BRANCH/scripts/install.sh | bash
+  curl -fsSL $REMOTE_RAW/$BRANCH/scripts/install.sh | ACP_RELAY_URL='ws://host:8000/daemon' bash
 
 Options:
   --dir <path>       Install directory (default: \$HOME/.local/share/acp)
@@ -19,12 +22,12 @@ Options:
   --help             Show this help
 
 Environment variables:
-  ACP_DIR            Install directory (overrides --dir default)
-  ACP_BRANCH         Git branch (overrides --branch default)
-  ACP_REMOTE         Git remote URL (default: ACP default remote)
+  ACP_RELAY_URL      WebSocket URL of the relay server
   ACP_DAEMON_TOKEN   Auth token for daemon-relay authentication
   ACP_DAEMON_ID      Daemon identifier (default: hostname)
-  ACP_RELAY_URL      WebSocket URL of the relay server
+  ACP_DIR            Install directory (overrides --dir default)
+  ACP_BRANCH         Git branch (overrides --branch default)
+  ACP_REMOTE         Git remote URL
 EOF
     exit 0
 }
@@ -48,7 +51,7 @@ ensure_uv() {
     echo "Installing uv (Python package manager)..."
     case "$(uname -s)" in
         MINGW*|MSYS*|CYGWIN*)
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "iex (iwr -UseBasicParsing -Uri https://astral.sh/uv/install.ps1).Content"
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "iex ((New-Object Net.WebClient).DownloadString('https://astral.sh/uv/install.ps1'))"
             ;;
         *)
             curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -60,16 +63,6 @@ ensure_uv() {
     fi
     if ! command -v uv &>/dev/null; then
         echo "Error: uv installation failed. Install manually: https://docs.astral.sh/uv"
-        exit 1
-    fi
-}
-
-check_cmd() {
-    if ! command -v "$1" &>/dev/null; then
-        echo "Error: '$1' is required but not installed."
-        case "$1" in
-            git) echo "  Install: https://git-scm.com/downloads" ;;
-        esac
         exit 1
     fi
 }
@@ -171,18 +164,47 @@ echo "Branch:  $BRANCH"
 echo "Install: $INSTALL_DIR"
 echo ""
 
-check_cmd git
 ensure_uv
 
 # Clone or update
-if [[ -d "$INSTALL_DIR/.git" ]]; then
-    echo "Updating existing installation..."
-    git -C "$INSTALL_DIR" fetch origin
-    git -C "$INSTALL_DIR" checkout "$BRANCH"
-    git -C "$INSTALL_DIR" pull origin "$BRANCH"
+if command -v git &>/dev/null; then
+    if [[ -d "$INSTALL_DIR/.git" ]]; then
+        echo "Updating existing installation..."
+        git -C "$INSTALL_DIR" fetch origin
+        git -C "$INSTALL_DIR" checkout "$BRANCH"
+        git -C "$INSTALL_DIR" pull origin "$BRANCH"
+    else
+        echo "Cloning repository..."
+        git clone --branch "$BRANCH" --depth 1 "$REMOTE" "$INSTALL_DIR"
+    fi
 else
-    echo "Cloning repository..."
-    git clone --branch "$BRANCH" --depth 1 "$REMOTE" "$INSTALL_DIR"
+    echo "git not found — downloading ZIP instead..."
+    tmp_dir="/tmp/acp-install-tmp"
+    rm -rf "$tmp_dir"
+    mkdir -p "$tmp_dir"
+    zip_url="$REMOTE_RAW/$BRANCH.zip"
+    if command -v curl &>/dev/null; then
+        curl -fsSL -o "$tmp_dir/repo.zip" "$zip_url"
+    elif command -v wget &>/dev/null; then
+        wget -q -O "$tmp_dir/repo.zip" "$zip_url"
+    else
+        echo "Error: need curl or wget to download repository"
+        exit 1
+    fi
+    if ! command -v unzip &>/dev/null; then
+        echo "Error: 'unzip' is required. Install it (apt install unzip / brew install unzip) or install git."
+        exit 1
+    fi
+    unzip -q "$tmp_dir/repo.zip" -d "$tmp_dir"
+    extracted="$(find "$tmp_dir" -maxdepth 1 -type d -name 'acp-remote-*' 2>/dev/null | head -1)"
+    if [[ -n "$extracted" ]]; then
+        rm -rf "$INSTALL_DIR"
+        mv "$extracted" "$INSTALL_DIR"
+    else
+        echo "Error: failed to extract repository"
+        exit 1
+    fi
+    rm -rf "$tmp_dir"
 fi
 
 echo ""

@@ -14,12 +14,14 @@ for ($i = 0; $i -lt $args.Count; $i++) {
         "-Remove" { $mode = "remove" }
         "-Help"   {
             Write-Host @"
-Usage: iex (iwr -Uri https://raw.githubusercontent.com/Raza-learner/acp-remote/$branch/scripts/install.ps1).Content
+Install ACP daemon and configure auto-start.
 
-Or:    powershell -Command "`$env:ACP_RELAY_URL='ws://host:8000/daemon'; iex (iwr -Uri https://raw.githubusercontent.com/Raza-learner/acp-remote/$branch/scripts/install.ps1).Content"
+Usage:
+  iwr -useb https://raw.githubusercontent.com/Raza-learner/acp-remote/$branch/scripts/install.ps1 | iex
+  `$env:ACP_RELAY_URL='ws://host:8000/daemon'; iwr -useb https://raw.githubusercontent.com/Raza-learner/acp-remote/$branch/scripts/install.ps1 | iex
 
 Environment variables:
-  ACP_RELAY_URL      WebSocket URL of the relay server (required if not local)
+  ACP_RELAY_URL      WebSocket URL of the relay server
   ACP_DAEMON_TOKEN   Auth token for daemon-relay authentication
   ACP_DAEMON_ID      Daemon identifier (default: hostname)
   ACP_BRANCH         Git branch (default: main)
