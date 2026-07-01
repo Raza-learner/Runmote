@@ -23,15 +23,8 @@ def _detect_acp_agents() -> list[dict]:
     # claude — ACP adapter, check for the actual binary
     if shutil.which("claude-agent-acp"):
         agents.append({"id": "claude", "name": "Claude Code", "command": ["claude-agent-acp"]})
-    # claude-code-wrapper — Python ACP wrapper with auto-bridge detection
-    # Only start if a bridge binary (claude, claude-code-acp, claude-agent-acp) is available
-    elif shutil.which("claude-code-wrapper") and (
-        shutil.which("claude") or shutil.which("claude-code-acp") or shutil.which("claude-agent-acp")
-    ):
-        agents.append({"id": "claude", "name": "Claude Code", "command": ["claude-code-wrapper"]})
-    # native claude fallback — run wrapper via module path
-    elif shutil.which("claude"):
-        agents.append({"id": "claude", "name": "Claude Code", "command": ["python", "-m", "claude_daemon"]})
+    elif shutil.which("npx"):
+        agents.append({"id": "claude", "name": "Claude Code", "command": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"]})
     # gemini — native ACP mode
     if shutil.which("gemini"):
         agents.append({"id": "gemini", "name": "Gemini", "command": ["gemini", "--acp"]})

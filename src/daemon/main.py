@@ -257,6 +257,16 @@ async def run_daemon():
                                     send_queues.pop(aid, None)
                                     await agents[aid].stop()
                                     del agents[aid]
+                                elif not agents[aid].online:
+                                    log(f"Agent '{aid}' was offline, restarting...")
+                                    if aid in agent_tasks:
+                                        at = agent_tasks.pop(aid)
+                                        for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
+                                            if t and not t.done():
+                                                t.cancel()
+                                    send_queues.pop(aid, None)
+                                    await agents[aid].stop()
+                                    del agents[aid]
                             for aid, cfg in detected.items():
                                 if aid not in agents:
                                     log(f"Agent '{aid}' newly detected, starting...")
