@@ -15,9 +15,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-daemon = [
-    { name = "agent-client-protocol" },
-]
 dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -27,7 +24,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "agent-client-protocol", specifier = ">=0.8.0" },
-    { name = "agent-client-protocol", marker = "extra == 'daemon'", specifier = ">=0.8.0" },
     { name = "fastapi", specifier = ">=0.137.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.26" },
@@ -36,7 +32,7 @@ requires-dist = [
     { name = "websockets", specifier = ">=16.0" },
     { name = "zeroconf", specifier = ">=0.150.0" },
 ]
-provides-extras = ["dev", "daemon"]
+provides-extras = ["dev"]
 
 [[package]]
 name = "agent-client-protocol"

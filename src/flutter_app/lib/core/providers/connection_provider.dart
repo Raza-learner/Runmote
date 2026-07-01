@@ -48,6 +48,7 @@ class AcpConnection {
   final AgentCapabilities? capabilities;
   final bool paired;
   final String? error;
+  final bool daemonConnected;
 
   const AcpConnection({
     this.channel,
@@ -61,6 +62,7 @@ class AcpConnection {
     this.capabilities,
     this.paired = false,
     this.error,
+    this.daemonConnected = false,
   });
 
   AcpAgent? get selectedAgent {
@@ -82,10 +84,12 @@ class AcpConnection {
     AgentCapabilities? capabilities,
     bool? paired,
     String? error,
+    bool? daemonConnected,
     bool clearChannel = false,
     bool clearSelectedAgent = false,
     bool clearAgentInfo = false,
     bool clearCapabilities = false,
+    bool clearDaemonConnected = false,
   }) {
     return AcpConnection(
       channel: clearChannel ? null : channel ?? this.channel,
@@ -103,6 +107,8 @@ class AcpConnection {
           : capabilities ?? this.capabilities,
       paired: paired ?? this.paired,
       error: error ?? this.error,
+      daemonConnected:
+          clearDaemonConnected ? false : daemonConnected ?? this.daemonConnected,
     );
   }
 }
@@ -214,7 +220,10 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         final result = json['result'] as Map<String, dynamic>?;
         if (result != null && result['paired'] == true) {
           final daemonId = result['daemonId'] as String?;
-          state = state.copyWith(daemonId: daemonId);
+          state = state.copyWith(
+            daemonId: daemonId,
+            daemonConnected: daemonId != null,
+          );
           pairCompleter.complete();
           return;
         }
@@ -230,7 +239,9 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         final params = json['params'] as Map<String, dynamic>?;
         final di = params?['daemonId'] as String?;
         if (di != null) {
-          state = state.copyWith(daemonId: di);
+          state = state.copyWith(daemonId: di, daemonConnected: true);
+        } else {
+          state = state.copyWith(daemonConnected: true);
         }
         return;
       }
@@ -246,6 +257,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
           clearSelectedAgent: true,
           clearAgentInfo: true,
           clearCapabilities: true,
+          daemonConnected: false,
         );
         return;
       }
@@ -437,6 +449,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       state: const AcpConnectionState.disconnected(),
       paired: false,
       error: reason,
+      daemonConnected: false,
     );
     _scheduleReconnect();
   }

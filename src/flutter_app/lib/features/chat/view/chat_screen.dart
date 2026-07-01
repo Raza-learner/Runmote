@@ -11,6 +11,7 @@ import '../viewmodel/chat_provider.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/session_list_provider.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../shared/widgets/daemon_offline_banner.dart';
 import 'widgets/message_bubble.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -174,6 +175,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final isBusy = chatState.whenOrNull(data: (cs) => cs.isBusy) ?? false;
     final canSendImages = connection.capabilities?.canSendImages ?? false;
+    final daemonDown =
+        connection.paired && !connection.daemonConnected;
 
     final modelConfig = chatState.whenOrNull(
       data: (cs) => cs.configOptions
@@ -207,6 +210,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
+          if (daemonDown) const DaemonOfflineBanner(),
           Expanded(
             child: chatState.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -315,7 +319,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               },
             ),
           ),
-          _buildInputArea(theme, isBusy, canSendImages, modelConfig),
+          _buildInputArea(theme, isBusy, canSendImages, modelConfig, daemonDown),
         ],
       ),
     );
@@ -326,6 +330,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     bool isBusy,
     bool canSendImages,
     ConfigOption? modelConfig,
+    bool daemonDown,
   ) {
     return Container(
       decoration: BoxDecoration(
@@ -394,13 +399,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       controller: _textController,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _sendMessage(),
-                      enabled: !isBusy,
+                      enabled: !isBusy && !daemonDown,
                       minLines: 1,
                       maxLines: 5,
                       decoration: InputDecoration(
-                        hintText: isBusy
-                            ? 'Agent is responding...'
-                            : 'Type a message...',
+                        hintText: daemonDown
+                            ? 'Daemon not connected'
+                            : isBusy
+                                ? 'Agent is responding...'
+                                : 'Type a message...',
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
@@ -409,7 +416,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (canSendImages && !isBusy)
+                  if (canSendImages && !isBusy && !daemonDown)
                     IconButton(
                       onPressed: _pickFile,
                       icon: Icon(
@@ -432,11 +439,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           ),
                         )
                       : IconButton.filled(
-                          onPressed:
-                              _textController.text.trim().isNotEmpty ||
-                                      _attachments.isNotEmpty
-                                  ? _sendMessage
-                                  : null,
+                          onPressed: daemonDown ||
+                                  (_textController.text.trim().isEmpty &&
+                                      _attachments.isEmpty)
+                              ? null
+                              : _sendMessage,
                           icon: const Icon(Icons.arrow_upward),
                         ),
                 ],

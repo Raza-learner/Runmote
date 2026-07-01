@@ -69,7 +69,20 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onUpgrade: (m, from, to) async {
+        if (from < 2) {
+          // v2: clear session cache so existing cross-agent cached sessions
+          // are reloaded cleanly with the new agent-aware relay logic.
+          await delete(sessionCache).go();
+        }
+      },
+    );
+  }
 
   Future<void> savePairedDevice(String code, String deviceName) async {
     await into(pairedDevices).insertOnConflictUpdate(

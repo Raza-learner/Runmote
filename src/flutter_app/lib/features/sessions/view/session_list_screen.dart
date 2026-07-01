@@ -9,6 +9,7 @@ import '../../../core/providers/session_list_provider.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/ongoing_session_banner.dart';
+import '../../../shared/widgets/daemon_offline_banner.dart';
 import 'widgets/session_card.dart';
 import 'widgets/directory_picker_sheet.dart';
 
@@ -72,6 +73,15 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
   }
 
   Future<void> _createSession() async {
+    final conn = ref.read(connectionProvider);
+    if (conn.paired && !conn.daemonConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot create session — daemon is not running'),
+        ),
+      );
+      return;
+    }
     final db = ref.read(databaseProvider);
     final savedCwd = await db.getDefaultCwd();
 
@@ -222,6 +232,8 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
           return Column(
             children: [
               const OngoingSessionBanner(),
+              if (connection.paired && !connection.daemonConnected)
+                const DaemonOfflineBanner(),
               if (!supportsSessionList && sessions.isNotEmpty)
                 _LocalOnlyBanner(),
               Expanded(

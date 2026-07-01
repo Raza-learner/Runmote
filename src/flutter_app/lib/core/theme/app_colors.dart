@@ -11,6 +11,7 @@ abstract final class AppColors {
   static const offline = Color(0xFF9E9E9E);
   static const connecting = Color(0xFFFF9800);
   static const error = Color(0xFFF44336);
+  static const daemonOffline = Color(0xFFE65100);
 
   static const glassLight = Color(0xCCFFFFFF);
   static const glassDark = Color(0xCC1E1E1E);

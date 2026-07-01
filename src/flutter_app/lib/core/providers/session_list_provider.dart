@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'connection_provider.dart';
@@ -24,6 +23,14 @@ class ActiveSessionsNotifier extends StateNotifier<Set<String>> {
       _timers.remove(sessionId);
       state = next;
     });
+  }
+
+  void markInactive(String sessionId) {
+    _timers[sessionId]?.cancel();
+    _timers.remove(sessionId);
+    final next = Set<String>.from(state)..remove(sessionId);
+    if (_latest == sessionId) _latest = next.isEmpty ? null : next.last;
+    state = next;
   }
 
   void clear() {
@@ -115,6 +122,16 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       final method = msg['method'] as String?;
       if (method != null && method.startsWith('session/')) {
         _debouncedRefresh();
+        return;
+      }
+
+      // Passive session-list responses forwarded from relay (no method, just
+      // id + result.sessions).  Refresh so the list stays in sync when the
+      // agent sends its initial list or after a daemon reconnect.
+      final result = msg['result'] as Map<String, dynamic>?;
+      if (result != null && result.containsKey('sessions')) {
+        _debouncedRefresh();
+        return;
       }
 
       // Track actively streaming sessions
@@ -157,7 +174,9 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
   }
 
   Future<void> loadSessions() async {
-    if (_isLoading) return;
+    if (_isLoading) {
+      return;
+    }
     _isLoading = true;
 
     // Preserve existing data while refreshing so the list doesn't flash.
@@ -218,13 +237,11 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
                 completer.complete(sessions);
               }
             } else {
-              debugPrint('[ACP-SESS] load error: ${msg['error']}');
               if (!completer.isCompleted) {
                 completer.complete([]);
               }
             }
-          } catch (e, _) {
-            debugPrint('[ACP-SESS] load listener error: $e');
+          } catch (e, st) {
             if (!completer.isCompleted) {
               completer.complete([]);
             }
@@ -246,10 +263,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
 
       final rawSessions = await completer.future.timeout(
         const Duration(seconds: 5),
-        onTimeout: () {
-          debugPrint('[ACP-SESS] load TIMEOUT');
-          return [];
-        },
+        onTimeout: () => [],
       );
 
       await sub.cancel();
@@ -259,6 +273,10 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       // knows about. Keep cached-only sessions (e.g. created on this phone).
       final remoteSessions = rawSessions
           .where((s) => !_deletedIds.contains(s.id))
+          // Defensive filter: ignore sessions the relay tagged for a different
+          // agent. This prevents cross-agent session leakage if the relay ever
+          // forwards a mixed list.
+          .where((s) => selectedAgentId == null || s.agentId == null || s.agentId == selectedAgentId)
           .toList();
       final merged = <String, AcpSession>{};
       for (final s in cachedSessions) {
@@ -282,7 +300,6 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
 
       state = AsyncValue.data(sessions);
     } catch (e, st) {
-      debugPrint('[ACP-SESS] load error: $e\n$st');
       state = AsyncValue.error(e, st);
     } finally {
       _isLoading = false;
@@ -293,7 +310,6 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
     try {
       final connection = _ref.read(connectionProvider);
       if (connection.channel == null) {
-        debugPrint('[ACP-SESS] create: channel is null');
         return null;
       }
 
@@ -322,13 +338,11 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
                 );
               }
             } else {
-              debugPrint('[ACP-SESS] create error: ${msg['error']}');
               if (!completer.isCompleted) {
                 completer.complete(null);
               }
             }
           } catch (e, st) {
-            debugPrint('[ACP-SESS] create listener error: $e\n$st');
             if (!completer.isCompleted) {
               completer.complete(null);
             }
@@ -337,7 +351,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       });
 
       requestId = DateTime.now().millisecondsSinceEpoch;
-      notifier.sendRaw({
+      final payload = {
         'jsonrpc': '2.0',
         'id': requestId,
         'method': 'session/new',
@@ -347,26 +361,25 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
           'cwd': cwd,
           'mcpServers': <String>[],
         },
-      });
+      };
+      notifier.sendRaw(payload);
 
       final session = await completer.future.timeout(
         const Duration(seconds: 5),
-        onTimeout: () {
-          debugPrint('[ACP-SESS] create TIMEOUT after 5s');
-          return null;
-        },
+        onTimeout: () => null,
       );
 
       await sub.cancel();
 
       if (session != null) {
         final db = _ref.read(databaseProvider);
+        final code = _cacheDeviceCode(
+          connection.pairingCode ?? '',
+          connection.selectedAgentId,
+        );
         await db.cacheSession(
           id: session.id,
-          deviceCode: _cacheDeviceCode(
-            connection.pairingCode ?? '',
-            connection.selectedAgentId,
-          ),
+          deviceCode: code,
           title: session.title,
           cwd: session.cwd,
           updatedAt: session.updatedAt,

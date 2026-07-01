@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket
 
 try:
     from .. import state
@@ -59,7 +59,6 @@ async def daemon_endpoint(websocket: WebSocket):
 
     try:
         async for message in websocket.iter_text():
-            print(f"daemon → relay: {message[:120]}")
 
             try:
                 data = json.loads(message)
@@ -79,6 +78,7 @@ async def daemon_endpoint(websocket: WebSocket):
                                 "id": msg_id,
                                 "error": {"code": -32001, "message": "invalid token"},
                             }))
+                        state.daemon_websocket = None
                         await websocket.close()
                         return
 
@@ -111,31 +111,21 @@ async def daemon_endpoint(websocket: WebSocket):
                 result = data.get("result")
                 if isinstance(result, dict):
                     sid = _register_session(result)
-                    if sid:
-                        print(f"  → registered session {sid[:20]}...")
 
                     sessions = result.get("sessions")
                     if isinstance(sessions, list):
-                        synced = 0
-                        skipped = 0
                         for s in sessions:
                             if isinstance(s, dict):
                                 sid = s.get("sessionId") or s.get("id") or ""
                                 if state.store.is_deleted(sid):
-                                    skipped += 1
                                     continue
-                                sid = _register_session(s)
-                                if sid:
-                                    synced += 1
-                                    print(f"  → registered session {sid[:20]}...")
-                        print(f"  → synced {synced} sessions" + (f" (skipped {skipped} deleted)" if skipped else ""))
+                                _register_session(s)
 
                 error = data.get("error")
                 if isinstance(error, dict):
                     sid = (error.get("data") or {}).get("sessionId")
                     if sid:
                         state.store.remove(sid)
-                        print(f"  → removed session {sid[:20]}...")
             except Exception as e:
                 print(f"  → failed to process daemon message: {e}")
 
@@ -146,26 +136,43 @@ async def daemon_endpoint(websocket: WebSocket):
                     if fwd.get("result") and isinstance(fwd["result"], dict):
                         sess_list = fwd["result"].get("sessions")
                         if isinstance(sess_list, list):
-                            fwd["result"]["sessions"] = [
+                            filtered = [
                                 s for s in sess_list
                                 if not isinstance(s, dict) or
                                    not state.store.is_deleted(s.get("sessionId") or s.get("id") or "")
                             ]
+                            # Fill in sessions from the store that the agent
+                            # didn't return (lost e.g. after a daemon restart).
+                            agent_sids = {
+                                s.get("sessionId") or s.get("id") or ""
+                                for s in filtered if isinstance(s, dict)
+                            }
+                            agent_id = fwd["result"].get("agentId", "")
+                            # Only merge cached sessions when we know which
+                            # agent the response belongs to. Without a valid
+                            # agent_id, merging would leak sessions from other
+                            # agents into this list.
+                            if agent_id:
+                                for cs in state.store.list_sessions(agent_id=agent_id):
+                                    if cs["sessionId"] not in agent_sids:
+                                        filtered.append(cs)
+                            fwd["result"]["sessions"] = filtered
                     await client.send_text(json.dumps(fwd))
                 except Exception:
                     state.app_clients.pop(cid, None)
 
-    except WebSocketDisconnect:
-        state.daemon_websocket = None
-        state.store.clear_daemon_id()
-        print("Daemon disconnected!")
-        forward = {
-            "jsonrpc": "2.0",
-            "method": "daemon/disconnected",
-            "params": {},
-        }
-        for cid, client in _paired_clients():
-            try:
-                await client.send_text(json.dumps(forward))
-            except Exception:
-                state.app_clients.pop(cid, None)
+    finally:
+        if state.daemon_websocket is websocket:
+            state.daemon_websocket = None
+            state.store.clear_daemon_id()
+            print("Daemon disconnected!")
+            forward = {
+                "jsonrpc": "2.0",
+                "method": "daemon/disconnected",
+                "params": {},
+            }
+            for cid, client in _paired_clients():
+                try:
+                    await client.send_text(json.dumps(forward))
+                except Exception:
+                    state.app_clients.pop(cid, None)

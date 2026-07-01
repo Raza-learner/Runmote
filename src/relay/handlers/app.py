@@ -1,6 +1,6 @@
 import json
 import uuid
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket
 
 try:
     from .. import state
@@ -102,10 +102,11 @@ async def app_endpoint(websocket: WebSocket):
                         continue
 
                     agent_id = (data.get("params") or {}).get("agentId", "")
+                    sessions = state.store.list_sessions(agent_id)
                     await websocket.send_text(json.dumps({
                         "jsonrpc": "2.0",
                         "id": msg_id,
-                        "result": {"sessions": state.store.list_sessions(agent_id)},
+                        "result": {"sessions": sessions},
                     }))
                     continue
 
@@ -163,7 +164,7 @@ async def app_endpoint(websocket: WebSocket):
                 print(f"  → failed to forward to daemon: {e}", flush=True)
                 await _send_error(websocket, None, -32005, f"daemon error: {e}")
 
-    except WebSocketDisconnect:
+    finally:
         state.app_clients.pop(client_id, None)
         state.app_to_token.pop(client_id, None)
         state.store.remove_client(client_id)

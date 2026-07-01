@@ -16,6 +16,7 @@ class Database:
             CREATE TABLE IF NOT EXISTS sessions (
                 session_id TEXT PRIMARY KEY,
                 client_id TEXT NOT NULL DEFAULT '',
+                agent_id TEXT NOT NULL DEFAULT '',
                 name TEXT NOT NULL DEFAULT '',
                 daemon_id TEXT NOT NULL DEFAULT '',
                 created_at REAL NOT NULL
@@ -28,15 +29,24 @@ class Database:
             )
         """)
         self._conn.commit()
+        self._migrate_add_agent_id()
 
     def load_all_sessions(self) -> list[dict]:
         rows = self._conn.execute("SELECT * FROM sessions").fetchall()
         return [dict(row) for row in rows]
 
-    def insert_session(self, session_id: str, client_id: str, name: str, daemon_id: str, created_at: float):
+    def insert_session(
+        self,
+        session_id: str,
+        client_id: str,
+        agent_id: str,
+        name: str,
+        daemon_id: str,
+        created_at: float,
+    ):
         self._conn.execute(
-            "INSERT OR REPLACE INTO sessions VALUES (?, ?, ?, ?, ?)",
-            (session_id, client_id, name, daemon_id, created_at),
+            "INSERT OR REPLACE INTO sessions VALUES (?, ?, ?, ?, ?, ?)",
+            (session_id, client_id, agent_id, name, daemon_id, created_at),
         )
         self._conn.commit()
 
@@ -72,6 +82,16 @@ class Database:
             "SELECT 1 FROM deleted_sessions WHERE session_id = ?", (session_id,)
         ).fetchone()
         return row is not None
+
+    def _migrate_add_agent_id(self):
+        """Add agent_id column to existing sessions table (pre-v2 schema)."""
+        try:
+            self._conn.execute("ALTER TABLE sessions ADD COLUMN agent_id TEXT NOT NULL DEFAULT ''")
+            self._conn.commit()
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" in str(e).lower():
+                return
+            raise
 
     def close(self):
         self._conn.close()

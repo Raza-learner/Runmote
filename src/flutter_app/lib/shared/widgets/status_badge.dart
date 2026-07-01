@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 
-enum AgentStatus { online, offline, connecting }
+enum AgentStatus { online, offline, connecting, daemonOffline }
 
 class StatusBadge extends StatelessWidget {
   final AgentStatus status;
@@ -22,6 +22,7 @@ class StatusBadge extends StatelessWidget {
         AgentStatus.online => AppColors.online,
         AgentStatus.offline => AppColors.offline,
         AgentStatus.connecting => AppColors.connecting,
+        AgentStatus.daemonOffline => AppColors.daemonOffline,
       },
     );
   }
@@ -39,6 +40,7 @@ class StatusLabel extends StatelessWidget {
       AgentStatus.online => (AppColors.online, 'Connected'),
       AgentStatus.offline => (AppColors.offline, 'Offline'),
       AgentStatus.connecting => (AppColors.connecting, 'Connecting...'),
+      AgentStatus.daemonOffline => (AppColors.daemonOffline, 'Daemon Offline'),
     };
     return Row(
       mainAxisSize: MainAxisSize.min,

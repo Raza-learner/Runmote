@@ -301,6 +301,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
               ));
               _ref.read(sessionListProvider.notifier).deleteSession(_sessionId);
               _finalizeStreaming();
+              _ref.read(activeSessionsProvider.notifier).markInactive(_sessionId);
               return;
             }
           }
@@ -312,6 +313,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
           }
 
           _finalizeStreaming();
+          _ref.read(activeSessionsProvider.notifier).markInactive(_sessionId);
           if (!wasLoad) {
             _ref.read(sessionListProvider.notifier).loadSessions();
           }
@@ -337,13 +339,24 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     );
   }
 
+  String _extractText(dynamic content) {
+    if (content is String) return content;
+    if (content is Map) return (content['text'] as String?) ?? '';
+    if (content is List) {
+      return content.map((c) {
+        if (c is Map) return (c['text'] as String?) ?? '';
+        return c.toString();
+      }).join();
+    }
+    return '';
+  }
+
   void _handleUpdate(Map<String, dynamic> params) {
     final update = params['update'] as Map<String, dynamic>?;
     if (update == null) return;
 
     final type = update['sessionUpdate'] as String?;
-    final content = update['content'] as Map<String, dynamic>?;
-    final text = content?['text'] as String? ?? '';
+    final text = _extractText(update['content']);
     final msgId = update['messageId'] as String?;
 
 
@@ -418,6 +431,16 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
           if (_loaded) _syncState();
           return;
         }
+      }
+    }
+    // If no msgId and role is assistant, append to last streaming assistant message
+    if (role == ChatMessageRole.assistant && _buffer.isNotEmpty) {
+      final last = _buffer.last;
+      if (last.role == ChatMessageRole.assistant && last.isStreaming) {
+        final newContent = last.content + text;
+        _buffer[_buffer.length - 1] = last.copyWith(content: newContent);
+        if (_loaded) _syncState();
+        return;
       }
     }
     _buffer.add(ChatMessage(

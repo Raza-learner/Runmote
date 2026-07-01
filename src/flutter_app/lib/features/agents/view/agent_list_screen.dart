@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/models/connection_state.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_colors.dart';
 import 'widgets/agent_card.dart';
 import 'widgets/agent_logo.dart';
 import '../../../../shared/widgets/error_banner.dart';
@@ -43,7 +44,20 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
 
     final isConnected = connection.state is Connected;
     final isReconnecting = connection.state is Reconnecting;
+    final isConnecting = connection.state is Connecting;
     final agents = connection.agents;
+    final daemonDown = isConnected && !connection.daemonConnected;
+
+    AgentStatus status;
+    if (isReconnecting || isConnecting) {
+      status = AgentStatus.connecting;
+    } else if (daemonDown) {
+      status = AgentStatus.daemonOffline;
+    } else if (isConnected) {
+      status = AgentStatus.online;
+    } else {
+      status = AgentStatus.offline;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -56,13 +70,7 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: StatusLabel(
-              status: isReconnecting
-                  ? AgentStatus.connecting
-                  : isConnected
-                      ? AgentStatus.online
-                      : AgentStatus.offline,
-            ),
+            child: StatusLabel(status: status),
           ),
         ],
       ),
@@ -84,68 +92,74 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
               },
             ),
           Expanded(
-            child: isConnected && agents.isNotEmpty
-                ? RefreshIndicator(
+            child: daemonDown
+                ? _DaemonOfflineState(
                     onRefresh: () async {
                       ref.read(connectionProvider.notifier).loadAgents();
                     },
-                    child: ListView.separated(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      itemCount: agents.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(height: AppSpacing.sm),
-                      itemBuilder: (context, index) {
-                        final agent = agents[index];
-                        return AgentCard(
-                          id: agent.id,
-                          name: agent.name,
-                          version: agent.version,
-                          isOnline: agent.online,
-                          isSelected:
-                              agent.id == connection.selectedAgentId,
-                          onTap: agent.online
-                              ? () {
-                                  ref
-                                      .read(connectionProvider.notifier)
-                                      .selectAgent(agent.id);
-                                  context.go('/sessions');
-                                }
-                              : null,
-                          onInfoTap: () => _showAgentDetail(agent),
-                        );
-                      },
-                    ),
                   )
-                : Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.smart_toy_outlined,
-                          size: 64,
-                          color: theme.colorScheme.onSurfaceVariant,
+                : isConnected && agents.isNotEmpty
+                    ? RefreshIndicator(
+                        onRefresh: () async {
+                          ref.read(connectionProvider.notifier).loadAgents();
+                        },
+                        child: ListView.separated(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          itemCount: agents.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: AppSpacing.sm),
+                          itemBuilder: (context, index) {
+                            final agent = agents[index];
+                            return AgentCard(
+                              id: agent.id,
+                              name: agent.name,
+                              version: agent.version,
+                              isOnline: agent.online,
+                              isSelected:
+                                  agent.id == connection.selectedAgentId,
+                              onTap: agent.online
+                                  ? () {
+                                      ref
+                                          .read(connectionProvider.notifier)
+                                          .selectAgent(agent.id);
+                                      context.go('/sessions');
+                                    }
+                                  : null,
+                              onInfoTap: () => _showAgentDetail(agent),
+                            );
+                          },
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          isReconnecting || connection.state is Connecting
-                              ? 'Connecting...'
-                              : 'No agents detected',
-                          style: theme.textTheme.titleMedium,
+                      )
+                    : Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.smart_toy_outlined,
+                              size: 64,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              isReconnecting || isConnecting
+                                  ? 'Connecting...'
+                                  : 'No agents detected',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Make sure an ACP agent is running on your PC.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 24),
+                            if (isReconnecting || isConnecting)
+                              const CircularProgressIndicator(),
+                          ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Make sure an ACP agent is running on your PC.',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 24),
-                        if (isReconnecting || connection.state is Connecting)
-                          const CircularProgressIndicator(),
-                      ],
-                    ),
-                  ),
+                      ),
           ),
         ],
       ),
@@ -271,6 +285,106 @@ class _DetailRow extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DaemonOfflineState extends StatelessWidget {
+  final Future<void> Function() onRefresh;
+
+  const _DaemonOfflineState({required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        children: [
+          const SizedBox(height: AppSpacing.xl),
+          const Center(
+            child: Icon(
+              Icons.power_off_rounded,
+              size: 72,
+              color: AppColors.daemonOffline,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Center(
+            child: Text(
+              'Daemon is not running',
+              style: theme.textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Center(
+            child: Text(
+              'The daemon on your remote device is offline. '
+              'Start it on the remote machine to reconnect.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'How to start the daemon',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Run this command on your remote device:',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm + 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    'acp-remote',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'The daemon will reconnect automatically once started. '
+                  'Pull down to refresh.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
