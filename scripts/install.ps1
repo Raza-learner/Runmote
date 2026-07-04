@@ -5,6 +5,10 @@ $remote    = if ($env:ACP_REMOTE)    { $env:ACP_REMOTE }    else { "https://gith
 $branch    = if ($env:ACP_BRANCH)    { $env:ACP_BRANCH }    else { "main" }
 $installDir = if ($env:ACP_DIR)      { $env:ACP_DIR }       else { "$env:USERPROFILE\.local\share\acp" }
 $mode      = "install"
+$skipAutostart = $false
+
+# Detect interactive mode
+$interactive = [Environment]::UserInteractive -and -not $PSCommandPath.StartsWith("-")
 
 # Parse $args for flags (when run as a file, not via iex)
 for ($i = 0; $i -lt $args.Count; $i++) {
@@ -56,23 +60,60 @@ if ($mode -eq "remove") {
     return
 }
 
+# --- Interactive prompts ---
+if ($interactive) {
+    Write-Host ""
+    Write-Host "  ACP Daemon Setup"
+    Write-Host "  ================"
+    Write-Host ""
+
+    # Daemon name
+    $defaultName = if ($env:ACP_DAEMON_ID) { $env:ACP_DAEMON_ID } else { $env:COMPUTERNAME }
+    $nameInput = Read-Host "  Daemon name [$defaultName]"
+    if ($nameInput) {
+        $env:ACP_DAEMON_ID = $nameInput
+    } else {
+        $env:ACP_DAEMON_ID = $defaultName
+    }
+
+    # Install directory
+    $dirInput = Read-Host "  Install directory [$installDir]"
+    if ($dirInput) {
+        $installDir = $dirInput
+    }
+
+    # Auto-start
+    $autostartInput = Read-Host "  Enable auto-start on login? [Y/n]"
+    if ($autostartInput -eq "n" -or $autostartInput -eq "N" -or $autostartInput -eq "no") {
+        $skipAutostart = $true
+    }
+
+    Write-Host ""
+}
+
 # --- Install ---
+$daemonName = if ($env:ACP_DAEMON_ID) { $env:ACP_DAEMON_ID } else { $env:COMPUTERNAME }
 Write-Host "ACP daemon installer"
 Write-Host "===================="
+Write-Host "Daemon:  $daemonName"
 Write-Host "Remote:  $remote"
 Write-Host "Branch:  $branch"
 Write-Host "Install: $installDir"
 Write-Host ""
 
+Write-Host "Step 1/4: Installing uv..."
+Write-Host "  Done."
+
 # Download repo
+Write-Host "Step 2/4: Downloading repository..."
 if (Test-Path $installDir) {
     if ($hasGit) {
-        Write-Host "Updating existing installation..."
+        Write-Host "  Updating existing installation..."
         Push-Location $installDir
         git fetch origin; git checkout $branch; git pull origin $branch
         Pop-Location
     } else {
-        Write-Host "Updating via ZIP download..."
+        Write-Host "  Updating via ZIP download..."
         $tmpDir = "$env:TEMP\acp-install-tmp"
         Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue | Out-Null
         New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
@@ -99,50 +140,48 @@ if (Test-Path $installDir) {
         Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue | Out-Null
     }
 }
+Write-Host "  Done."
 
-# Install deps (uv sync auto-downloads Python 3.13+ if missing)
-Write-Host ""
-Write-Host "Installing dependencies..."
+# Install deps
+Write-Host "Step 3/4: Installing dependencies..."
 Push-Location $installDir
 uv sync --frozen
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Warning: frozen sync failed — running full sync..."
+    Write-Host "  frozen sync failed — running full sync..."
     uv sync
 }
 Pop-Location
+Write-Host "  Done."
 
 # Configure auto-start
-Write-Host ""
-Write-Host "Configuring auto-start..."
-& (Join-Path $installDir "scripts" "setup-autostart.ps1") -Install
+if ($skipAutostart) {
+    Write-Host "  Auto-start skipped."
+} else {
+    Write-Host "Step 4/4: Configuring auto-start..."
+    & (Join-Path $installDir "scripts" "setup-autostart.ps1") -Install
+    Write-Host "  Done."
+}
 
 # Post-install
 Write-Host ""
-Write-Host "+-----------------------------------------------+"
-Write-Host "| ACP daemon installed successfully!            |"
-Write-Host "|                                               |"
-Write-Host "| It will start automatically after login.     |"
-Write-Host "|                                               |"
-Write-Host "| To start now:                                 |"
-Write-Host "|   schtasks /Run /TN 'ACP Daemon'              |"
-Write-Host "|                                               |"
-Write-Host "| To check status:                              |"
-Write-Host "|   schtasks /Query /TN 'ACP Daemon'            |"
-Write-Host "|                                               |"
-Write-Host "| To restart + get pairing code:                |"
-Write-Host "|   acp-remote                                  |"
-Write-Host "|                                               |"
-Write-Host "| -- Pair with the app --                       |"
-Write-Host "|                                               |"
-Write-Host "| After starting, the daemon shows a code:     |"
-Write-Host "|   +-----------------------------+             |"
-Write-Host "|   |  Device Code: 123456       |             |"
-Write-Host "|   +-----------------------------+             |"
-Write-Host "|                                               |"
-Write-Host "| Open the ACP mobile app and enter this code   |"
-Write-Host "| to pair with your device.                     |"
-Write-Host "|                                               |"
-Write-Host "| See all paired devices and manage sessions    |"
-Write-Host "| directly from the app.                        |"
-Write-Host "+-----------------------------------------------+"
-
+Write-Host "+----------------------------------------------------+"
+Write-Host "|     ACP daemon installed successfully!             |"
+Write-Host "|                                                    |"
+Write-Host "|  It will start automatically after login.         |"
+Write-Host "|                                                    |"
+Write-Host "|  To control the daemon now:                        |"
+Write-Host "|    acp-remote          (interactive menu)          |"
+Write-Host "|    acp-remote start    (start daemon)              |"
+Write-Host "|    acp-remote code     (show pairing code)         |"
+Write-Host "|    acp-remote stop     (stop daemon)               |"
+Write-Host "|                                                    |"
+Write-Host "|  -- Pair with the ACP app --                       |"
+Write-Host "|                                                    |"
+Write-Host "|  Start the daemon, then use the app to scan the    |"
+Write-Host "|  QR code shown in the terminal or type the code.   |"
+Write-Host "|                                                    |"
+Write-Host "|  Run: acp-remote code                              |"
+Write-Host "|                                                    |"
+Write-Host "|  See all paired devices and manage sessions        |"
+Write-Host "|  directly from the app.                            |"
+Write-Host "+----------------------------------------------------+"

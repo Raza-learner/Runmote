@@ -48,13 +48,21 @@ class _PairScreenState extends ConsumerState<PairScreen> {
 
   void _onCodeChanged() {
     final text = _codeController.text;
-    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.length > 6) return;
+    final chars = text.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+    if (chars.length > 8) return;
     String formatted;
-    if (digits.length <= 3) {
-      formatted = digits;
+    if (chars.length <= 4 && chars.length > 0) {
+      // 6-digit codes (old): format as XXX-XXX once we have 5+ chars
+      // 8-char codes (new): format as XXXX-XXXX once we have 5+ chars
+      formatted = chars;
     } else {
-      formatted = '${digits.substring(0, 3)}-${digits.substring(3)}';
+      if (chars.length >= 5 && chars.length <= 6 && RegExp(r'^\d+$').hasMatch(chars)) {
+        // 6-digit: split 3-3
+        formatted = '${chars.substring(0, 3)}-${chars.substring(3)}';
+      } else {
+        // 8-char: split 4-4
+        formatted = '${chars.substring(0, 4)}-${chars.substring(4)}';
+      }
     }
     if (formatted != text) {
       _codeController.value = TextEditingValue(
@@ -67,9 +75,10 @@ class _PairScreenState extends ConsumerState<PairScreen> {
 
   Future<void> _connect({String? code}) async {
     final pairingCode = (code ?? _codeController.text)
-        .replaceAll(RegExp(r'[^0-9]'), '');
-    if (pairingCode.length != 6) {
-      setState(() => _error = 'Please enter a 6-digit pairing code');
+        .replaceAll(RegExp(r'[^A-Za-z0-9]'), '')
+        .toUpperCase();
+    if (pairingCode.length != 8 && pairingCode.length != 6) {
+      setState(() => _error = 'Please enter a 6-digit or 8-character pairing code');
       return;
     }
     setState(() {
@@ -81,14 +90,24 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: url);
   }
 
+  bool _isValidCode(String raw) {
+    // Accept 8-char alphanumeric (new relay) or 6-digit (old relay).
+    return RegExp(r'^[A-Za-z0-9]{8}$').hasMatch(raw) ||
+           RegExp(r'^\d{6}$').hasMatch(raw);
+  }
+
   void _onQrDetect(BarcodeCapture capture) {
     if (_qrScanned || _isConnecting) return;
     final barcode = capture.barcodes.firstOrNull;
-    final raw = barcode?.rawValue;
-    if (raw != null && raw.length == 6 && RegExp(r'^\d{6}$').hasMatch(raw)) {
+    final raw = barcode?.rawValue?.trim();
+    debugPrint('[QR] scanned raw: "${raw ?? "null"}" (len=${raw?.length ?? 0})');
+    if (raw != null && _isValidCode(raw)) {
       _qrScanned = true;
       _scannerController?.stop();
       _connect(code: raw);
+    } else if (raw != null && raw.isNotEmpty) {
+      final display = raw.length > 20 ? '${raw.substring(0, 20)}...' : raw;
+      setState(() => _error = 'Scanned: "$display" (len=${raw.length})');
     }
   }
 
@@ -422,7 +441,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                         letterSpacing: 4,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'XXX-XXX',
+                        hintText: 'XXXX-XXXX',
                         hintStyle: TextStyle(
                           color: Colors.white.withValues(alpha: 0.3),
                           fontSize: 28,
@@ -510,7 +529,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
             SizedBox(height: 8),
             Text('2. Look for the QR code in the terminal where the daemon is running'),
             SizedBox(height: 8),
-            Text('3. Use the QR scanner to scan it, or type the 6-digit code shown below it'),
+            Text('3. Use the QR scanner to scan it, or type the 8-character code shown below it'),
           ],
         ),
         actions: [

@@ -1,61 +1,183 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+INSTALL_DIR="$(cd "$SELF_DIR/.." && pwd)"
+PYTHON="$INSTALL_DIR/.venv/bin/python"
+
 case "$(uname -s)" in
-    Linux)             OS="linux" ;;
-    Darwin)            OS="darwin" ;;
+    Linux)   OS="linux" ;;
+    Darwin)  OS="darwin" ;;
     MINGW*|MSYS*|CYGWIN*) OS="windows" ;;
-    *)                 echo "Error: unsupported OS"; exit 1 ;;
+    *)       echo "Error: unsupported OS"; exit 1 ;;
 esac
 
-restart_daemon() {
+get_daemon_name() {
+    if [[ -n "${ACP_DAEMON_ID:-}" ]]; then
+        echo "$ACP_DAEMON_ID"
+    elif command -v hostname &>/dev/null; then
+        hostname
+    elif command -v hostnamectl &>/dev/null; then
+        hostnamectl hostname 2>/dev/null || uname -n
+    else
+        uname -n
+    fi
+}
+
+start_daemon() {
     case "$OS" in
         linux)
-            systemctl --user restart acp-daemon.service 2>/dev/null
+            systemctl --user start acp-daemon.service 2>/dev/null
             ;;
         darwin)
-            launchctl stop com.acp.daemon 2>/dev/null || true
-            sleep 1
             launchctl start com.acp.daemon 2>/dev/null || true
             ;;
         windows)
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(dirname "$0")/acp-remote.ps1"
-            exit $?
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/acp-remote.ps1" -Start
+            return
             ;;
     esac
+    echo "Daemon started."
 }
 
-get_code() {
+stop_daemon() {
     case "$OS" in
         linux)
-            journalctl --user -u acp-daemon.service -n 50 --no-pager 2>/dev/null | grep -oP 'Device Code:\s+\K\d+' | tail -1
+            systemctl --user stop acp-daemon.service 2>/dev/null
             ;;
         darwin)
-            grep -oP 'Device Code:\s+\K\d+' ~/Library/Logs/acp-daemon.log 2>/dev/null | tail -1
+            launchctl stop com.acp.daemon 2>/dev/null || true
             ;;
         windows)
-            echo ""  # not reached — restart_daemon delegates to .ps1
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/acp-remote.ps1" -Stop
+            return
+            ;;
+    esac
+    echo "Daemon stopped."
+}
+
+is_running() {
+    case "$OS" in
+        linux)
+            systemctl --user is-active --quiet acp-daemon.service 2>/dev/null
+            ;;
+        darwin)
+            launchctl list com.acp.daemon &>/dev/null
+            ;;
+        windows)
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+                "Get-ScheduledTask -TaskName 'ACP Daemon' -ErrorAction SilentlyContinue | Where-Object State -eq 'Running'" 2>/dev/null | grep -q Running
             ;;
     esac
 }
 
-echo "Restarting ACP daemon..."
-restart_daemon
+get_pairing_code() {
+    case "$OS" in
+        linux)
+            journalctl --user -u acp-daemon.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1
+            ;;
+        darwin)
+            grep -oP 'pairing code:\s+\K\S+' ~/Library/Logs/acp-daemon.log 2>/dev/null | tail -1
+            ;;
+        windows)
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+                "Select-String -Path (\"\$env:TEMP\acp-daemon.log\") -Pattern 'pairing code:\s+(\S+)' | Select-Object -Last 1 | ForEach-Object { \$_.Matches.Groups[1].Value }" 2>/dev/null
+            ;;
+    esac
+}
 
-echo "Waiting for new pairing code..."
-for i in $(seq 1 15); do
-    sleep 1
-    code=$(get_code)
-    if [[ -n "$code" ]]; then
-        echo ""
-        echo "+---------------------------+"
-        printf "|  Device Code: %-6s  |\n" "$code"
-        echo "+---------------------------+"
-        echo ""
-        exit 0
+show_code_fallback() {
+    local formatted="${code:0:4}-${code:4}"
+    echo ""
+    echo "  ┌─────────────────────────────┐"
+    printf "  │  Pairing Code: %-12s  │\n" "$formatted"
+    echo "  │                             │"
+    echo "  │  Enter this in the app      │"
+    echo "  └─────────────────────────────┘"
+    echo ""
+}
+
+show_qr() {
+    if ! is_running; then
+        echo "Daemon is not running. Start it first: acp-remote start"
+        return 1
     fi
-done
 
-echo "Error: could not retrieve pairing code within 15 seconds"
-echo "Check daemon logs for the code."
-exit 1
+    echo "Fetching pairing code..."
+    local code=""
+    for i in $(seq 1 10); do
+        sleep 1
+        code=$(get_pairing_code)
+        if [[ -n "$code" ]]; then
+            break
+        fi
+    done
+
+    if [[ -z "$code" ]]; then
+        echo "Could not retrieve pairing code. Is the daemon connected to the relay?"
+        return 1
+    fi
+
+    echo ""
+    if [[ -f "$PYTHON" ]] && [[ -d "$INSTALL_DIR/src" ]]; then
+        "$PYTHON" -c "
+import sys; sys.path.insert(0, '$INSTALL_DIR/src')
+from daemon.main import _pairing_banner
+print(_pairing_banner('$code'))
+" 2>/dev/null && return 0
+    fi
+    show_code_fallback
+}
+
+show_menu() {
+    local status="STOPPED"
+    if is_running; then
+        status="RUNNING"
+    fi
+    local name
+    name=$(get_daemon_name)
+
+    echo ""
+    echo "  ACP Daemon Control"
+    echo "  $(printf '=%.0s' {1..40})"
+    echo "  Status: $status  |  Daemon: $name"
+    echo ""
+    echo "    1) Start daemon"
+    echo "    2) Stop daemon"
+    echo "    3) Show pairing QR code"
+    echo "    q) Quit"
+    echo ""
+
+    while true; do
+        read -r -p "  Choice: " choice || { echo ""; exit 0; }
+        case "$choice" in
+            1) echo ""; start_daemon; break ;;
+            2) echo ""; stop_daemon; break ;;
+            3) echo ""; show_qr; break ;;
+            q|Q) echo ""; exit 0 ;;
+            *)   echo "  Invalid choice" ;;
+        esac
+    done
+}
+
+# --- CLI dispatch ---
+case "${1:-}" in
+    start)  start_daemon; exit 0 ;;
+    stop)   stop_daemon; exit 0 ;;
+    code)   show_qr; exit $? ;;
+    status)
+        name=$(get_daemon_name)
+        if is_running; then
+            echo "Daemon: RUNNING ($name)"
+        else
+            echo "Daemon: STOPPED ($name)"
+        fi
+        exit 0
+        ;;
+    "")     show_menu ;;
+    *)
+        echo "Usage: acp-remote [start|stop|code|status]"
+        echo "       acp-remote          (interactive menu)"
+        exit 1
+        ;;
+esac

@@ -52,6 +52,7 @@ def env_setup():
     env = os.environ.copy()
     env["ACP_RELAY_HOST"] = "127.0.0.1"
     env["ACP_RELAY_PORT"] = str(RELAY_PORT)
+    env["ACP_RELAY_URL"] = f"ws://{env['ACP_RELAY_HOST']}:{env['ACP_RELAY_PORT']}/daemon"
     env["ACP_RELAY_DB"] = ":memory:"
     env["ACP_LOG_DIR"] = "/tmp/acp_test_logs"
     env["ACP_LOG_LEVEL"] = "ERROR"
@@ -115,7 +116,6 @@ def daemon_process(env_setup):
         if not line:
             break
         if "pairing code:" in line:
-            # Line format: "← pairing code: 123456"
             pairing_code = line.split(":")[-1].strip()
             break
     if pairing_code is None:
@@ -137,12 +137,12 @@ class TestSessionIntegration:
     """Real relay+daemon integration test."""
 
     @pytest.mark.asyncio
-    async def test_connect_pair_and_create_session(self, daemon_process):
+    async def test_connect_pair_and_create_session(self, relay_process, daemon_process):
         from websockets.asyncio.client import connect
 
         pairing_code = daemon_process.pairing_code
         assert pairing_code is not None, "No pairing code from daemon"
-        assert len(pairing_code) == 6, f"Invalid pairing code: {pairing_code}"
+        assert len(pairing_code) == 8, f"Invalid pairing code: {pairing_code}"
 
         async with connect(APP_URL) as ws:
             # --- Pair ---
@@ -233,7 +233,7 @@ class TestSessionIntegration:
             print(f"  ✓ Daemon status: connected={status.get('connected')}")
 
     @pytest.mark.asyncio
-    async def test_session_list_persistence(self, daemon_process):
+    async def test_session_list_persistence(self, relay_process, daemon_process):
         """Verify sessions from previous test are still visible."""
         from websockets.asyncio.client import connect
 

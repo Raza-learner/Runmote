@@ -7,9 +7,11 @@ from fastapi import APIRouter, WebSocket
 try:
     from .. import state
     from ..config import RELAY_TOKEN
+    from ..pairing import is_code_expired
 except ImportError:
     import state
     from config import RELAY_TOKEN
+    from pairing import is_code_expired
 
 router = APIRouter()
 
@@ -70,7 +72,13 @@ async def app_endpoint(websocket: WebSocket):
                     attempts.append(now)
 
                     params = data.get("params") or {}
-                    code = params.get("code", "").strip()
+                    code = params.get("code", "").strip().upper()
+                    if is_code_expired(code):
+                        state.code_to_token.pop(code, None)
+                        state.claimed_codes.discard(code)
+                        await _send_error(websocket, msg_id, -32002, "pairing code expired — generate a new one")
+                        print(f"  → client {client_id} auth failed (expired code)", flush=True)
+                        continue
                     token = state.code_to_token.get(code)
                     if token is None:
                         await _send_error(websocket, msg_id, -32002, "invalid pairing code")

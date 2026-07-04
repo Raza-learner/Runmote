@@ -4,11 +4,11 @@ from fastapi import APIRouter, WebSocket
 try:
     from .. import state
     from ..config import RELAY_TOKEN
-    from ..pairing import generate_pairing_code
+    from ..pairing import generate_pairing_code, cleanup_expired_codes
 except ImportError:
     import state
     from config import RELAY_TOKEN
-    from pairing import generate_pairing_code
+    from pairing import generate_pairing_code, cleanup_expired_codes
 
 router = APIRouter()
 
@@ -87,6 +87,7 @@ async def daemon_endpoint(websocket: WebSocket):
                     for old_code in old_codes:
                         del state.code_to_token[old_code]
 
+                    cleanup_expired_codes(set(state.code_to_token.keys()))
                     pairing_code = generate_pairing_code(set(state.code_to_token.keys()))
                     state.token_to_daemons[token] = daemon_id
                     state.code_to_token[pairing_code] = token

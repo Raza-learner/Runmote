@@ -24,14 +24,18 @@ def log(msg: str):
 
 def _pairing_banner(code: str) -> str:
     """Generate a pairing banner with QR code (primary) and text code (secondary)."""
-    formatted = f"{code[:3]}-{code[3:]}"
+    if len(code) == 6:
+        formatted = f"{code[:3]}-{code[3:]}"
+    else:
+        formatted = f"{code[:4]}-{code[4:]}"
     qr = qrcode.QRCode(border=2, box_size=1)
     qr.add_data(code)
+    qr.make(fit=True)
     buf = StringIO()
-    qr.print_ascii(out=buf, invert=True)
+    qr.print_ascii(out=buf, invert=False)
     qr_lines = buf.getvalue().splitlines()
     qr_width = max(len(l) for l in qr_lines)
-    inner_width = max(qr_width, 28)
+    inner_width = max(qr_width, 32)
     lines = [f"╔{'═' * (inner_width + 2)}╗"]
     lines.append(f"║{' ' * (inner_width + 2)}║")
     title = "Scan QR Code"
@@ -47,7 +51,7 @@ def _pairing_banner(code: str) -> str:
     sub = "Or enter code:"
     pad2 = (inner_width - len(sub)) // 2
     lines.append(f"║  {' ' * pad2}{sub}{' ' * (inner_width - pad2 - len(sub))}  ║")
-    code_line = f"     {formatted}     "
+    code_line = f"   {formatted}   "
     pad3 = (inner_width - len(code_line)) // 2
     lines.append(f"║  {' ' * pad3}{code_line}{' ' * (inner_width - pad3 - len(code_line))}  ║")
     lines.append(f"║{' ' * (inner_width + 2)}║")

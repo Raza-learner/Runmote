@@ -6,6 +6,11 @@ REMOTE_RAW="${ACP_REMOTE_RAW:-https://raw.githubusercontent.com/Raza-learner/acp
 BRANCH="${ACP_BRANCH:-main}"
 INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/acp}"
 MODE="install"
+INTERACTIVE=0
+
+if [[ -t 0 ]] && [[ -t 1 ]]; then
+    INTERACTIVE=1
+fi
 
 usage() {
     cat <<EOF
@@ -57,7 +62,6 @@ ensure_uv() {
             curl -LsSf https://astral.sh/uv/install.sh | sh
             ;;
     esac
-    # Refresh PATH
     if [[ -f "$HOME/.cargo/env" ]]; then
         source "$HOME/.cargo/env"
     fi
@@ -78,59 +82,51 @@ print_postinstall() {
 
     echo ""
     echo "+----------------------------------------------------+"
-    echo "| ACP daemon installed successfully!                 |"
+    echo "|     ACP daemon installed successfully!             |"
     echo "|                                                    |"
-    echo "| It will start automatically after your next login. |"
+    echo "|  It will start automatically after next login.     |"
 
     case "$os" in
         linux)
             echo "|                                                    |"
-            echo "| To start now:                                      |"
-            echo "|   systemctl --user start acp-daemon                |"
+            echo "|  To control the daemon now:                        |"
+            echo "|    acp-remote          (interactive menu)          |"
+            echo "|    acp-remote start    (start daemon)              |"
+            echo "|    acp-remote code     (show pairing code)         |"
+            echo "|    acp-remote stop     (stop daemon)               |"
             echo "|                                                    |"
-            echo "| To check status:                                   |"
-            echo "|   systemctl --user status acp-daemon               |"
-            echo "|                                                    |"
-            echo "| Logs:                                              |"
-            echo "|   journalctl --user -u acp-daemon -f               |"
+            echo "|  Logs: journalctl --user -u acp-daemon -f          |"
             ;;
         darwin)
             echo "|                                                    |"
-            echo "| To start now:                                      |"
-            echo "|   launchctl load ~/Library/LaunchAgents/com.acp.daemon.plist |"
+            echo "|  To control the daemon now:                        |"
+            echo "|    acp-remote          (interactive menu)          |"
+            echo "|    acp-remote start    (start daemon)              |"
+            echo "|    acp-remote code     (show pairing code)         |"
+            echo "|    acp-remote stop     (stop daemon)               |"
             echo "|                                                    |"
-            echo "| To check status:                                   |"
-            echo "|   launchctl list com.acp.daemon                    |"
-            echo "|                                                    |"
-            echo "| Logs:                                              |"
-            echo "|   tail -f ~/Library/Logs/acp-daemon.log            |"
+            echo "|  Logs: tail -f ~/Library/Logs/acp-daemon.log       |"
             ;;
         windows)
             echo "|                                                    |"
-            echo "| To start now:                                      |"
-            echo "|   schtasks /Run /TN \"ACP Daemon\"                  |"
-            echo "|                                                    |"
-            echo "| To check status:                                   |"
-            echo "|   schtasks /Query /TN \"ACP Daemon\"                |"
-            echo "|                                                    |"
-            echo "| To restart + get pairing code:                     |"
-            echo "|   acp-remote                                        |"
+            echo "|  To control the daemon now:                        |"
+            echo "|    acp-remote          (interactive menu)          |"
+            echo "|    acp-remote start    (start daemon)              |"
+            echo "|    acp-remote code     (show pairing code)         |"
+            echo "|    acp-remote stop     (stop daemon)               |"
             ;;
     esac
 
     echo "|                                                    |"
-    echo "| -- Pair with the app --                            |"
+    echo "|  -- Pair with the ACP app --                       |"
     echo "|                                                    |"
-    echo "| After starting, the daemon shows a pairing code:   |"
-    echo "|   +-----------------------------+                  |"
-    echo "|   |  Device Code: 123456       |                  |"
-    echo "|   +-----------------------------+                  |"
+    echo "|  Start the daemon, then use the app to scan the    |"
+    echo "|  QR code shown in the terminal or type the code.   |"
     echo "|                                                    |"
-    echo "| Open the ACP mobile app and enter this code        |"
-    echo "| to pair with your device.                          |"
+    echo "|  Run: acp-remote code                              |"
     echo "|                                                    |"
-    echo "| See all paired devices and manage sessions         |"
-    echo "| directly from the app.                             |"
+    echo "|  See all paired devices and manage sessions        |"
+    echo "|  directly from the app.                            |"
     echo "+----------------------------------------------------+"
 }
 
@@ -149,36 +145,73 @@ if [[ "$MODE" == "remove" ]]; then
             fi
             ;;
     esac
-
     echo "Removing $INSTALL_DIR..."
     rm -rf "$INSTALL_DIR"
     echo "ACP daemon uninstalled."
     exit 0
 fi
 
+# --- Interactive prompts ---
+if [[ "$INTERACTIVE" -eq 1 ]]; then
+    echo ""
+    echo "  ACP Daemon Setup"
+    echo "  ================"
+    echo ""
+
+    # Daemon name
+    default_name="${ACP_DAEMON_ID:-}"
+    if [[ -z "$default_name" ]]; then
+        default_name="$(command -v hostname &>/dev/null && hostname || uname -n)"
+    fi
+    read -r -p "  Daemon name [$default_name]: " name_input
+    if [[ -n "$name_input" ]]; then
+        export ACP_DAEMON_ID="$name_input"
+    else
+        export ACP_DAEMON_ID="$default_name"
+    fi
+
+    # Install directory
+    read -r -p "  Install directory [$INSTALL_DIR]: " dir_input
+    if [[ -n "$dir_input" ]]; then
+        INSTALL_DIR="$dir_input"
+    fi
+
+    # Auto-start
+    read -r -p "  Enable auto-start on login? [Y/n]: " autostart_input
+    case "${autostart_input,,}" in
+        n|no) SKIP_AUTOSTART=1 ;;
+        *)    SKIP_AUTOSTART=0 ;;
+    esac
+
+    echo ""
+fi
+
 # --- Install mode ---
 echo "ACP daemon installer"
 echo "===================="
+echo "Daemon:  ${ACP_DAEMON_ID:-$(command -v hostname &>/dev/null && hostname || uname -n)}"
 echo "Remote:  $REMOTE"
 echo "Branch:  $BRANCH"
 echo "Install: $INSTALL_DIR"
 echo ""
 
+echo "Step 1/4: Installing uv..."
 ensure_uv
+echo "  Done."
 
-# Clone or update
+echo "Step 2/4: Downloading repository..."
 if command -v git &>/dev/null; then
     if [[ -d "$INSTALL_DIR/.git" ]]; then
-        echo "Updating existing installation..."
+        echo "  Updating existing installation..."
         git -C "$INSTALL_DIR" fetch origin
         git -C "$INSTALL_DIR" checkout "$BRANCH"
         git -C "$INSTALL_DIR" pull origin "$BRANCH"
     else
-        echo "Cloning repository..."
+        echo "  Cloning repository..."
         git clone --branch "$BRANCH" --depth 1 "$REMOTE" "$INSTALL_DIR"
     fi
 else
-    echo "git not found — downloading ZIP instead..."
+    echo "  git not found — downloading ZIP..."
     tmp_dir="/tmp/acp-install-tmp"
     rm -rf "$tmp_dir"
     mkdir -p "$tmp_dir"
@@ -206,26 +239,29 @@ else
     fi
     rm -rf "$tmp_dir"
 fi
+echo "  Done."
 
-echo ""
-echo "Installing dependencies..."
+echo "Step 3/4: Installing dependencies..."
 cd "$INSTALL_DIR"
-
-# uv sync auto-downloads Python 3.13+ if not found, creates .venv, installs deps
 if ! uv sync --frozen; then
-    echo "Warning: frozen sync failed — running full sync..."
+    echo "  frozen sync failed — running full sync..."
     uv sync
 fi
+echo "  Done."
 
-echo ""
-echo "Configuring auto-start..."
-case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*)
-        powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTALL_DIR/scripts/setup-autostart.ps1" -Install
-        ;;
-    *)
-        bash "$INSTALL_DIR/scripts/setup-autostart.sh" --install --dir "$INSTALL_DIR"
-        ;;
-esac
+if [[ "${SKIP_AUTOSTART:-0}" -eq 1 ]]; then
+    echo "  Auto-start skipped."
+else
+    echo "Step 4/4: Configuring auto-start..."
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*)
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTALL_DIR/scripts/setup-autostart.ps1" -Install
+            ;;
+        *)
+            bash "$INSTALL_DIR/scripts/setup-autostart.sh" --install --dir "$INSTALL_DIR"
+            ;;
+    esac
+    echo "  Done."
+fi
 
 print_postinstall

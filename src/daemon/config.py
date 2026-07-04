@@ -4,7 +4,12 @@ import shutil
 import socket
 
 
-RELAY_URL = os.environ.get("ACP_RELAY_URL", "ws://localhost:8000/daemon")
+RELAY_HOST = os.environ.get("ACP_RELAY_HOST", "localhost")
+RELAY_PORT = os.environ.get("ACP_RELAY_PORT", "8000")
+RELAY_URL = os.environ.get(
+    "ACP_RELAY_URL",
+    f"ws://{RELAY_HOST}:{RELAY_PORT}/daemon",
+)
 
 _raw_agent_command = os.environ.get("ACP_AGENT_COMMAND", '["opencode", "acp"]')
 AGENT_COMMAND = json.loads(_raw_agent_command)
