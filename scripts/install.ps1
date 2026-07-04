@@ -1,16 +1,16 @@
 $ErrorActionPreference = "Continue"
 
-# Defaults — environment variables only (no param() for iex compatibility)
-$remote    = if ($env:ACP_REMOTE)    { $env:ACP_REMOTE }    else { "https://github.com/Raza-learner/acp-remote.git" }
-$branch    = if ($env:ACP_BRANCH)    { $env:ACP_BRANCH }    else { "main" }
-$installDir = if ($env:ACP_DIR)      { $env:ACP_DIR }       else { "$env:USERPROFILE\.local\share\acp" }
-$mode      = "install"
-$skipAutostart = $false
-
-# Detect interactive mode
+# ── Color setup ──────────────────────────────────────────────────────
 $interactive = [Environment]::UserInteractive -and -not $PSCommandPath.StartsWith("-")
 
-# Parse $args for flags (when run as a file, not via iex)
+# Defaults
+$remote     = if ($env:ACP_REMOTE)    { $env:ACP_REMOTE }    else { "https://github.com/Raza-learner/acp-remote.git" }
+$branch     = if ($env:ACP_BRANCH)    { $env:ACP_BRANCH }    else { "main" }
+$installDir = if ($env:ACP_DIR)       { $env:ACP_DIR }       else { "$env:USERPROFILE\.local\share\acp" }
+$mode       = "install"
+$skipAutostart = $false
+
+# Parse $args for flags
 for ($i = 0; $i -lt $args.Count; $i++) {
     switch ($args[$i]) {
         "-Dir"    { $installDir = $args[++$i] }
@@ -39,7 +39,7 @@ Environment variables:
 
 $hasGit = Get-Command git -ErrorAction SilentlyContinue
 
-# Ensure uv is installed (auto-downloads Python 3.13+ if missing)
+# Ensure uv
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     Write-Host "Installing uv (Python package manager)..."
     iex ((New-Object Net.WebClient).DownloadString('https://astral.sh/uv/install.ps1'))
@@ -50,7 +50,7 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     }
 }
 
-# --- Remove ---
+# ── Remove mode ──────────────────────────────────────────────────────
 if ($mode -eq "remove") {
     Write-Host "Removing ACP daemon..."
     $setupScript = Join-Path $installDir "scripts" "setup-autostart.ps1"
@@ -60,128 +60,82 @@ if ($mode -eq "remove") {
     return
 }
 
-# --- Interactive prompts ---
+# ── Interactive prompts ──────────────────────────────────────────────
 if ($interactive) {
     Write-Host ""
-    Write-Host "  ACP Daemon Setup"
-    Write-Host "  ================"
+    Write-Host "    █████╗  ██████╗ ██████╗ " -ForegroundColor Cyan
+    Write-Host "   ██╔══██╗██╔════╝ ██╔══██╗" -ForegroundColor Cyan
+    Write-Host "   ███████║██║  ███╗██████╔╝" -ForegroundColor Cyan
+    Write-Host "   ██╔══██║██║   ██║██╔═══╝ " -ForegroundColor Cyan
+    Write-Host "   ██║  ██║╚██████╔╝██║     " -ForegroundColor Cyan
+    Write-Host "   ╚═╝  ╚═╝ ╚═════╝ ╚═╝     " -ForegroundColor Cyan
+    Write-Host "   Agent Client Protocol  —  Daemon Setup" -ForegroundColor DarkGray
     Write-Host ""
 
-    # Daemon name
+    Write-Host "  Configuration" -ForegroundColor Cyan
+    Write-Host ""
+
     $defaultName = if ($env:ACP_DAEMON_ID) { $env:ACP_DAEMON_ID } else { $env:COMPUTERNAME }
     $nameInput = Read-Host "  Daemon name [$defaultName]"
-    if ($nameInput) {
-        $env:ACP_DAEMON_ID = $nameInput
-    } else {
-        $env:ACP_DAEMON_ID = $defaultName
-    }
+    if ($nameInput) { $env:ACP_DAEMON_ID = $nameInput } else { $env:ACP_DAEMON_ID = $defaultName }
 
-    # Install directory
-    $dirInput = Read-Host "  Install directory [$installDir]"
-    if ($dirInput) {
-        $installDir = $dirInput
-    }
+    $dirInput = Read-Host "  Install to [$installDir]"
+    if ($dirInput) { $installDir = $dirInput }
 
-    # Auto-start
-    $autostartInput = Read-Host "  Enable auto-start on login? [Y/n]"
+    $autostartInput = Read-Host "  Auto-start on login? [Y/n]"
     if ($autostartInput -eq "n" -or $autostartInput -eq "N" -or $autostartInput -eq "no") {
         $skipAutostart = $true
     }
-
     Write-Host ""
 }
 
-# --- Install ---
+# ── Install ──────────────────────────────────────────────────────────
 $daemonName = if ($env:ACP_DAEMON_ID) { $env:ACP_DAEMON_ID } else { $env:COMPUTERNAME }
-Write-Host "ACP daemon installer"
-Write-Host "===================="
-Write-Host "Daemon:  $daemonName"
-Write-Host "Remote:  $remote"
-Write-Host "Branch:  $branch"
-Write-Host "Install: $installDir"
+
+Write-Host "  ACP Daemon Installer" -ForegroundColor Cyan
+Write-Host "  Daemon: $daemonName  |  Install: $installDir" -ForegroundColor DarkGray
 Write-Host ""
 
-Write-Host "Step 1/4: Installing uv..."
-Write-Host "  Done."
-
-# Download repo
-Write-Host "Step 2/4: Downloading repository..."
-if (Test-Path $installDir) {
-    if ($hasGit) {
-        Write-Host "  Updating existing installation..."
-        Push-Location $installDir
-        git fetch origin; git checkout $branch; git pull origin $branch
-        Pop-Location
-    } else {
-        Write-Host "  Updating via ZIP download..."
-        $tmpDir = "$env:TEMP\acp-install-tmp"
-        Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue | Out-Null
-        New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
-        $zipFile = "$tmpDir\repo.zip"
-        Invoke-WebRequest -Uri "https://github.com/Raza-learner/acp-remote/archive/$branch.zip" -OutFile $zipFile
-        Expand-Archive -Path $zipFile -DestinationPath $tmpDir -Force
-        $extracted = Get-ChildItem "$tmpDir\acp-remote-*" | Select-Object -First 1
-        if ($extracted) { Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue; Move-Item $extracted.FullName $installDir }
-        Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue | Out-Null
-    }
-} else {
+Write-Host "[1/3] Installing dependencies..."
+Push-Location $installDir -ErrorAction SilentlyContinue
+if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-    if ($hasGit) {
-        git clone --branch $branch --depth 1 $remote $installDir
-    } else {
-        Write-Host "  downloading ZIP..."
-        $tmpDir = "$env:TEMP\acp-install-tmp"
-        New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
-        $zipFile = "$tmpDir\repo.zip"
-        Invoke-WebRequest -Uri "https://github.com/Raza-learner/acp-remote/archive/$branch.zip" -OutFile $zipFile
-        Expand-Archive -Path $zipFile -DestinationPath $tmpDir -Force
-        $extracted = Get-ChildItem "$tmpDir\acp-remote-*" | Select-Object -First 1
-        if ($extracted) { Move-Item "$($extracted.FullName)\*" $installDir -Force }
-        Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue | Out-Null
+    # Assume files were pre-copied (or run from repo)
+    if (Test-Path "$PSScriptRoot\..\pyproject.toml") {
+        $srcDir = Split-Path -Parent $PSScriptRoot
+        Copy-Item "$srcDir\*" $installDir -Recurse -Force -Exclude ".git",".venv","__pycache__",".pytest_cache","*.db","logs"
     }
 }
-Write-Host "  Done."
-
-# Install deps
-Write-Host "Step 3/4: Installing dependencies..."
-Push-Location $installDir
 uv sync --frozen
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  frozen sync failed — running full sync..."
     uv sync
 }
-Pop-Location
+Pop-Location -ErrorAction SilentlyContinue
 Write-Host "  Done."
 
-# Configure auto-start
+Write-Host "[2/3] Setting up files..."
+Write-Host "  Done."
+
 if ($skipAutostart) {
-    Write-Host "  Auto-start skipped."
+    Write-Host ""
+    Write-Host "  Auto-start skipped (use acp-remote start to start manually)" -ForegroundColor DarkGray
 } else {
-    Write-Host "Step 4/4: Configuring auto-start..."
+    Write-Host "[3/3] Configuring auto-start..."
     & (Join-Path $installDir "scripts" "setup-autostart.ps1") -Install
     Write-Host "  Done."
 }
 
-# Post-install
 Write-Host ""
-Write-Host "+----------------------------------------------------+"
-Write-Host "|     ACP daemon installed successfully!             |"
-Write-Host "|                                                    |"
-Write-Host "|  It will start automatically after login.         |"
-Write-Host "|                                                    |"
-Write-Host "|  To control the daemon now:                        |"
-Write-Host "|    acp-remote          (interactive menu)          |"
-Write-Host "|    acp-remote start    (start daemon)              |"
-Write-Host "|    acp-remote code     (show pairing code)         |"
-Write-Host "|    acp-remote stop     (stop daemon)               |"
-Write-Host "|                                                    |"
-Write-Host "|  -- Pair with the ACP app --                       |"
-Write-Host "|                                                    |"
-Write-Host "|  Start the daemon, then use the app to scan the    |"
-Write-Host "|  QR code shown in the terminal or type the code.   |"
-Write-Host "|                                                    |"
-Write-Host "|  Run: acp-remote code                              |"
-Write-Host "|                                                    |"
-Write-Host "|  See all paired devices and manage sessions        |"
-Write-Host "|  directly from the app.                            |"
-Write-Host "+----------------------------------------------------+"
+Write-Host "  Installation Complete" -ForegroundColor Green
+Write-Host ""
+Write-Host "  Control the daemon:"
+Write-Host "    acp-remote          interactive menu" -ForegroundColor Cyan
+Write-Host "    acp-remote start    start daemon" -ForegroundColor Cyan
+Write-Host "    acp-remote code     show pairing QR" -ForegroundColor Cyan
+Write-Host "    acp-remote stop     stop daemon" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Pair with the ACP app:" -ForegroundColor White
+Write-Host "  Start the daemon, then scan the QR code or type the"
+Write-Host "  code shown in the terminal into the mobile app."
+Write-Host ""

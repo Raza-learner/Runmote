@@ -5,6 +5,17 @@ SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_DIR="$(cd "$SELF_DIR/.." && pwd)"
 PYTHON="$INSTALL_DIR/.venv/bin/python"
 
+# ── Color setup ──────────────────────────────────────────────────────
+if [[ -t 1 ]] && [[ -t 0 ]]; then
+    n() { printf '\033[%sm' "$1"; }
+    BOLD="$(n 1)"; DIM="$(n 2)"; RESET="$(n 0)"
+    RED="$(n 31)"; GREEN="$(n 32)"; YELLOW="$(n 33)"
+    BLUE="$(n 34)"; CYAN="$(n 36)"; WHITE="$(n 97)"
+else
+    n() { :; }
+    BOLD=""; DIM=""; RESET=""; RED=""; GREEN=""; YELLOW=""; BLUE=""; CYAN=""; WHITE=""
+fi
+
 case "$(uname -s)" in
     Linux)   OS="linux" ;;
     Darwin)  OS="darwin" ;;
@@ -12,112 +23,94 @@ case "$(uname -s)" in
     *)       echo "Error: unsupported OS"; exit 1 ;;
 esac
 
+# ── Daemon control ───────────────────────────────────────────────────
 get_daemon_name() {
-    if [[ -n "${ACP_DAEMON_ID:-}" ]]; then
-        echo "$ACP_DAEMON_ID"
-    elif command -v hostname &>/dev/null; then
-        hostname
-    elif command -v hostnamectl &>/dev/null; then
-        hostnamectl hostname 2>/dev/null || uname -n
-    else
-        uname -n
-    fi
+    if [[ -n "${ACP_DAEMON_ID:-}" ]]; then echo "$ACP_DAEMON_ID"
+    elif command -v hostname &>/dev/null; then hostname
+    else uname -n; fi
 }
 
 start_daemon() {
     case "$OS" in
-        linux)
-            systemctl --user start acp-daemon.service 2>/dev/null
-            ;;
-        darwin)
-            launchctl start com.acp.daemon 2>/dev/null || true
-            ;;
-        windows)
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/acp-remote.ps1" -Start
-            return
-            ;;
+        linux)   systemctl --user start acp-daemon.service 2>/dev/null ;;
+        darwin)  launchctl start com.acp.daemon 2>/dev/null || true ;;
+        windows) powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/acp-remote.ps1" -Start; return ;;
     esac
-    echo "Daemon started."
+    echo "  ${GREEN}Daemon started.${RESET}"
 }
 
 stop_daemon() {
     case "$OS" in
-        linux)
-            systemctl --user stop acp-daemon.service 2>/dev/null
-            ;;
-        darwin)
-            launchctl stop com.acp.daemon 2>/dev/null || true
-            ;;
-        windows)
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/acp-remote.ps1" -Stop
-            return
-            ;;
+        linux)   systemctl --user stop acp-daemon.service 2>/dev/null ;;
+        darwin)  launchctl stop com.acp.daemon 2>/dev/null || true ;;
+        windows) powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/acp-remote.ps1" -Stop; return ;;
     esac
-    echo "Daemon stopped."
+    echo "  ${YELLOW}Daemon stopped.${RESET}"
 }
 
 is_running() {
     case "$OS" in
-        linux)
-            systemctl --user is-active --quiet acp-daemon.service 2>/dev/null
-            ;;
-        darwin)
-            launchctl list com.acp.daemon &>/dev/null
-            ;;
-        windows)
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
-                "Get-ScheduledTask -TaskName 'ACP Daemon' -ErrorAction SilentlyContinue | Where-Object State -eq 'Running'" 2>/dev/null | grep -q Running
-            ;;
+        linux)   systemctl --user is-active --quiet acp-daemon.service 2>/dev/null ;;
+        darwin)  launchctl list com.acp.daemon &>/dev/null ;;
+        windows) powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+            "Get-ScheduledTask -TaskName 'ACP Daemon' -ErrorAction SilentlyContinue | Where-Object State -eq 'Running'" 2>/dev/null | grep -q Running ;;
     esac
 }
 
 get_pairing_code() {
     case "$OS" in
-        linux)
-            journalctl --user -u acp-daemon.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1
-            ;;
-        darwin)
-            grep -oP 'pairing code:\s+\K\S+' ~/Library/Logs/acp-daemon.log 2>/dev/null | tail -1
-            ;;
-        windows)
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
-                "Select-String -Path (\"\$env:TEMP\acp-daemon.log\") -Pattern 'pairing code:\s+(\S+)' | Select-Object -Last 1 | ForEach-Object { \$_.Matches.Groups[1].Value }" 2>/dev/null
-            ;;
+        linux)   journalctl --user -u acp-daemon.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1 ;;
+        darwin)  grep -oP 'pairing code:\s+\K\S+' ~/Library/Logs/acp-daemon.log 2>/dev/null | tail -1 ;;
+        windows) powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+            "Select-String -Path (\"\$env:TEMP\acp-daemon.log\") -Pattern 'pairing code:\s+(\S+)' | Select-Object -Last 1 | ForEach-Object { \$_.Matches.Groups[1].Value }" 2>/dev/null ;;
     esac
 }
 
+# ── Pairing code display ─────────────────────────────────────────────
 show_code_fallback() {
     local formatted="${code:0:4}-${code:4}"
     echo ""
-    echo "  ┌─────────────────────────────┐"
-    printf "  │  Pairing Code: %-12s  │\n" "$formatted"
-    echo "  │                             │"
-    echo "  │  Enter this in the app      │"
-    echo "  └─────────────────────────────┘"
+    echo "  ${BOLD}┌─────────────────────────────┐${RESET}"
+    printf "  ${BOLD}│${RESET}  ${CYAN}Pairing Code:${RESET} ${GREEN}${BOLD}%-12s${RESET}  ${BOLD}│${RESET}\n" "$formatted"
+    echo "  ${BOLD}│${RESET}                             ${BOLD}│${RESET}"
+    echo "  ${BOLD}│${RESET}  ${DIM}Enter this in the app${RESET}      ${BOLD}│${RESET}"
+    echo "  ${BOLD}└─────────────────────────────┘${RESET}"
     echo ""
+}
+
+show_code_only() {
+    if ! is_running; then
+        echo "  ${YELLOW}Daemon is not running. Start it first.${RESET}"
+        return 1
+    fi
+    echo "  ${DIM}Fetching pairing code...${RESET}"
+    local code=""
+    for i in $(seq 1 5); do
+        sleep 1; code=$(get_pairing_code)
+        [[ -n "$code" ]] && break
+    done
+    if [[ -z "$code" ]]; then
+        echo "  ${RED}Could not retrieve pairing code.${RESET}"
+        return 1
+    fi
+    show_code_fallback
 }
 
 show_qr() {
     if ! is_running; then
-        echo "Daemon is not running. Start it first: acp-remote start"
+        echo "  ${YELLOW}Daemon is not running. Start it first.${RESET}"
         return 1
     fi
-
-    echo "Fetching pairing code..."
+    echo "  ${DIM}Fetching pairing code...${RESET}"
     local code=""
     for i in $(seq 1 10); do
-        sleep 1
-        code=$(get_pairing_code)
-        if [[ -n "$code" ]]; then
-            break
-        fi
+        sleep 1; code=$(get_pairing_code)
+        [[ -n "$code" ]] && break
     done
-
     if [[ -z "$code" ]]; then
-        echo "Could not retrieve pairing code. Is the daemon connected to the relay?"
+        echo "  ${RED}Could not retrieve pairing code. Is the daemon connected?${RESET}"
         return 1
     fi
-
     echo ""
     if [[ -f "$PYTHON" ]] && [[ -d "$INSTALL_DIR/src" ]]; then
         "$PYTHON" -c "
@@ -129,12 +122,13 @@ print(_pairing_banner('$code'))
     show_code_fallback
 }
 
+# ── Uninstall ────────────────────────────────────────────────────────
 uninstall_daemon() {
     echo ""
-    read -r -p "  Uninstall ACP daemon? This will remove all files and auto-start config. [y/N]: " confirm
+    read -r -p "  ${RED}${BOLD}Uninstall ACP daemon?${RESET} This removes all files and auto-start. ${DIM}[y/N]${RESET}: " confirm
     case "${confirm,,}" in
         y|yes) ;;
-        *) echo "  Cancelled."; return 0 ;;
+        *) echo "  ${DIM}Cancelled.${RESET}"; return 0 ;;
     esac
 
     echo ""
@@ -146,79 +140,171 @@ uninstall_daemon() {
         linux)
             systemctl --user disable --now acp-daemon.service 2>/dev/null || true
             rm -f "$HOME/.config/systemd/user/acp-daemon.service"
-            systemctl --user daemon-reload 2>/dev/null || true
-            ;;
+            systemctl --user daemon-reload 2>/dev/null || true ;;
         darwin)
             launchctl unload -w "$HOME/Library/LaunchAgents/com.acp.daemon.plist" 2>/dev/null || true
-            rm -f "$HOME/Library/LaunchAgents/com.acp.daemon.plist"
-            ;;
+            rm -f "$HOME/Library/LaunchAgents/com.acp.daemon.plist" ;;
         windows)
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/setup-autostart.ps1" -Remove
-            ;;
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/setup-autostart.ps1" -Remove ;;
     esac
 
     echo "  Removing acp-remote command..."
     rm -f "$HOME/.local/bin/acp-remote"
 
-    echo "  Removing install directory: $INSTALL_DIR"
+    echo "  Removing $INSTALL_DIR..."
     rm -rf "$INSTALL_DIR"
 
     echo ""
-    echo "  ACP daemon uninstalled."
+    echo "  ${GREEN}ACP daemon uninstalled.${RESET}"
+}
+
+# ── Menu (arrow-key TTY) ────────────────────────────────────────────
+_menu_draw() {
+    local sel=$1 W=42
+    local hl hl_off name
+    hl="${BOLD}\033[7m"
+    hl_off="\033[0m${RESET}"
+    name="$(get_daemon_name)"
+
+    local status_color status_text
+    if is_running; then
+        status_color="${GREEN}"; status_text="● RUNNING"
+    else
+        status_color="${RED}"; status_text="● STOPPED"
+    fi
+
+    box_top() { echo "  ${BOLD}${CYAN}╔$(printf '═%.0s' $(eval "echo {1..$W}"))╗${RESET}"; }
+    box_mid() { echo "  ${BOLD}${CYAN}╠$(printf '═%.0s' $(eval "echo {1..$W}"))╣${RESET}"; }
+    box_bot() { echo "  ${BOLD}${CYAN}╚$(printf '═%.0s' $(eval "echo {1..$W}"))╝${RESET}"; }
+    box_row() { printf "  ${BOLD}${CYAN}║${RESET}%-${W}s${BOLD}${CYAN}║${RESET}\n" "$1"; }
+
+    local items=(
+        ""
+        "   ${CYAN}Start${RESET} daemon"
+        "   ${RED}Stop${RESET} daemon"
+        "   Show pairing ${CYAN}QR code${RESET}"
+        "   Show pairing ${CYAN}code${RESET} ${DIM}(text)${RESET}"
+        "   ${RED}Uninstall${RESET} daemon"
+        "   Quit"
+    )
+
+    box_top
+    box_row "      ${WHITE}${BOLD}ACP Daemon Control${RESET}"
+    box_mid
+    box_row "${status_color}  ${status_text}${RESET}"
+    box_row "${DIM}  Daemon: ${name}${RESET}"
+    box_mid
+
+    local i
+    for i in 1 2 3 4 5 6; do
+        if [[ $i -eq $sel ]]; then
+            box_row "${hl}${items[$i]}${hl_off}"
+        else
+            box_row "${items[$i]}"
+        fi
+    done
+
+    box_bot
+    echo ""
+    echo "  ${DIM}↑↓ navigate  ↵ select  q quit${RESET}"
+}
+
+_exec_action() {
+    case $1 in
+        1) start_daemon; sleep 1 ;;
+        2) stop_daemon; sleep 1 ;;
+        3) show_qr; echo ""; read -r -p "  Press Enter to continue..." _ ;;
+        4) show_code_only; echo ""; read -r -p "  Press Enter to continue..." _ ;;
+        5) uninstall_daemon; return 1 ;;
+        6) echo ""; exit 0 ;;
+    esac
+    return 0
 }
 
 show_menu() {
-    local status="STOPPED"
-    if is_running; then
-        status="RUNNING"
-    fi
-    local name
-    name=$(get_daemon_name)
+    if [[ ! -t 0 ]]; then
+        # Non-TTY fallback: number-based menu
+        while true; do
+            local status_color status_text name
+            if is_running; then status_color="${GREEN}"; status_text="● RUNNING"
+            else status_color="${RED}"; status_text="● STOPPED"; fi
+            name="$(get_daemon_name)"
 
-    echo ""
-    echo "  ACP Daemon Control"
-    echo "  $(printf '=%.0s' {1..40})"
-    echo "  Status: $status  |  Daemon: $name"
-    echo ""
-    echo "    1) Start daemon"
-    echo "    2) Stop daemon"
-    echo "    3) Show pairing QR code"
-    echo "    4) Uninstall daemon"
-    echo "    q) Quit"
-    echo ""
+            echo ""
+            echo "  ${BOLD}${CYAN}ACP Daemon Control${RESET}   ${status_color}${status_text}${RESET}   ${DIM}Daemon: ${name}${RESET}"
+            echo ""
+            echo "  1) Start daemon       2) Stop daemon"
+            echo "  3) Show QR code       4) Show code (text)"
+            echo "  5) Uninstall daemon   q) Quit"
+            echo ""
+            read -r -p "  Choice: " choice || exit 0
+            case "$choice" in
+                1) echo ""; start_daemon; sleep 1 ;;
+                2) echo ""; stop_daemon; sleep 1 ;;
+                3) echo ""; show_qr; echo ""; read -r -p "  Press Enter to continue..." _ ;;
+                4) echo ""; show_code_only; echo ""; read -r -p "  Press Enter to continue..." _ ;;
+                5) uninstall_daemon; return ;;
+                q|Q) echo ""; exit 0 ;;
+                *) echo "  Invalid choice"; sleep 1 ;;
+            esac
+        done
+    fi
+
+    # TTY: arrow-key menu
+    local old_stty=$(stty -g) 2>/dev/null || true
+    stty -echo -icanon min 1 time 0 2>/dev/null || true
+    trap 'stty "$old_stty" 2>/dev/null; printf "\033[0m\n"' EXIT
+
+    local sel=1
+    _menu_draw $sel
 
     while true; do
-        read -r -p "  Choice: " choice || { echo ""; exit 0; }
-        case "$choice" in
-            1) echo ""; start_daemon; break ;;
-            2) echo ""; stop_daemon; break ;;
-            3) echo ""; show_qr; break ;;
-            4) uninstall_daemon; exit $? ;;
-            q|Q) echo ""; exit 0 ;;
-            *)   echo "  Invalid choice" ;;
+        local key=""
+        IFS= read -rsn1 key 2>/dev/null || true
+
+        case "$key" in
+            $'\033')
+                read -rsn2 -t 0.01 key2 2>/dev/null || true
+                case "$key2" in
+                    '[A') ((sel > 1)) && ((sel--)) ;;
+                    '[B') ((sel < 6)) && ((sel++)) ;;
+                esac
+                ;;
+            q|Q)
+                stty "$old_stty" 2>/dev/null
+                printf "\033[0m\n"
+                exit 0
+                ;;
+            $'\n'|$'\r'|'')
+                stty "$old_stty" 2>/dev/null
+                printf "\033[0m\n\n"
+                if ! _exec_action $sel; then return; fi
+                stty -echo -icanon min 1 time 0 2>/dev/null || true
+                ;;
         esac
+
+        printf '\033[16A\033[J\r' 2>/dev/null || true
+        _menu_draw $sel
     done
 }
 
-# --- CLI dispatch ---
+# ── CLI dispatch ─────────────────────────────────────────────────────
 case "${1:-}" in
     start)     start_daemon; exit 0 ;;
     stop)      stop_daemon; exit 0 ;;
     code)      show_qr; exit $? ;;
+    text)      show_code_only; exit $? ;;
     uninstall) uninstall_daemon; exit $? ;;
     status)
         name=$(get_daemon_name)
         if is_running; then
-            echo "Daemon: RUNNING ($name)"
+            echo "${GREEN}●${RESET} Daemon: RUNNING (${name})"
         else
-            echo "Daemon: STOPPED ($name)"
+            echo "${RED}●${RESET} Daemon: STOPPED (${name})"
         fi
-        exit 0
-        ;;
+        exit 0 ;;
     "")     show_menu ;;
-    *)
-        echo "Usage: acp-remote [start|stop|code|uninstall|status]"
-        echo "       acp-remote          (interactive menu)"
-        exit 1
-        ;;
+    *)      echo "Usage: acp-remote [start|stop|code|text|uninstall|status]"
+            echo "       acp-remote          (interactive menu)"
+            exit 1 ;;
 esac
