@@ -59,6 +59,7 @@ class SessionSettings extends Table {
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openDb());
+  AppDatabase.test() : super(NativeDatabase.memory());
 
   static LazyDatabase _openDb() {
     return LazyDatabase(() async {

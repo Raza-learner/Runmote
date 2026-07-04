@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../../../shared/widgets/diff_viewer.dart';
+import '../../../../shared/widgets/terminal_viewer.dart';
 
 class ToolCallCard extends StatefulWidget {
   final String name;
   final String? output;
+  final List<Map<String, String>>? diffs;
+  final String? terminalId;
   final bool isCompleted;
   final bool isStreaming;
 
@@ -10,6 +14,8 @@ class ToolCallCard extends StatefulWidget {
     super.key,
     required this.name,
     this.output,
+    this.diffs,
+    this.terminalId,
     this.isCompleted = false,
     this.isStreaming = true,
   });
@@ -103,19 +109,41 @@ class _ToolCallCardState extends State<ToolCallCard> {
               ),
             ),
           ),
-          if (hasOutput)
+          if (hasOutput || widget.diffs != null || widget.terminalId != null)
             AnimatedCrossFade(
               firstChild: const SizedBox.shrink(),
               secondChild: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
-                child: Text(
-                  widget.output!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.terminalId != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: TerminalViewer(
+                          terminalId: widget.terminalId!,
+                          output: widget.output,
+                        ),
+                      ),
+                    if (widget.diffs != null)
+                      ...widget.diffs!.map((d) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: DiffViewer(
+                              oldText: d['oldText'] ?? '',
+                              newText: d['newText'] ?? '',
+                            ),
+                          )),
+                    if (hasOutput && widget.terminalId == null)
+                      Text(
+                        widget.output!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
                 ),
               ),
               crossFadeState: _expanded

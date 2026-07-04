@@ -10,6 +10,7 @@ import '../models/connection_state.dart';
 import '../models/agent_info.dart';
 import '../models/agent_capabilities.dart';
 import 'database_provider.dart';
+import 'preferences_provider.dart';
 
 class AcpAgent {
   final String id;
@@ -368,8 +369,10 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     return id;
   }
 
-  int loadSession(String sessionId, String cwd) {
+  Future<int> loadSession(String sessionId, String cwd) async {
     final id = _nextId;
+    final prefs = await _ref.read(preferencesServiceProvider.future);
+    final mcps = prefs.getMcpServers().map((s) => s.toJson()).toList();
     sendRaw({
       'jsonrpc': '2.0',
       'id': id,
@@ -378,7 +381,37 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         if (state.selectedAgentId != null) 'agentId': state.selectedAgentId,
         'sessionId': sessionId,
         'cwd': cwd,
-        'mcpServers': <Map<String, dynamic>>[],
+        'mcpServers': mcps,
+      },
+    });
+    return id;
+  }
+
+  void closeSession(String sessionId) {
+    sendRaw({
+      'jsonrpc': '2.0',
+      'id': _nextId,
+      'method': 'session/close',
+      'params': {
+        if (state.selectedAgentId != null) 'agentId': state.selectedAgentId,
+        'sessionId': sessionId,
+      },
+    });
+  }
+
+  Future<int> resumeSession(String sessionId, String cwd) async {
+    final id = _nextId;
+    final prefs = await _ref.read(preferencesServiceProvider.future);
+    final mcps = prefs.getMcpServers().map((s) => s.toJson()).toList();
+    sendRaw({
+      'jsonrpc': '2.0',
+      'id': id,
+      'method': 'session/resume',
+      'params': {
+        if (state.selectedAgentId != null) 'agentId': state.selectedAgentId,
+        'sessionId': sessionId,
+        'cwd': cwd,
+        'mcpServers': mcps,
       },
     });
     return id;
@@ -422,6 +455,31 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       'id': id,
       'method': 'filesystem/list_drives',
       'params': {},
+    });
+    return id;
+  }
+
+  int readTextFile(String path, {int? line, int? limit}) {
+    final id = _nextId;
+    final params = <String, dynamic>{'path': path};
+    if (line != null) params['line'] = line;
+    if (limit != null) params['limit'] = limit;
+    sendRaw({
+      'jsonrpc': '2.0',
+      'id': id,
+      'method': 'fs/read_text_file',
+      'params': params,
+    });
+    return id;
+  }
+
+  int writeTextFile(String path, String content) {
+    final id = _nextId;
+    sendRaw({
+      'jsonrpc': '2.0',
+      'id': id,
+      'method': 'fs/write_text_file',
+      'params': {'path': path, 'content': content},
     });
     return id;
   }

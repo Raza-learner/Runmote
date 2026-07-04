@@ -82,7 +82,12 @@ async def daemon_endpoint(websocket: WebSocket):
                         await websocket.close()
                         return
 
-                    pairing_code = generate_pairing_code()
+                    # Remove old pairing code for this token (daemon reconnecting)
+                    old_codes = [c for c, t in state.code_to_token.items() if t == token]
+                    for old_code in old_codes:
+                        del state.code_to_token[old_code]
+
+                    pairing_code = generate_pairing_code(set(state.code_to_token.keys()))
                     state.token_to_daemons[token] = daemon_id
                     state.code_to_token[pairing_code] = token
                     state.store.set_daemon_id(daemon_id)

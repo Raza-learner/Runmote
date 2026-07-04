@@ -1,5 +1,7 @@
 import json
+import time
 import uuid
+from collections import defaultdict
 from fastapi import APIRouter, WebSocket
 
 try:
@@ -10,6 +12,11 @@ except ImportError:
     from config import RELAY_TOKEN
 
 router = APIRouter()
+
+# Per-IP pairing attempt tracking for rate limiting
+_pair_attempts: dict[str, list[float]] = defaultdict(list)
+_MAX_PAIR_ATTEMPTS = 5
+_PAIR_WINDOW_SEC = 60
 
 
 def _is_authenticated(client_id: str) -> bool:
@@ -52,6 +59,16 @@ async def app_endpoint(websocket: WebSocket):
                     continue
 
                 if method == "auth/pair":
+                    client_ip = websocket.client.host if hasattr(websocket.client, 'host') else 'unknown'
+                    now = time.time()
+                    attempts = _pair_attempts[client_ip]
+                    attempts[:] = [t for t in attempts if now - t < _PAIR_WINDOW_SEC]
+                    if len(attempts) >= _MAX_PAIR_ATTEMPTS:
+                        print(f"  → client {client_id} rate limited (IP: {client_ip})", flush=True)
+                        await _send_error(websocket, msg_id, -32029, "too many attempts — try again later")
+                        continue
+                    attempts.append(now)
+
                     params = data.get("params") or {}
                     code = params.get("code", "").strip()
                     token = state.code_to_token.get(code)

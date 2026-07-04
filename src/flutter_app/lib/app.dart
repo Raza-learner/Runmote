@@ -1,3 +1,4 @@
+import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,16 +18,20 @@ class _AppState extends ConsumerState<App> {
   @override
   void initState() {
     super.initState();
-    _loadThemeMode();
+    _loadPrefs();
   }
 
-  Future<void> _loadThemeMode() async {
+  Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('theme_mode') ?? 'system';
-    final accent = prefs.getInt('accent_color');
     ref.read(themeModeStateProvider.notifier).state = _parseThemeMode(mode);
-    if (accent != null) {
-      ref.read(accentColorProvider.notifier).state = Color(accent);
+
+    final schemeName = prefs.getString('flex_scheme');
+    if (schemeName != null) {
+      final scheme = FlexScheme.values.where((s) => s.name == schemeName).firstOrNull;
+      if (scheme != null) {
+        ref.read(flexSchemeProvider.notifier).state = scheme;
+      }
     }
   }
 
@@ -44,13 +49,13 @@ class _AppState extends ConsumerState<App> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeStateProvider);
-    final accentColor = ref.watch(accentColorProvider);
+    final scheme = ref.watch(flexSchemeProvider);
     return MaterialApp.router(
       title: 'ACP Remote',
       routerConfig: goRouter,
       debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(seed: accentColor),
-      darkTheme: buildDarkTheme(seed: accentColor),
+      theme: buildFlexTheme(scheme: scheme, brightness: Brightness.light),
+      darkTheme: buildFlexTheme(scheme: scheme, brightness: Brightness.dark),
       themeMode: themeMode,
     );
   }

@@ -233,6 +233,9 @@ async def run_daemon():
 
                 await _send_json(websocket, _agent_list_message(agents))
 
+                # NOTE: this closure references `send_queues`, `agent_tasks` and
+                # `agents` defined later in this function scope. This works because
+                # the closure doesn't execute until the event loop yields.
                 async def relay_to_agents():
                     async for message in websocket:
                         try:
@@ -370,6 +373,49 @@ async def run_daemon():
                                     "jsonrpc": "2.0",
                                     "id": msg_id,
                                     "error": {"code": -32000, "message": f"Failed to list directory: {e}"},
+                                })
+                            continue
+
+                        if method == "fs/read_text_file":
+                            params = data.get("params") or {}
+                            path = os.path.expanduser(params.get("path", ""))
+                            line = params.get("line")
+                            limit = params.get("limit")
+                            try:
+                                with open(path, "r") as f:
+                                    content = f.read()
+                                result = {"content": content}
+                                await _send_json(websocket, {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "result": result,
+                                })
+                            except Exception as e:
+                                await _send_json(websocket, {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "error": {"code": -32000, "message": f"Failed to read file: {e}"},
+                                })
+                            continue
+
+                        if method == "fs/write_text_file":
+                            params = data.get("params") or {}
+                            path = os.path.expanduser(params.get("path", ""))
+                            content = params.get("content", "")
+                            try:
+                                os.makedirs(os.path.dirname(path), exist_ok=True)
+                                with open(path, "w") as f:
+                                    f.write(content)
+                                await _send_json(websocket, {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "result": None,
+                                })
+                            except Exception as e:
+                                await _send_json(websocket, {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "error": {"code": -32000, "message": f"Failed to write file: {e}"},
                                 })
                             continue
 

@@ -312,7 +312,8 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
         itemCount: filtered.length,
         itemBuilder: (context, index) {
           final session = filtered[index];
-          return Padding(
+          final isFiltering = searchQuery.isNotEmpty;
+          final card = Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: SessionCard(
               title: session.title,
@@ -330,6 +331,28 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
                 _confirmDelete(session);
               },
             ),
+          );
+          if (isFiltering) return card;
+          return Dismissible(
+            key: ValueKey(session.id),
+            direction: DismissDirection.endToStart,
+            confirmDismiss: (_) async {
+              _confirmDelete(session);
+              return false;
+            },
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 24),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.delete_outline,
+                color: theme.colorScheme.onErrorContainer,
+              ),
+            ),
+            child: card,
           );
         },
       ),

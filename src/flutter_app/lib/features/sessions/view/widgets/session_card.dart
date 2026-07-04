@@ -104,7 +104,7 @@ class SessionCard extends StatelessWidget {
                 icon: Icon(
                   Icons.delete_outline,
                   size: 20,
-                  color: theme.colorScheme.error,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
                 onPressed: onDelete,
                 visualDensity: VisualDensity.compact,

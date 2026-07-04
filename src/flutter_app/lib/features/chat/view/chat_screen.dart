@@ -30,11 +30,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _showScrollButton = false;
   bool _userScrolledUp = false;
   final List<Map<String, String>> _attachments = [];
+  late String _title;
+
   @override
   void initState() {
     super.initState();
+    _title = _fallbackTitle(widget.cwd);
     _scrollController.addListener(_onScroll);
     _textController.addListener(() => setState(() {}));
+  }
+
+  String _fallbackTitle(String cwd) {
+    if (cwd.isNotEmpty && cwd != '/') {
+      final parts = cwd.split('/');
+      return parts.lastWhere((p) => p.isNotEmpty, orElse: () => cwd);
+    }
+    return 'Chat';
   }
 
   @override
@@ -147,9 +158,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final chatState = ref.watch(chatProvider((widget.sessionId, widget.cwd)));
     final connection = ref.watch(connectionProvider);
-    final sessionList = ref.watch(sessionListProvider);
+    final canSendImages = connection.capabilities?.canSendImages ?? false;
+    final daemonDown = connection.paired && !connection.daemonConnected;
 
     ref.listen(
       chatProvider((widget.sessionId, widget.cwd)),
@@ -166,22 +177,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (newMessageArrived || streamingStarted) {
           Future.microtask(_scrollToBottomIfNearEnd);
         }
+
+        final prevReq = previous?.valueOrNull?.permissionRequest;
+        final nextReq = next.valueOrNull?.permissionRequest;
+        if (nextReq != null && prevReq != nextReq) {
+          Future.microtask(() {
+            if (mounted) _showPermissionDialog(context, nextReq);
+          });
+        }
       },
     );
 
-    final title = sessionList.whenOrNull(data: _sessionTitle) ??
-        connection.agentInfo?.name ??
-        'Chat';
-
-    final isBusy = chatState.whenOrNull(data: (cs) => cs.isBusy) ?? false;
-    final canSendImages = connection.capabilities?.canSendImages ?? false;
-    final daemonDown =
-        connection.paired && !connection.daemonConnected;
-
-    final modelConfig = chatState.whenOrNull(
-      data: (cs) => cs.configOptions
-          .where((c) => c.category == 'model')
-          .firstOrNull,
+    ref.listen(
+      sessionListProvider,
+      (previous, next) {
+        final sessions = next.valueOrNull;
+        if (sessions == null) return;
+        final newTitle = _sessionTitle(sessions);
+        if (newTitle.isNotEmpty && newTitle != _title) {
+          setState(() => _title = newTitle);
+        }
+      },
     );
 
     return Scaffold(
@@ -190,7 +206,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              title,
+              _title,
               style: theme.textTheme.titleMedium,
               overflow: TextOverflow.ellipsis,
             ),
@@ -207,131 +223,174 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'Close session',
+            onPressed: () {
+              ref.read(connectionProvider.notifier).closeSession(widget.sessionId);
+              context.pop();
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
           if (daemonDown) const DaemonOfflineBanner(),
+          Consumer(
+            builder: (context, ref, child) {
+              final modeOptions = ref.watch(
+                chatProvider((widget.sessionId, widget.cwd)).select(
+                  (state) => state.valueOrNull?.configOptions
+                          .where((c) => c.category == 'mode')
+                          .toList() ??
+                      [],
+                ),
+              );
+              if (modeOptions.isEmpty || modeOptions.first.options.length <= 1) {
+                return const SizedBox.shrink();
+              }
+              return _buildModeSelector(theme, modeOptions.first);
+            },
+          ),
           Expanded(
-            child: chatState.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 56,
-                        color: theme.colorScheme.error,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Could not load chat',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        e.toString(),
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton.tonal(
-                        onPressed: () => ref
-                            .read(chatProvider(
-                                    (widget.sessionId, widget.cwd))
-                                .notifier)
-                            .loadMessages(),
-                        child: const Text('Retry'),
-                      ),
-                    ],
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Consumer(
+                    builder: (context, ref, child) {
+                      final chatState = ref.watch(
+                        chatProvider((widget.sessionId, widget.cwd)),
+                      );
+                      return chatState.when(
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
+                        error: (e, _) {
+                          final t = Theme.of(context);
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.error_outline,
+                                    size: 56,
+                                    color: t.colorScheme.error,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Could not load chat',
+                                    style: t.textTheme.titleMedium,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    e.toString(),
+                                    textAlign: TextAlign.center,
+                                    style: t.textTheme.bodyMedium?.copyWith(
+                                      color: t.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  FilledButton.tonal(
+                                    onPressed: () => ref
+                                        .read(chatProvider((
+                                                widget.sessionId, widget.cwd))
+                                            .notifier)
+                                        .loadMessages(),
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        data: (cs) {
+                          final messages = cs.messages;
+                          if (messages.isEmpty) {
+                            final t = Theme.of(context);
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.chat_bubble_outline,
+                                      size: 64,
+                                      color: t.colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'Start a conversation',
+                                      style: t.textTheme.titleMedium?.copyWith(
+                                        color: t.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Type a message below to begin chatting with the agent.',
+                                      style: t.textTheme.bodyMedium?.copyWith(
+                                        color: t.colorScheme.onSurfaceVariant,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                          final reversedMessages = messages.reversed.toList();
+                          return ListView.builder(
+                            reverse: true,
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(16),
+                            itemCount: reversedMessages.length,
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: true,
+                            itemBuilder: (context, index) {
+                              final msg = reversedMessages[index];
+                              return RepaintBoundary(
+                                key: ValueKey(msg.id),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: MessageBubble(message: msg),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
-              ),
-              data: (cs) {
-                final messages = cs.messages;
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.chat_bubble_outline,
-                            size: 64,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Start a conversation',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Type a message below to begin chatting with the agent.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
+                if (_showScrollButton)
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: FloatingActionButton.small(
+                      onPressed: _scrollToBottom,
+                      child: const Icon(Icons.keyboard_arrow_down),
                     ),
-                  );
-                }
-                final reversedMessages = messages.reversed.toList();
-                return Stack(
-                  children: [
-                    ListView.builder(
-                      reverse: true,
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: reversedMessages.length,
-                      addAutomaticKeepAlives: false,
-                      addRepaintBoundaries: true,
-                      itemBuilder: (context, index) {
-                        final msg = reversedMessages[index];
-                        return RepaintBoundary(
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: MessageBubble(message: msg),
-                          ),
-                        );
-                      },
-                    ),
-                    if (_showScrollButton)
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: FloatingActionButton.small(
-                          onPressed: _scrollToBottom,
-                          child: const Icon(Icons.keyboard_arrow_down),
-                        ),
-                      ),
-                  ],
-                );
-              },
+                  ),
+              ],
             ),
           ),
-          _buildInputArea(theme, isBusy, canSendImages, modelConfig, daemonDown),
+          _buildInputArea(theme, canSendImages, daemonDown),
         ],
       ),
     );
   }
 
-  Widget _buildInputArea(
-    ThemeData theme,
-    bool isBusy,
-    bool canSendImages,
-    ConfigOption? modelConfig,
-    bool daemonDown,
-  ) {
+  List<SlashCommand> _filterSlashCommands(List<SlashCommand> commands, String query) {
+    if (query.isEmpty) return commands;
+    final q = query.toLowerCase();
+    return commands.where((c) => c.name.toLowerCase().contains(q)).toList();
+  }
+
+  Widget _buildInputArea(ThemeData theme, bool canSendImages, bool daemonDown) {
+    final text = _textController.text;
+    final slashMatch = text.startsWith('/') ? text.substring(1) : null;
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
@@ -340,117 +399,351 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
       ),
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_attachments.isNotEmpty)
-              Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _attachments.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final att = _attachments[index];
-                    return Chip(
-                      label: Text(
-                        att['name'] ?? 'file',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      deleteIcon: const Icon(Icons.close, size: 16),
-                      onDeleted: () => setState(
-                          () => _attachments.removeAt(index)),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    );
-                  },
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-              child: Row(
-                children: [
-                  if (modelConfig != null)
-                    _ModelChip(
-                      label: modelConfig.currentValue.isNotEmpty
-                          ? modelConfig.currentValue
-                          : modelConfig.name,
-                      onTap: () {
-                        final cs = ref
-                            .read(chatProvider(
-                                (widget.sessionId, widget.cwd)))
-                            .valueOrNull;
-                        if (cs != null) _showConfigSheet(context, cs);
+        child: Consumer(
+          builder: (context, ref, child) {
+            final chatState = ref.watch(chatProvider((widget.sessionId, widget.cwd)));
+            final cs = chatState.valueOrNull;
+            final isBusy = cs?.isBusy ?? false;
+
+            final slashCommands = slashMatch != null && cs != null
+                ? _filterSlashCommands(cs.availableCommands, slashMatch)
+                : <SlashCommand>[];
+            final modelConfig = cs?.configOptions
+                .where((c) => c.category == 'model')
+                .firstOrNull;
+            final modelLabel = modelConfig != null
+                ? (modelConfig.currentValue.isNotEmpty
+                    ? modelConfig.currentValue
+                    : modelConfig.name.isNotEmpty
+                        ? modelConfig.name
+                        : null)
+                : (cs?.currentModel?.isNotEmpty ?? false)
+                    ? cs!.currentModel
+                    : ref.read(connectionProvider).agentInfo?.name;
+            final t = Theme.of(context);
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_attachments.isNotEmpty)
+                  Container(
+                    height: 40,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _attachments.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final att = _attachments[index];
+                        return Chip(
+                          label: Text(
+                            att['name'] ?? 'file',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          deleteIcon: const Icon(Icons.close, size: 16),
+                          onDeleted: () => setState(
+                              () => _attachments.removeAt(index)),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        );
                       },
                     ),
-                  const Spacer(),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _textController,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
-                      enabled: !isBusy && !daemonDown,
-                      minLines: 1,
-                      maxLines: 5,
-                      decoration: InputDecoration(
-                        hintText: daemonDown
-                            ? 'Daemon not connected'
-                            : isBusy
-                                ? 'Agent is responding...'
-                                : 'Type a message...',
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                      ),
+                  ),
+                if (slashCommands.isNotEmpty)
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 160),
+                    margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                    decoration: BoxDecoration(
+                      color: t.colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: slashCommands.length,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      itemBuilder: (ctx, i) {
+                        final cmd = slashCommands[i];
+                        final hint = cmd.inputHint != null ? ' ${cmd.inputHint}' : '';
+                        return InkWell(
+                          onTap: () {
+                            _textController.text = '/${cmd.name} ';
+                            _textController.selection = TextSelection.collapsed(
+                              offset: _textController.text.length,
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: t.colorScheme.tertiaryContainer,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '/${cmd.name}',
+                                    style: t.textTheme.labelMedium?.copyWith(
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    '${cmd.description}$hint',
+                                    style: t.textTheme.bodySmall,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  if (canSendImages && !isBusy && !daemonDown)
-                    IconButton(
-                      onPressed: _pickFile,
-                      icon: Icon(
-                        Icons.attach_file,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      tooltip: 'Attach image',
-                      style: IconButton.styleFrom(
-                        backgroundColor: theme.colorScheme.surfaceContainerHigh,
-                      ),
-                    ),
-                  const SizedBox(width: 4),
-                  isBusy
-                      ? const Padding(
-                          padding: EdgeInsets.all(10),
-                          child: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2.5),
-                          ),
-                        )
-                      : IconButton.filled(
-                          onPressed: daemonDown ||
-                                  (_textController.text.trim().isEmpty &&
-                                      _attachments.isEmpty)
-                              ? null
-                              : _sendMessage,
-                          icon: const Icon(Icons.arrow_upward),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                  child: Row(
+                    children: [
+                      if (modelLabel != null)
+                        _ModelChip(
+                          label: modelLabel,
+                          onTap: (cs != null && cs.configOptions.isNotEmpty)
+                              ? () => _showConfigSheet(context, cs)
+                              : null,
                         ),
-                ],
+                      const Spacer(),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _textController,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _sendMessage(),
+                          readOnly: isBusy || daemonDown,
+                          minLines: 1,
+                          maxLines: 5,
+                          decoration: InputDecoration(
+                            hintText: daemonDown
+                                ? 'Daemon not connected'
+                                : isBusy
+                                    ? 'Agent is responding...'
+                                    : 'Type a message...',
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (canSendImages)
+                        IconButton(
+                          onPressed: (isBusy || daemonDown) ? null : _pickFile,
+                          icon: Icon(
+                            Icons.attach_file,
+                            color: t.colorScheme.onSurfaceVariant,
+                          ),
+                          tooltip: 'Attach image',
+                          style: IconButton.styleFrom(
+                            backgroundColor: t.colorScheme.surfaceContainerHigh,
+                          ),
+                        ),
+                      const SizedBox(width: 4),
+                      SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: isBusy
+                            ? const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                                ),
+                              )
+                            : IconButton.filled(
+                                onPressed: daemonDown ||
+                                        (_textController.text.trim().isEmpty &&
+                                            _attachments.isEmpty)
+                                    ? null
+                                    : _sendMessage,
+                                icon: const Icon(Icons.arrow_upward),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModeSelector(
+    ThemeData theme,
+    ConfigOption opt,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: opt.options.map((v) {
+            final selected = v.value == opt.currentValue;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(v.name, style: const TextStyle(fontSize: 12)),
+                selected: selected,
+                visualDensity: VisualDensity.compact,
+                onSelected: (_) {
+                  ref
+                      .read(chatProvider(
+                              (widget.sessionId, widget.cwd))
+                          .notifier)
+                      .setConfigOption(opt.id, v.value);
+                },
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  void _showPermissionDialog(BuildContext context, PermissionRequest req) {
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.shield_outlined, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                req.title ?? 'Permission Requested',
+                style: theme.textTheme.titleMedium,
               ),
             ),
           ],
         ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (req.toolName != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        req.toolName!,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (req.toolContent.isNotEmpty)
+              ...req.toolContent.map((c) {
+                final text = c['text'] as String? ?? '';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    text,
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 5,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }),
+            const SizedBox(height: 12),
+            Text(
+              'Allow the agent to perform this action?',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ref
+                  .read(chatProvider(
+                          (widget.sessionId, widget.cwd))
+                      .notifier)
+                  .dismissPermission();
+            },
+            child: const Text('Cancel'),
+          ),
+          ...req.options.map((opt) {
+            final isAllow = opt.kind.contains('allow');
+            return isAllow
+                ? FilledButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      ref
+                          .read(chatProvider(
+                                  (widget.sessionId, widget.cwd))
+                              .notifier)
+                          .respondToPermission(opt.optionId);
+                    },
+                    child: Text(opt.name),
+                  )
+                : TextButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      ref
+                          .read(chatProvider(
+                                  (widget.sessionId, widget.cwd))
+                              .notifier)
+                          .respondToPermission(opt.optionId);
+                    },
+                    child: Text(opt.name),
+                  );
+          }),
+        ],
       ),
     );
   }
@@ -554,9 +847,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
 class _ModelChip extends StatelessWidget {
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
-  const _ModelChip({required this.label, required this.onTap});
+  const _ModelChip({required this.label, this.onTap});
 
   @override
   Widget build(BuildContext context) {

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'connection_provider.dart';
 import 'database_provider.dart';
+import 'preferences_provider.dart';
 import '../models/connection_state.dart';
 
 class ActiveSessionsNotifier extends StateNotifier<Set<String>> {
@@ -110,6 +111,8 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
   Timer? _debounceTimer;
   bool _wasConnected = false;
   bool _isLoading = false;
+  int _requestSeq = 0;
+  int get _nextRequestId => ++_requestSeq;
 
   SessionListNotifier(this._ref) : super(const AsyncValue.loading()) {
     _listenToMessages();
@@ -180,6 +183,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
     _isLoading = true;
 
     // Preserve existing data while refreshing so the list doesn't flash.
+    final currentSessions = state.valueOrNull ?? [];
     if (!state.hasValue) {
       state = const AsyncValue.loading();
     }
@@ -213,9 +217,24 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
               ))
           .where((s) => !_deletedIds.contains(s.id))
           .toList();
-      state = AsyncValue.data(cachedSessions);
+
+      if (!state.hasValue) {
+        state = AsyncValue.data(cachedSessions);
+      }
 
       if (!supportsList) {
+        final merged = <String, AcpSession>{};
+        for (final s in currentSessions) {
+          if (!_deletedIds.contains(s.id)) {
+            merged[s.id] = s;
+          }
+        }
+        for (final s in cachedSessions) {
+          merged[s.id] = s;
+        }
+        final sessions = merged.values.toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        state = AsyncValue.data(sessions);
         return;
       }
 
@@ -249,7 +268,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
         }
       });
 
-      requestId = DateTime.now().millisecondsSinceEpoch;
+      requestId = _nextRequestId;
       final params = <String, dynamic>{};
       if (selectedAgentId != null) {
         params['agentId'] = selectedAgentId;
@@ -278,7 +297,17 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
           // forwards a mixed list.
           .where((s) => selectedAgentId == null || s.agentId == null || s.agentId == selectedAgentId)
           .toList();
+
+      // Preserve very recent local sessions while refreshing so a newly
+      // created session doesn't flicker out before the agent echoes it back.
+      final nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
+      final recentThreshold = nowSec - 10;
       final merged = <String, AcpSession>{};
+      for (final s in currentSessions) {
+        if (!_deletedIds.contains(s.id) && s.updatedAt >= recentThreshold) {
+          merged[s.id] = s;
+        }
+      }
       for (final s in cachedSessions) {
         merged[s.id] = s;
       }
@@ -350,7 +379,9 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
         }
       });
 
-      requestId = DateTime.now().millisecondsSinceEpoch;
+      requestId = _nextRequestId;
+      final prefs = await _ref.read(preferencesServiceProvider.future);
+      final mcps = prefs.getMcpServers().map((s) => s.toJson()).toList();
       final payload = {
         'jsonrpc': '2.0',
         'id': requestId,
@@ -359,7 +390,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
           if (connection.selectedAgentId != null)
             'agentId': connection.selectedAgentId,
           'cwd': cwd,
-          'mcpServers': <String>[],
+          'mcpServers': mcps,
         },
       };
       notifier.sendRaw(payload);
@@ -409,7 +440,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
     final connection = _ref.read(connectionProvider);
     notifier.sendRaw({
       'jsonrpc': '2.0',
-      'id': DateTime.now().millisecondsSinceEpoch,
+      'id': _nextRequestId,
       'method': 'session/delete',
       'params': {
         if (connection.selectedAgentId != null)

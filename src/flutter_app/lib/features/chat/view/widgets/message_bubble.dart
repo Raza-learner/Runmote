@@ -101,6 +101,7 @@ class MessageBubble extends StatelessWidget {
     void flushTools() {
       if (toolCalls.isNotEmpty) {
         result.add(ToolCallGroup(
+          key: ValueKey('tools_${toolCalls.first.id}'),
           segments: List.unmodifiable(toolCalls),
           isStreaming: message.isStreaming,
         ));
@@ -124,14 +125,24 @@ class MessageBubble extends StatelessWidget {
   Widget _buildSegment(AssistantSegment seg, ThemeData theme) {
     switch (seg.kind) {
       case SegmentKind.thought:
-        return ThinkingSection(text: seg.text, isStreaming: message.isStreaming);
+        return ThinkingSection(
+          key: ValueKey('thought_${seg.id}'),
+          text: seg.text,
+          isStreaming: message.isStreaming,
+        );
       case SegmentKind.toolCall:
         // Tool calls are always grouped above; this branch is a fallback.
         final output = seg.metadata['output'] as String?;
         final isCompleted = seg.metadata['status'] == 'completed';
+        final diffs = (seg.metadata['diffs'] as List<dynamic>?)
+            ?.cast<Map<String, String>>();
+        final terminalId = seg.metadata['terminalId'] as String?;
         return ToolCallCard(
+          key: ValueKey('tool_${seg.id}'),
           name: seg.text,
           output: output,
+          diffs: diffs,
+          terminalId: terminalId,
           isCompleted: isCompleted,
           isStreaming: message.isStreaming,
         );
@@ -322,9 +333,15 @@ class _ToolCallGroupState extends State<ToolCallGroup>
                 children: widget.segments.map((seg) {
                   final output = seg.metadata['output'] as String?;
                   final isCompleted = seg.metadata['status'] == 'completed';
+                  final diffs = (seg.metadata['diffs'] as List<dynamic>?)
+                      ?.cast<Map<String, String>>();
+                  final terminalId = seg.metadata['terminalId'] as String?;
                   return ToolCallCard(
+                    key: ValueKey(seg.id),
                     name: seg.text,
                     output: output,
+                    diffs: diffs,
+                    terminalId: terminalId,
                     isCompleted: isCompleted,
                     isStreaming: widget.isStreaming,
                   );

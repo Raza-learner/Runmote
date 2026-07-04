@@ -55,15 +55,6 @@ class AgentCard extends StatelessWidget {
                     Row(
                       children: [
                         StatusLabel(status: status),
-                        if (version.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            'v$version',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
                         if (sessionsCount != null) ...[
                           const SizedBox(width: 8),
                           Icon(

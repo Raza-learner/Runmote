@@ -66,12 +66,76 @@ class ConfigOptionValue {
   }
 }
 
+class SlashCommand {
+  final String name;
+  final String description;
+  final String? inputHint;
+
+  const SlashCommand({
+    required this.name,
+    required this.description,
+    this.inputHint,
+  });
+
+  factory SlashCommand.fromJson(Map<String, dynamic> json) {
+    return SlashCommand(
+      name: json['name'] as String,
+      description: json['description'] as String? ?? '',
+      inputHint: (json['input'] as Map<String, dynamic>?)?.let((m) => m['hint'] as String?),
+    );
+  }
+}
+
+extension _Let<T extends Object> on T {
+  R? let<R>(R? Function(T) f) => f(this);
+}
+
+class PermissionOption {
+  final String optionId;
+  final String name;
+  final String kind;
+
+  const PermissionOption({
+    required this.optionId,
+    required this.name,
+    required this.kind,
+  });
+
+  factory PermissionOption.fromJson(Map<String, dynamic> json) {
+    return PermissionOption(
+      optionId: json['optionId'] as String,
+      name: json['name'] as String? ?? json['optionId'] as String,
+      kind: json['kind'] as String? ?? 'allow_once',
+    );
+  }
+}
+
+class PermissionRequest {
+  final String sessionId;
+  final int requestId;
+  final String? title;
+  final String? toolName;
+  final List<Map<String, dynamic>> toolContent;
+  final List<PermissionOption> options;
+
+  const PermissionRequest({
+    required this.sessionId,
+    required this.requestId,
+    this.title,
+    this.toolName,
+    this.toolContent = const [],
+    this.options = const [],
+  });
+}
+
 class ChatState {
   final List<ChatMessage> messages;
   final List<ConfigOption> configOptions;
   final String? currentModel;
   final String? currentMode;
   final bool isBusy;
+  final List<SlashCommand> availableCommands;
+  final PermissionRequest? permissionRequest;
 
   const ChatState({
     this.messages = const [],
@@ -79,6 +143,8 @@ class ChatState {
     this.currentModel,
     this.currentMode,
     this.isBusy = false,
+    this.availableCommands = const [],
+    this.permissionRequest,
   });
 }
 
@@ -93,6 +159,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   final Set<int> _pendingIds = {};
   int? _loadPendingId;
   String? _timeoutMessageId;
+  List<ConfigOption>? _pendingConfigs;
 
   ChatNotifier(this._ref, this._sessionId, this._cwd)
       : super(const AsyncValue.loading()) {
@@ -101,26 +168,38 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     loadMessages();
   }
 
-  void _loadSessionFromAgent() {
+  Future<void> _loadSessionFromAgent() async {
     final connection = _ref.read(connectionProvider);
     final supportsLoad = connection.capabilities?.supportsLoadSession ?? true;
     if (!supportsLoad) {
       return;
     }
     final notifier = _ref.read(connectionProvider.notifier);
-    final id = notifier.loadSession(_sessionId, _cwd);
+    final id = await notifier.loadSession(_sessionId, _cwd);
     _pendingIds.add(id);
     _loadPendingId = id;
   }
 
-  bool get _isBusy =>
-      _pendingIds.isNotEmpty ||
-      _buffer.any((m) => m.isStreaming);
+  bool get _isBusy {
+    // Session load should not block the input field; only actual message
+    // requests and streaming content should make the chat "busy".
+    final busyPending = _pendingIds.where((id) => id != _loadPendingId).length;
+    return busyPending > 0 || _buffer.any((m) => m.isStreaming);
+  }
+
+  List<SlashCommand> _slashCommands = [];
+  PermissionRequest? _permissionRequest;
 
   void _syncState() {
+    final current = state.valueOrNull;
     state = AsyncValue.data(ChatState(
       messages: List.of(_buffer),
+      configOptions: current?.configOptions ?? [],
+      currentModel: current?.currentModel,
+      currentMode: current?.currentMode,
       isBusy: _isBusy,
+      availableCommands: _slashCommands,
+      permissionRequest: _permissionRequest,
     ));
   }
 
@@ -133,6 +212,8 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       currentModel: model?.currentValue,
       currentMode: mode?.currentValue,
       isBusy: _isBusy,
+      availableCommands: _slashCommands,
+      permissionRequest: _permissionRequest,
     ));
   }
 
@@ -150,6 +231,12 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       debugPrint('[ACP-CHAT] _loadMessages error: $e');
     }
     _loaded = true;
+    if (_pendingConfigs != null) {
+      _syncConfigAndState(_pendingConfigs!);
+      _pendingConfigs = null;
+    } else {
+      _syncState();
+    }
     if (_loadPendingId != null) {
       Future.delayed(const Duration(seconds: 10), () {
         if (_loadPendingId != null && _pendingIds.contains(_loadPendingId)) {
@@ -158,14 +245,14 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
           _syncState();
         }
       });
-      return;
     }
-    _syncState();
   }
 
   void _setConfigOptions(List<ConfigOption> configs) {
     if (_loaded) {
       _syncConfigAndState(configs);
+    } else {
+      _pendingConfigs = configs;
     }
   }
 
@@ -271,6 +358,9 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
             _handleUpdate(params);
           } else if (method == 'session/notification') {
             _handleLegacyNotification(params);
+          } else if (method == 'session/request_permission') {
+            _handlePermissionRequest(msg['id'], params);
+            return;
           }
         }
 
@@ -377,13 +467,30 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
         );
       case 'tool_call_update':
         final toolOut = update['content'] as List<dynamic>?;
-        final outText = toolOut
-                ?.map((c) => (c as Map<String, dynamic>)['text'] ?? '')
-                .join('\n') ??
-            '';
+        final textParts = <String>[];
+        final diffs = <Map<String, String>>[];
+        String? terminalId;
+        if (toolOut != null) {
+          for (final c in toolOut) {
+            final map = c as Map<String, dynamic>;
+            if (map['type'] == 'diff') {
+              diffs.add({
+                'path': map['path'] as String? ?? '',
+                'oldText': map['oldText'] as String? ?? '',
+                'newText': map['newText'] as String? ?? '',
+              });
+            } else if (map['type'] == 'terminal') {
+              terminalId = map['terminalId'] as String?;
+            } else {
+              textParts.add(map['text'] as String? ?? '');
+            }
+          }
+        }
+        final outText = textParts.join('\n');
         final toolId = update['toolCallId'] as String? ?? '';
         final toolStatus = update['status'] as String?;
-        _updateToolOutput(toolId, outText, toolStatus);
+        _updateToolOutput(toolId, outText, toolStatus,
+            diffs: diffs, terminalId: terminalId);
       case 'plan':
         _ensureAssistantMessage();
         _addSegment(
@@ -402,6 +509,14 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
                 .map((e) => ConfigOption.fromJson(e as Map<String, dynamic>))
                 .toList(),
           );
+        }
+      case 'available_commands_update':
+        final raw = update['availableCommands'] as List<dynamic>?;
+        if (raw != null) {
+          _slashCommands = raw
+              .map((e) => SlashCommand.fromJson(e as Map<String, dynamic>))
+              .toList();
+          if (_loaded) _syncState();
         }
       case 'usage_update':
         break;
@@ -496,7 +611,8 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     }
   }
 
-  void _updateToolOutput(String toolId, String outText, String? status) {
+  void _updateToolOutput(String toolId, String outText, String? status,
+      {List<Map<String, String>> diffs = const [], String? terminalId}) {
     for (var i = 0; i < _buffer.length; i++) {
       final m = _buffer[i];
       for (final seg in m.segments) {
@@ -507,6 +623,15 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
           }
           if (status != null) {
             newMeta['status'] = status;
+          }
+          if (diffs.isNotEmpty) {
+            final existing =
+                (newMeta['diffs'] as List<dynamic>?)?.cast<Map<String, String>>() ??
+                    [];
+            newMeta['diffs'] = [...existing, ...diffs];
+          }
+          if (terminalId != null) {
+            newMeta['terminalId'] = terminalId;
           }
           _buffer[i] = m.copyWith(
             segments: m.segments
@@ -645,6 +770,71 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       }).toList();
       _setConfigOptions(updatedConfigs);
     }
+  }
+
+  void _handlePermissionRequest(int? requestId, Map<String, dynamic> params) {
+    final toolCall = params['toolCall'] as Map<String, dynamic>?;
+    final rawOptions = params['options'] as List<dynamic>?;
+    _permissionRequest = PermissionRequest(
+      sessionId: _sessionId,
+      requestId: requestId ?? 0,
+      title: toolCall?['title'] as String?,
+      toolName: toolCall?['kind'] as String?,
+      toolContent: (toolCall?['content'] as List<dynamic>?)
+              ?.cast<Map<String, dynamic>>() ??
+          const [],
+      options: rawOptions
+              ?.map((e) => PermissionOption.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+    );
+    state = AsyncValue.data(ChatState(
+      messages: List.of(_buffer),
+      isBusy: _isBusy,
+      availableCommands: _slashCommands,
+      permissionRequest: _permissionRequest,
+    ));
+  }
+
+  void respondToPermission(String optionId) {
+    final req = _permissionRequest;
+    if (req == null) return;
+    final notifier = _ref.read(connectionProvider.notifier);
+    notifier.sendRaw({
+      'jsonrpc': '2.0',
+      'id': req.requestId,
+      'result': {
+        'outcome': {
+          'outcome': 'selected',
+          'optionId': optionId,
+        },
+      },
+    });
+    _permissionRequest = null;
+    state = AsyncValue.data(ChatState(
+      messages: List.of(_buffer),
+      isBusy: _isBusy,
+      availableCommands: _slashCommands,
+    ));
+  }
+
+  void dismissPermission() {
+    final req = _permissionRequest;
+    if (req == null) return;
+    final notifier = _ref.read(connectionProvider.notifier);
+    notifier.sendRaw({
+      'jsonrpc': '2.0',
+      'id': req.requestId,
+      'result': {
+        'outcome': {'outcome': 'cancelled'},
+      },
+    });
+    _permissionRequest = null;
+    state = AsyncValue.data(ChatState(
+      messages: List.of(_buffer),
+      isBusy: _isBusy,
+      availableCommands: _slashCommands,
+    ));
   }
 
   @override

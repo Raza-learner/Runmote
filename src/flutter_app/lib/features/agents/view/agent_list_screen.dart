@@ -211,23 +211,10 @@ class _AgentDetailSheet extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          StatusLabel(
-                            status: agent.online
-                                ? AgentStatus.online
-                                : AgentStatus.offline,
-                          ),
-                          if (agent.version.isNotEmpty) ...[
-                            const SizedBox(width: 12),
-                            Text(
-                              'v${agent.version}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ],
+                      StatusLabel(
+                        status: agent.online
+                            ? AgentStatus.online
+                            : AgentStatus.offline,
                       ),
                     ],
                   ),
@@ -240,6 +227,12 @@ class _AgentDetailSheet extends StatelessWidget {
               label: 'Agent ID',
               value: agent.id,
             ),
+            if (agent.version.isNotEmpty)
+              _DetailRow(
+                icon: Icons.tag_outlined,
+                label: 'Version',
+                value: 'v${agent.version}',
+              ),
           ],
         ),
       ),
