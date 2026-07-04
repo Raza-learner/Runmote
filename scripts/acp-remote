@@ -129,6 +129,44 @@ print(_pairing_banner('$code'))
     show_code_fallback
 }
 
+uninstall_daemon() {
+    echo ""
+    read -r -p "  Uninstall ACP daemon? This will remove all files and auto-start config. [y/N]: " confirm
+    case "${confirm,,}" in
+        y|yes) ;;
+        *) echo "  Cancelled."; return 0 ;;
+    esac
+
+    echo ""
+    echo "  Stopping daemon..."
+    stop_daemon 2>/dev/null || true
+
+    echo "  Removing auto-start..."
+    case "$OS" in
+        linux)
+            systemctl --user disable --now acp-daemon.service 2>/dev/null || true
+            rm -f "$HOME/.config/systemd/user/acp-daemon.service"
+            systemctl --user daemon-reload 2>/dev/null || true
+            ;;
+        darwin)
+            launchctl unload -w "$HOME/Library/LaunchAgents/com.acp.daemon.plist" 2>/dev/null || true
+            rm -f "$HOME/Library/LaunchAgents/com.acp.daemon.plist"
+            ;;
+        windows)
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/setup-autostart.ps1" -Remove
+            ;;
+    esac
+
+    echo "  Removing acp-remote command..."
+    rm -f "$HOME/.local/bin/acp-remote"
+
+    echo "  Removing install directory: $INSTALL_DIR"
+    rm -rf "$INSTALL_DIR"
+
+    echo ""
+    echo "  ACP daemon uninstalled."
+}
+
 show_menu() {
     local status="STOPPED"
     if is_running; then
@@ -145,6 +183,7 @@ show_menu() {
     echo "    1) Start daemon"
     echo "    2) Stop daemon"
     echo "    3) Show pairing QR code"
+    echo "    4) Uninstall daemon"
     echo "    q) Quit"
     echo ""
 
@@ -154,6 +193,7 @@ show_menu() {
             1) echo ""; start_daemon; break ;;
             2) echo ""; stop_daemon; break ;;
             3) echo ""; show_qr; break ;;
+            4) uninstall_daemon; exit $? ;;
             q|Q) echo ""; exit 0 ;;
             *)   echo "  Invalid choice" ;;
         esac
@@ -162,9 +202,10 @@ show_menu() {
 
 # --- CLI dispatch ---
 case "${1:-}" in
-    start)  start_daemon; exit 0 ;;
-    stop)   stop_daemon; exit 0 ;;
-    code)   show_qr; exit $? ;;
+    start)     start_daemon; exit 0 ;;
+    stop)      stop_daemon; exit 0 ;;
+    code)      show_qr; exit $? ;;
+    uninstall) uninstall_daemon; exit $? ;;
     status)
         name=$(get_daemon_name)
         if is_running; then
@@ -176,7 +217,7 @@ case "${1:-}" in
         ;;
     "")     show_menu ;;
     *)
-        echo "Usage: acp-remote [start|stop|code|status]"
+        echo "Usage: acp-remote [start|stop|code|uninstall|status]"
         echo "       acp-remote          (interactive menu)"
         exit 1
         ;;

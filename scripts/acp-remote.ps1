@@ -2,7 +2,8 @@ param(
     [switch]$Start,
     [switch]$Stop,
     [switch]$Code,
-    [switch]$Status
+    [switch]$Status,
+    [switch]$Uninstall
 )
 
 $ErrorActionPreference = "Continue"
@@ -96,6 +97,34 @@ print(_pairing_banner('$code'))
     Show-CodeFallback $code
 }
 
+function Uninstall-Daemon {
+    Write-Host ""
+    $confirm = Read-Host "  Uninstall ACP daemon? This will remove all files and auto-start config. [y/N]"
+    if ($confirm -notin @("y", "Y", "yes")) {
+        Write-Host "  Cancelled."
+        return
+    }
+
+    Write-Host ""
+    Write-Host "  Stopping daemon..."
+    Stop-Daemon
+
+    Write-Host "  Removing scheduled task..."
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
+
+    Write-Host "  Removing acp-remote command..."
+    Remove-Item -Force "$env:USERPROFILE\.local\bin\acp-remote.cmd" -ErrorAction SilentlyContinue
+
+    Write-Host "  Removing wrapper script..."
+    Remove-Item -Force (Join-Path $scriptDir "run-daemon.ps1") -ErrorAction SilentlyContinue
+
+    Write-Host "  Removing install directory: $installDir"
+    Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
+
+    Write-Host ""
+    Write-Host "  ACP daemon uninstalled."
+}
+
 function Show-Menu {
     $status = if (Test-IsRunning) { "RUNNING" } else { "STOPPED" }
     $name = Get-DaemonName
@@ -108,6 +137,7 @@ function Show-Menu {
     Write-Host "    1) Start daemon"
     Write-Host "    2) Stop daemon"
     Write-Host "    3) Show pairing QR code"
+    Write-Host "    4) Uninstall daemon"
     Write-Host "    q) Quit"
     Write-Host ""
 
@@ -117,6 +147,7 @@ function Show-Menu {
             "1" { Write-Host ""; Start-Daemon; break }
             "2" { Write-Host ""; Stop-Daemon; break }
             "3" { Write-Host ""; Show-QR; break }
+            "4" { Uninstall-Daemon; exit 0 }
             "q" { exit 0 }
             "Q" { exit 0 }
             default { Write-Host "  Invalid choice" }
@@ -125,10 +156,11 @@ function Show-Menu {
 }
 
 # --- CLI dispatch ---
-if ($Start)    { Start-Daemon; exit 0 }
-if ($Stop)     { Stop-Daemon; exit 0 }
-if ($Code)     { Show-QR; exit 0 }
-if ($Status)   {
+if ($Start)     { Start-Daemon; exit 0 }
+if ($Stop)      { Stop-Daemon; exit 0 }
+if ($Code)      { Show-QR; exit 0 }
+if ($Uninstall) { Uninstall-Daemon; exit 0 }
+if ($Status)    {
     $name = Get-DaemonName
     if (Test-IsRunning) {
         Write-Host "Daemon: RUNNING ($name)"
