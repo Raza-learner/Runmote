@@ -5,7 +5,10 @@ import signal
 import stat
 import sys
 from copy import deepcopy
+from io import StringIO
 from pathlib import Path
+
+import qrcode
 
 _src = Path(__file__).resolve().parent
 if str(_src) not in sys.path:
@@ -17,6 +20,44 @@ from websockets.asyncio.client import connect
 
 def log(msg: str):
     print(msg, flush=True)
+
+
+def _pairing_banner(code: str) -> str:
+    """Generate a pairing banner with QR code (primary) and text code (secondary)."""
+    formatted = f"{code[:3]}-{code[3:]}"
+    qr = qrcode.QRCode(border=2, box_size=1)
+    qr.add_data(code)
+    buf = StringIO()
+    qr.print_ascii(out=buf, invert=True)
+    qr_lines = buf.getvalue().splitlines()
+    qr_width = max(len(l) for l in qr_lines)
+    inner_width = max(qr_width, 28)
+    lines = [f"╔{'═' * (inner_width + 2)}╗"]
+    lines.append(f"║{' ' * (inner_width + 2)}║")
+    title = "Scan QR Code"
+    pad = (inner_width - len(title)) // 2
+    lines.append(f"║  {' ' * pad}{title}{' ' * (inner_width - pad - len(title))}  ║")
+    lines.append(f"║{' ' * (inner_width + 2)}║")
+    for ql in qr_lines:
+        side = inner_width - len(ql)
+        lines.append(f"║  {ql}{' ' * side}  ║")
+    lines.append(f"║{' ' * (inner_width + 2)}║")
+    lines.append(f"║  {'─' * inner_width}  ║")
+    lines.append(f"║{' ' * (inner_width + 2)}║")
+    sub = "Or enter code:"
+    pad2 = (inner_width - len(sub)) // 2
+    lines.append(f"║  {' ' * pad2}{sub}{' ' * (inner_width - pad2 - len(sub))}  ║")
+    code_line = f"     {formatted}     "
+    pad3 = (inner_width - len(code_line)) // 2
+    lines.append(f"║  {' ' * pad3}{code_line}{' ' * (inner_width - pad3 - len(code_line))}  ║")
+    lines.append(f"║{' ' * (inner_width + 2)}║")
+    lines.append(f"╚{'═' * (inner_width + 2)}╝")
+    return "\n" + "\n".join(lines) + "\n"
+
+# Tracks request info (cwd, method) keyed by message id, so
+# cwd can be injected into the agent response and method-level
+# error handling can be applied (e.g. session/close "Method not found").
+_request_info: dict[str, dict] = {}
 
 
 def _normalize_path(path: str) -> str:
@@ -135,16 +176,42 @@ def _message_for_agent(message: dict) -> dict:
     return forwarded
 
 
-def _tag_agent_response(message: dict, agent: AgentProcess) -> dict:
+def _tag_agent_response(message: dict, agent: AgentProcess, session_cwd: str = "", session_method: str = "") -> dict:
     tagged = deepcopy(message)
+
+    # Handle "Method not found" for session/close — some agents
+    # (cursor, copilot) don't implement it. Treat as success so the
+    # client considers the session closed.
+    if session_method == "session/close":
+        error = tagged.get("error")
+        if isinstance(error, dict) and error.get("code") == -32601:
+            return {"jsonrpc": "2.0", "id": message.get("id"), "result": {"ok": True}}
+
+    # Handle session/resume failures — agent either doesn't support
+    # resume (-32601) or can't resume this session (-32603, e.g.
+    # codex's "no rollout found"). Let the client create a new session.
+    if session_method == "session/resume":
+        error = tagged.get("error")
+        if isinstance(error, dict) and error.get("code") in (-32601, -32603):
+            return {"jsonrpc": "2.0", "id": message.get("id"), "result": {
+                "sessionId": "",
+                "agentId": agent.id,
+                "note": "Session resume not available, create a new session",
+            }}
+
+    # Regular handling
     result = tagged.get("result")
     if isinstance(result, dict):
         result.setdefault("agentId", agent.id)
+        if session_cwd and not result.get("cwd"):
+            result["cwd"] = session_cwd
         sessions = result.get("sessions")
         if isinstance(sessions, list):
             for session in sessions:
                 if isinstance(session, dict):
                     session.setdefault("agentId", agent.id)
+                    if session_cwd and not session.get("cwd"):
+                        session["cwd"] = session_cwd
     params = tagged.get("params")
     if isinstance(params, dict):
         params.setdefault("agentId", agent.id)
@@ -213,13 +280,7 @@ async def run_daemon():
                             pairing_code = result.get("pairingCode", "")
                             if pairing_code:
                                 log(f"← pairing code: {pairing_code}")
-                                banner = (
-                                    "\n"
-                                    "╔═══════════════════════════════════════╗\n"
-                                    f"║        Device Code:  {pairing_code:<18}║\n"
-                                    "╚═══════════════════════════════════════╝\n"
-                                )
-                                print(banner, flush=True)
+                                print(_pairing_banner(pairing_code), flush=True)
                             break
                     except json.JSONDecodeError:
                         log(f"Invalid JSON from relay during identify: {msg[:200]}")
@@ -432,6 +493,18 @@ async def run_daemon():
                             })
                             continue
 
+                        # Save request info (cwd, method) keyed by message id.
+                        # Used to inject cwd into the agent response and to
+                        # handle method-level errors (e.g. session/close).
+                        if msg_id is not None:
+                            info: dict[str, str] = {"method": method or ""}
+                            if method in ("session/new", "session/resume"):
+                                params = data.get("params") or {}
+                                cwd = params.get("cwd", "")
+                                if cwd:
+                                    info["cwd"] = cwd
+                            _request_info[str(msg_id)] = info
+
                         if agent.id in send_queues:
                             await send_queues[agent.id].put(_message_for_agent(data))
                         else:
@@ -457,7 +530,11 @@ async def run_daemon():
                             try:
                                 data = json.loads(raw)
                                 _capture_agent_info(data, agent)
-                                tagged = _tag_agent_response(data, agent)
+                                req_id = str(data.get("id")) if data.get("id") is not None else ""
+                                info = _request_info.pop(req_id, {}) if req_id else {}
+                                cwd = info.get("cwd", "")
+                                method = info.get("method", "")
+                                tagged = _tag_agent_response(data, agent, session_cwd=cwd, session_method=method)
                                 await _send_json(websocket, tagged)
                             except json.JSONDecodeError:
                                 await websocket.send(raw)
@@ -470,7 +547,11 @@ async def run_daemon():
                             try:
                                 data = json.loads(raw)
                                 _capture_agent_info(data, agent)
-                                tagged = _tag_agent_response(data, agent)
+                                req_id = str(data.get("id")) if data.get("id") is not None else ""
+                                info = _request_info.pop(req_id, {}) if req_id else {}
+                                cwd = info.get("cwd", "")
+                                method = info.get("method", "")
+                                tagged = _tag_agent_response(data, agent, session_cwd=cwd, session_method=method)
                                 await _send_json(websocket, tagged)
                             except json.JSONDecodeError:
                                 await websocket.send(raw)

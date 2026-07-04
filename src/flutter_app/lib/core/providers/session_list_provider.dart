@@ -86,6 +86,14 @@ class AcpSession {
     );
   }
 
+  AcpSession copyWith({String? cwd}) => AcpSession(
+    id: id,
+    title: title,
+    cwd: cwd ?? this.cwd,
+    updatedAt: updatedAt,
+    agentId: agentId,
+  );
+
   static double _secondsTimestamp(dynamic value) {
     if (value is num) {
       final ts = value.toDouble();
@@ -312,7 +320,14 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
         merged[s.id] = s;
       }
       for (final s in remoteSessions) {
-        merged[s.id] = s;
+        final existing = merged[s.id];
+        if (existing != null && s.cwd.isEmpty && existing.cwd.isNotEmpty) {
+          // Preserve local cwd when remote omits it (some agents don't
+          // echo cwd in session/list). Patch it into the remote entry.
+          merged[s.id] = s.copyWith(cwd: existing.cwd);
+        } else {
+          merged[s.id] = s;
+        }
       }
       final sessions = merged.values.toList()
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));

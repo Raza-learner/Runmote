@@ -1,4 +1,7 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -40,13 +43,19 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final connection = ref.watch(connectionProvider);
+    
+    // Optimized: Select only necessary state parts to minimize rebuilds
+    final connectionState = ref.watch(connectionProvider.select((c) => c.state));
+    final agents = ref.watch(connectionProvider.select((c) => c.agents));
+    final daemonConnected = ref.watch(connectionProvider.select((c) => c.daemonConnected));
+    final pairingCode = ref.watch(connectionProvider.select((c) => c.pairingCode));
+    final relayUrl = ref.watch(connectionProvider.select((c) => c.relayUrl));
+    final selectedAgentId = ref.watch(connectionProvider.select((c) => c.selectedAgentId));
 
-    final isConnected = connection.state is Connected;
-    final isReconnecting = connection.state is Reconnecting;
-    final isConnecting = connection.state is Connecting;
-    final agents = connection.agents;
-    final daemonDown = isConnected && !connection.daemonConnected;
+    final isConnected = connectionState is Connected;
+    final isReconnecting = connectionState is Reconnecting;
+    final isConnecting = connectionState is Connecting;
+    final daemonDown = isConnected && !daemonConnected;
 
     AgentStatus status;
     if (isReconnecting || isConnecting) {
@@ -60,10 +69,11 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
     }
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
-          connection.pairingCode != null
-              ? '${connection.pairingCode!.substring(0, 3)}-${connection.pairingCode!.substring(3)}'
+          pairingCode != null
+              ? '${pairingCode.substring(0, 3)}-${pairingCode.substring(3)}'
               : 'Agents',
           style: theme.textTheme.titleMedium,
         ),
@@ -73,20 +83,29 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
             child: StatusLabel(status: status),
           ),
         ],
+        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+        elevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
       ),
       body: Column(
         children: [
-          if (!isConnected && connection.pairingCode != null)
+          // Adjust for transparent app bar
+          SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
+          if (!isConnected && pairingCode != null)
             ErrorBanner(
               message: isReconnecting
                   ? 'Reconnecting...'
                   : 'Connection lost. Tap to reconnect.',
               onRetry: () {
-                final code = connection.pairingCode;
-                if (code != null) {
+                if (pairingCode != null) {
                   ref.read(connectionProvider.notifier).connect(
-                    code,
-                    relayUrl: connection.relayUrl,
+                    pairingCode,
+                    relayUrl: relayUrl,
                   );
                 }
               },
@@ -116,9 +135,10 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
                               version: agent.version,
                               isOnline: agent.online,
                               isSelected:
-                                  agent.id == connection.selectedAgentId,
+                                  agent.id == selectedAgentId,
                               onTap: agent.online
                                   ? () {
+                                      HapticFeedback.lightImpact();
                                       ref
                                           .read(connectionProvider.notifier)
                                           .selectAgent(agent.id);
@@ -198,7 +218,10 @@ class _AgentDetailSheet extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             Row(
               children: [
-                AgentLogo(id: agent.id, name: agent.name, size: 56),
+                Hero(
+                  tag: 'agent-logo-${agent.id}',
+                  child: AgentLogo(id: agent.id, name: agent.name, size: 56),
+                ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(

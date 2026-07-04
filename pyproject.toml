@@ -10,6 +10,8 @@ dependencies = [
     "websockets>=16.0",
     "zeroconf>=0.150.0",
     "agent-client-protocol>=0.8.0",
+    "qrcode>=8.0",
+    "pillow>=11.0",
 ]
 
 [project.optional-dependencies]
@@ -28,3 +30,9 @@ package = true
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]

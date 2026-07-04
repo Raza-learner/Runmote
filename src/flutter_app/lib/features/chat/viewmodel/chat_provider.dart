@@ -160,12 +160,38 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   int? _loadPendingId;
   String? _timeoutMessageId;
   List<ConfigOption>? _pendingConfigs;
+  Timer? _streamingTimer;
+
+  /// Tracks whether the WebSocket connection is still alive. When the
+  /// connection drops we cancel timers and skip work to avoid triggering
+  /// UI rebuilds during the reconnect storm.
+  bool _connected = true;
 
   ChatNotifier(this._ref, this._sessionId, this._cwd)
       : super(const AsyncValue.loading()) {
     _listenToRelay();
+    _watchConnection();
     _loadSessionFromAgent();
     loadMessages();
+  }
+
+  void _watchConnection() {
+    _ref.listen(connectionProvider, (prev, next) {
+      if (next.state is Connected && prev?.state is! Connected) {
+        _connected = true;
+      } else if (next.state is Disconnected || next.state is Reconnecting) {
+        _connected = false;
+        _streamingTimer?.cancel();
+      }
+    });
+  }
+
+  void _logBusy(String label) {
+    final pending = _pendingIds.toList();
+    final streaming = _buffer.where((m) => m.isStreaming).map((m) => m.id).toList();
+    debugPrint(
+      '[ACP-DIAG] $label session=$_sessionId loadPending=$_loadPendingId pending=$pending streaming=$streaming isBusy=$_isBusy',
+    );
   }
 
   Future<void> _loadSessionFromAgent() async {
@@ -178,6 +204,8 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     final id = await notifier.loadSession(_sessionId, _cwd);
     _pendingIds.add(id);
     _loadPendingId = id;
+    _logBusy('loadAgent');
+    if (_loaded) _syncState();
   }
 
   bool get _isBusy {
@@ -187,10 +215,22 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     return busyPending > 0 || _buffer.any((m) => m.isStreaming);
   }
 
+  /// Called periodically or after state changes to clean up streaming that
+  /// was orphaned (no pending request IDs) — likely from another client.
+  void _cleanOrphanedStream() {
+    if (_buffer.any((m) => m.isStreaming) &&
+        _pendingIds.where((id) => id != _loadPendingId).isEmpty) {
+      debugPrint('[ACP-DIAG] orphaned stream detected; finalizing session=$_sessionId');
+      _finalizeStreaming();
+    }
+  }
+
   List<SlashCommand> _slashCommands = [];
   PermissionRequest? _permissionRequest;
 
   void _syncState() {
+    if (!_connected) return;
+    _logBusy('sync');
     final current = state.valueOrNull;
     state = AsyncValue.data(ChatState(
       messages: List.of(_buffer),
@@ -203,7 +243,30 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     ));
   }
 
+  void _bumpStreamingTimer() {
+    _streamingTimer?.cancel();
+    if (!_buffer.any((m) => m.isStreaming)) return;
+    _streamingTimer = Timer(const Duration(seconds: 30), () {
+      if (_buffer.any((m) => m.isStreaming)) {
+        // If no pending request IDs, this is an orphaned stream from
+        // another client — finalize immediately.
+        if (_pendingIds.where((id) => id != _loadPendingId).isEmpty) {
+          debugPrint(
+            '[ACP-DIAG] orphaned streaming timeout; finalizing session=$_sessionId',
+          );
+          _cleanOrphanedStream();
+        } else {
+          debugPrint(
+            '[ACP-DIAG] streaming inactivity timeout; finalizing session=$_sessionId',
+          );
+          _finalizeStreaming();
+        }
+      }
+    });
+  }
+
   void _syncConfigAndState(List<ConfigOption> configs) {
+    if (!_connected) return;
     final model = configs.where((c) => c.category == 'model').firstOrNull;
     final mode = configs.where((c) => c.category == 'mode').firstOrNull;
     state = AsyncValue.data(ChatState(
@@ -246,6 +309,11 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
         }
       });
     }
+
+    // Orphaned stream safety net: if streaming messages exist after loading
+    // with no pending request IDs (the original requester was another client),
+    // finalize them after a short grace period so the UI doesn't stay stuck.
+    Future.delayed(const Duration(seconds: 10), _cleanOrphanedStream);
   }
 
   void _setConfigOptions(List<ConfigOption> configs) {
@@ -320,6 +388,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
 
       if (added) {
         _saveMessagesToDb();
+        _finalizeStreaming();
         if (_loaded) _syncState();
       }
     } catch (e) {
@@ -367,6 +436,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
         // Detect JSON-RPC response to a pending request (prompt/load done)
         final msgId = msg['id'];
         if (method == null && msgId != null && _pendingIds.remove(msgId)) {
+          _streamingTimer?.cancel();
           final wasLoad = msgId == _loadPendingId;
           if (wasLoad) {
             _loadPendingId = null;
@@ -374,6 +444,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
             if (result != null && result['messages'] is List) {
               _populateFromLoad(result);
             }
+            _finalizeStreaming();
           }
 
           // If the agent says the session doesn't exist, remove it locally
@@ -409,9 +480,16 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
           }
         }
 
-        // Capture configOptions from session/new response
+        // Capture configOptions from session/new or session/load response.
+        // Only process JSON-RPC responses (no method, has id) to prevent
+        // notifications from accidentally setting config options.
         final result = msg['result'] as Map<String, dynamic>?;
-        if (result != null && result['configOptions'] is List) {
+        if (method == null && result != null && result['configOptions'] is List) {
+          final respSessionId = result['sessionId'] as String?;
+          // When sessionId is explicitly present and doesn't match, skip.
+          if (respSessionId != null && respSessionId != _sessionId) {
+            return;
+          }
           final configs = (result['configOptions'] as List<dynamic>)
               .map((e) => ConfigOption.fromJson(e as Map<String, dynamic>))
               .toList();
@@ -527,6 +605,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   }
 
   void _finalizeStreaming() {
+    if (!_connected) return;
     for (var i = 0; i < _buffer.length; i++) {
       if (_buffer[i].isStreaming) {
         _buffer[i] = _buffer[i].copyWith(isStreaming: false);
@@ -565,6 +644,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       isStreaming: role == ChatMessageRole.assistant,
       createdAt: DateTime.now().millisecondsSinceEpoch,
     ));
+    if (role == ChatMessageRole.assistant) _bumpStreamingTimer();
     if (_loaded) _syncState();
   }
 
@@ -595,6 +675,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
         ],
       );
     }
+    _bumpStreamingTimer();
     if (_loaded) _syncState();
   }
 
@@ -608,6 +689,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
         createdAt: DateTime.now().millisecondsSinceEpoch,
         segments: [],
       ));
+      _bumpStreamingTimer();
     }
   }
 
@@ -638,6 +720,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
                 .map((s) => s == seg ? s.copyWith(metadata: newMeta) : s)
                 .toList(),
           );
+          _bumpStreamingTimer();
           if (_loaded) _syncState();
           return;
         }
@@ -717,6 +800,8 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
 
     final id = notifier.sendSessionMessage(_sessionId, text, extra: extra);
     _pendingIds.add(id);
+    _logBusy('sendMessage');
+    _syncState();
 
     // After 30s, show a waiting message but keep the pending ID alive so
     // a late response is still processed (agent may be busy executing a tool).
@@ -733,6 +818,26 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       _timeoutMessageId = msg.id;
       _buffer.add(msg);
       _syncState();
+    });
+
+    // After 60s total, if the agent still hasn't responded, clean up the
+    // pending ID and finalize any stuck streaming messages so isBusy
+    // resets and the user can retry.
+    Future.delayed(const Duration(seconds: 60), () {
+      if (!_pendingIds.contains(id)) return;
+      _pendingIds.remove(id);
+      if (_timeoutMessageId != null) {
+        for (var i = 0; i < _buffer.length; i++) {
+          if (_buffer[i].id == _timeoutMessageId) {
+            _buffer[i] = _buffer[i].copyWith(
+              content:
+                  'Agent did not respond within 60 seconds. You can try sending your message again.',
+            );
+            break;
+          }
+        }
+      }
+      _finalizeStreaming();
     });
   }
 
@@ -839,6 +944,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
 
   @override
   void dispose() {
+    _streamingTimer?.cancel();
     _sub?.cancel();
     super.dispose();
   }

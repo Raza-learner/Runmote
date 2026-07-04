@@ -31,12 +31,12 @@ class _ThinkingSectionState extends State<ThinkingSection> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
+        color: theme.colorScheme.surface.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
@@ -44,32 +44,49 @@ class _ThinkingSectionState extends State<ThinkingSection> {
         children: [
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.psychology_outlined,
-                    size: 16,
-                    color: theme.colorScheme.onSurfaceVariant,
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.4),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.auto_awesome_outlined,
+                      size: 14,
+                      color: theme.colorScheme.secondary,
+                    ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 10),
                   Text(
-                    'Thinking',
+                    'Thinking Process',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: theme.colorScheme.secondary,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.3,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (widget.isStreaming) _AnimatedThinkingDots(),
+                  if (widget.isStreaming) 
+                    const SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        valueColor: AlwaysStoppedAnimation(Colors.grey),
+                      ),
+                    ),
                   const Spacer(),
                   Icon(
                     _expanded
                         ? Icons.keyboard_arrow_up
                         : Icons.keyboard_arrow_down,
-                    size: 16,
-                    color: theme.colorScheme.onSurfaceVariant,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                   ),
                 ],
               ),
@@ -78,12 +95,13 @@ class _ThinkingSectionState extends State<ThinkingSection> {
           AnimatedCrossFade(
             firstChild: const SizedBox.shrink(),
             secondChild: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Text(
                 widget.text,
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontStyle: FontStyle.italic,
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                  height: 1.5,
                 ),
               ),
             ),

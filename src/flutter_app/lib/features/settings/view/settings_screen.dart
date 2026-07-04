@@ -32,12 +32,40 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.wifi),
-                  title: const Text('Paired relay'),
-                  subtitle: Text(
-                    connection.relayUrl ?? 'Not connected',
-                    style: const TextStyle(fontFamily: 'monospace'),
+                  leading: const Icon(Icons.wifi_rounded),
+                  title: const Text('Connection Status'),
+                  subtitle: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: connection.daemonConnected ? Colors.green : Colors.orange,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(connection.daemonConnected ? 'Connected to Relay' : 'Connecting to Relay...'),
+                    ],
                   ),
+                  trailing: connection.relayUrl != null ? IconButton(
+                    icon: const Icon(Icons.info_outline, size: 20),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Relay Details'),
+                          content: SelectableText(connection.relayUrl!),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ) : null,
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
@@ -45,7 +73,7 @@ class SettingsScreen extends ConsumerWidget {
                     Icons.link,
                     color: theme.colorScheme.primary,
                   ),
-                  title: const Text('Pairing code'),
+                  title: const Text('Pairing Code'),
                   subtitle: Text(
                     connection.pairingCode != null
                         ? '${connection.pairingCode!.substring(0, 3)}-${connection.pairingCode!.substring(3)}'
@@ -55,7 +83,7 @@ class SettingsScreen extends ConsumerWidget {
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: Icon(Icons.link_off, color: theme.colorScheme.error),
-                  title: const Text('Unpair device'),
+                  title: const Text('Unpair Device'),
                   subtitle: const Text('Disconnect and return to pair screen'),
                   onTap: () => _confirmUnpair(context, ref),
                 ),
@@ -74,50 +102,66 @@ class SettingsScreen extends ConsumerWidget {
               children: [
                 ListTile(
                   leading: const Icon(Icons.palette_outlined),
-                  title: const Text('Color scheme'),
+                  title: const Text('Color Scheme'),
                   subtitle: Text(
                     _schemeName(ref.watch(flexSchemeProvider)),
                   ),
-                  trailing: Icon(
-                    Icons.chevron_right,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                  trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showSchemePicker(context, ref),
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
-                ListTile(
-                  leading: Icon(
-                    themeMode == ThemeMode.dark
-                        ? Icons.dark_mode
-                        : themeMode == ThemeMode.light
-                            ? Icons.light_mode
-                            : Icons.brightness_auto,
-                  ),
-                  title: const Text('Theme'),
-                  subtitle: Text(_themeName(themeMode)),
-                  trailing: SegmentedButton<ThemeMode>(
-                    segments: const [
-                      ButtonSegment(
-                        value: ThemeMode.system,
-                        icon: Icon(Icons.brightness_auto, size: 18),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            themeMode == ThemeMode.dark
+                                ? Icons.dark_mode_rounded
+                                : themeMode == ThemeMode.light
+                                    ? Icons.light_mode_rounded
+                                    : Icons.brightness_auto_rounded,
+                            size: 20,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 16),
+                          Text('Theme Mode', style: theme.textTheme.titleMedium),
+                        ],
                       ),
-                      ButtonSegment(
-                        value: ThemeMode.light,
-                        icon: Icon(Icons.light_mode, size: 18),
-                      ),
-                      ButtonSegment(
-                        value: ThemeMode.dark,
-                        icon: Icon(Icons.dark_mode, size: 18),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<ThemeMode>(
+                          segments: const [
+                            ButtonSegment(
+                              value: ThemeMode.system,
+                              label: Text('System'),
+                              icon: Icon(Icons.brightness_auto, size: 18),
+                            ),
+                            ButtonSegment(
+                              value: ThemeMode.light,
+                              label: Text('Light'),
+                              icon: Icon(Icons.light_mode, size: 18),
+                            ),
+                            ButtonSegment(
+                              value: ThemeMode.dark,
+                              label: Text('Dark'),
+                              icon: Icon(Icons.dark_mode, size: 18),
+                            ),
+                          ],
+                          selected: {themeMode},
+                          onSelectionChanged: (set) {
+                            final mode = set.first;
+                            ref.read(themeModeStateProvider.notifier).state = mode;
+                            SharedPreferences.getInstance().then((prefs) {
+                              prefs.setString('theme_mode', mode.name);
+                            });
+                          },
+                        ),
                       ),
                     ],
-                    selected: {themeMode},
-                    onSelectionChanged: (set) {
-                      final mode = set.first;
-                      ref.read(themeModeStateProvider.notifier).state = mode;
-                      SharedPreferences.getInstance().then((prefs) {
-                        prefs.setString('theme_mode', mode.name);
-                      });
-                    },
                   ),
                 ),
               ],
@@ -131,7 +175,7 @@ class SettingsScreen extends ConsumerWidget {
               children: [
                 ListTile(
                   leading: const Icon(Icons.folder_outlined),
-                  title: const Text('Default working directory'),
+                  title: const Text('Default Working Directory'),
                   subtitle: Text(
                     ref.watch(defaultCwdProvider).valueOrNull ?? '/home',
                     style: const TextStyle(fontFamily: 'monospace'),
@@ -142,7 +186,7 @@ class SettingsScreen extends ConsumerWidget {
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: Icon(Icons.delete_outline, color: theme.colorScheme.error),
-                  title: const Text('Clear local data'),
+                  title: const Text('Clear Local Data'),
                   subtitle: const Text('Remove all cached messages and sessions'),
                   onTap: () => _confirmClearData(context, ref),
                 ),
@@ -150,13 +194,50 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
+          const _SectionHeader(title: 'About'),
+          const SizedBox(height: AppSpacing.sm),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: const Text('Documentation'),
+                  trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+                  onTap: () {
+                    // Open docs URL
+                  },
+                ),
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                ListTile(
+                  leading: const Icon(Icons.bug_report_outlined),
+                  title: const Text('Report an Issue'),
+                  trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+                  onTap: () {
+                    // Open GitHub issues
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
           Center(
-            child: Text(
-              'ACP Remote v2.0.0',
-              style: TextStyle(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontSize: 12,
-              ),
+            child: Column(
+              children: [
+                Text(
+                  'ACP Remote v2.0.0',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Crafted with ❤️ for Developers',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
@@ -170,17 +251,6 @@ class SettingsScreen extends ConsumerWidget {
         .replaceAllMapped(RegExp(r'[A-Z]'), (m) => ' ${m.group(0)}')
         .trim()
         .replaceFirst(scheme.name[0], scheme.name[0].toUpperCase());
-  }
-
-  String _themeName(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.light:
-        return 'Light';
-      case ThemeMode.dark:
-        return 'Dark';
-      default:
-        return 'System';
-    }
   }
 
   static const _schemeGroups = [
@@ -559,7 +629,6 @@ class _McpServersSectionState extends ConsumerState<_McpServersSection> {
       text: server?.args.join(' ') ?? '',
     );
     final urlCtrl = TextEditingController(text: server?.url ?? '');
-    final isHttp = server?.type == 'http';
 
     final isHttpState = ValueNotifier(server?.type == 'http');
 

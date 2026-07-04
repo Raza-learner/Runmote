@@ -36,7 +36,7 @@ void main() {
       ),
     ));
 
-    expect(find.text('Untitled'), findsOneWidget);
+    expect(find.text('Untitled Session'), findsOneWidget);
   });
 
   testWidgets('SessionCard shows active indicator', (WidgetTester tester) async {

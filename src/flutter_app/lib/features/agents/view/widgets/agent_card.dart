@@ -39,7 +39,10 @@ class AgentCard extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
             children: [
-              AgentLogo(id: id, name: name),
+              Hero(
+                tag: 'agent-logo-$id',
+                child: AgentLogo(id: id, name: name),
+              ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(

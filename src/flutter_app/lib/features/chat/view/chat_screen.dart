@@ -12,6 +12,7 @@ import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/session_list_provider.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/daemon_offline_banner.dart';
+import 'widgets/chat_skeleton.dart';
 import 'widgets/message_bubble.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -31,6 +32,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _userScrolledUp = false;
   final List<Map<String, String>> _attachments = [];
   late String _title;
+  bool _showSkeleton = true;
 
   @override
   void initState() {
@@ -38,6 +40,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _title = _fallbackTitle(widget.cwd);
     _scrollController.addListener(_onScroll);
     _textController.addListener(() => setState(() {}));
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _showSkeleton = false);
+    });
   }
 
   String _fallbackTitle(String cwd) {
@@ -234,37 +239,44 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          if (daemonDown) const DaemonOfflineBanner(),
-          Consumer(
-            builder: (context, ref, child) {
-              final modeOptions = ref.watch(
-                chatProvider((widget.sessionId, widget.cwd)).select(
-                  (state) => state.valueOrNull?.configOptions
-                          .where((c) => c.category == 'mode')
-                          .toList() ??
-                      [],
-                ),
-              );
-              if (modeOptions.isEmpty || modeOptions.first.options.length <= 1) {
-                return const SizedBox.shrink();
-              }
-              return _buildModeSelector(theme, modeOptions.first);
-            },
-          ),
-          Expanded(
-            child: Stack(
+      body: Consumer(
+        builder: (context, ref, child) {
+          final chatState = ref.watch(
+            chatProvider((widget.sessionId, widget.cwd)),
+          );
+          if (_showSkeleton || chatState.isLoading) {
+            return Column(
               children: [
-                Positioned.fill(
-                  child: Consumer(
-                    builder: (context, ref, child) {
-                      final chatState = ref.watch(
-                        chatProvider((widget.sessionId, widget.cwd)),
-                      );
-                      return chatState.when(
-                        loading: () =>
-                            const Center(child: CircularProgressIndicator()),
+                if (daemonDown) const DaemonOfflineBanner(),
+                const Expanded(child: ChatSkeleton()),
+              ],
+            );
+          }
+
+          return Column(
+            children: [
+              if (daemonDown) const DaemonOfflineBanner(),
+              Consumer(
+                builder: (context, ref, child) {
+                  final modeOptions = ref.watch(
+                    chatProvider((widget.sessionId, widget.cwd)).select(
+                      (state) => state.valueOrNull?.configOptions
+                              .where((c) => c.category == 'mode')
+                              .toList() ??
+                          [],
+                    ),
+                  );
+                  if (modeOptions.isEmpty || modeOptions.first.options.length <= 1) {
+                    return const SizedBox.shrink();
+                  }
+                  return _buildModeSelector(theme, modeOptions.first);
+                },
+              ),
+              Expanded(
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: chatState.whenOrNull(
                         error: (e, _) {
                           final t = Theme.of(context);
                           return Center(
@@ -360,24 +372,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             },
                           );
                         },
-                      );
-                    },
-                  ),
-                ),
-                if (_showScrollButton)
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: FloatingActionButton.small(
-                      onPressed: _scrollToBottom,
-                      child: const Icon(Icons.keyboard_arrow_down),
+                      ) ?? const Center(child: Text('Could not load chat')),
                     ),
-                  ),
-              ],
-            ),
-          ),
-          _buildInputArea(theme, canSendImages, daemonDown),
-        ],
+                    if (_showScrollButton)
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: FloatingActionButton.small(
+                          onPressed: _scrollToBottom,
+                          child: const Icon(Icons.keyboard_arrow_down),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              _buildInputArea(theme, canSendImages, daemonDown),
+            ],
+          );
+        },
       ),
     );
   }
@@ -393,15 +405,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final slashMatch = text.startsWith('/') ? text.substring(1) : null;
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
+        color: theme.colorScheme.surface,
         border: Border(
-          top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          top: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
         ),
       ),
       child: SafeArea(
         child: Consumer(
           builder: (context, ref, child) {
-            final chatState = ref.watch(chatProvider((widget.sessionId, widget.cwd)));
+            final chatState =
+                ref.watch(chatProvider((widget.sessionId, widget.cwd)));
             final cs = chatState.valueOrNull;
             final isBusy = cs?.isBusy ?? false;
 
@@ -427,93 +442,115 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               children: [
                 if (_attachments.isNotEmpty)
                   Container(
-                    height: 40,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    height: 54,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: _attachments.length,
                       separatorBuilder: (_, _) => const SizedBox(width: 8),
                       itemBuilder: (context, index) {
                         final att = _attachments[index];
-                        return Chip(
-                          label: Text(
-                            att['name'] ?? 'file',
-                            style: const TextStyle(fontSize: 12),
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: t.colorScheme.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: t.colorScheme.outlineVariant),
                           ),
-                          deleteIcon: const Icon(Icons.close, size: 16),
-                          onDeleted: () => setState(
-                              () => _attachments.removeAt(index)),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          padding: const EdgeInsets.only(left: 10, right: 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.image_outlined, size: 16, color: t.colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Text(
+                                att['name'] ?? 'file',
+                                style: t.textTheme.labelMedium,
+                              ),
+                              const SizedBox(width: 4),
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 16),
+                                onPressed: () => setState(() => _attachments.removeAt(index)),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ],
+                          ),
                         );
                       },
                     ),
                   ),
                 if (slashCommands.isNotEmpty)
                   Container(
-                    constraints: const BoxConstraints(maxHeight: 160),
-                    margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                     decoration: BoxDecoration(
                       color: t.colorScheme.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
                     ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: slashCommands.length,
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      itemBuilder: (ctx, i) {
-                        final cmd = slashCommands[i];
-                        final hint = cmd.inputHint != null ? ' ${cmd.inputHint}' : '';
-                        return InkWell(
-                          onTap: () {
-                            _textController.text = '/${cmd.name} ';
-                            _textController.selection = TextSelection.collapsed(
-                              offset: _textController.text.length,
-                            );
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: t.colorScheme.tertiaryContainer,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: slashCommands.length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: t.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        ),
+                        padding: EdgeInsets.zero,
+                        itemBuilder: (ctx, i) {
+                          final cmd = slashCommands[i];
+                          final hint = cmd.inputHint != null ? ' ${cmd.inputHint}' : '';
+                          return InkWell(
+                            onTap: () {
+                              _textController.text = '/${cmd.name} ';
+                              _textController.selection = TextSelection.collapsed(
+                                offset: _textController.text.length,
+                              );
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
                                     '/${cmd.name}',
-                                    style: t.textTheme.labelMedium?.copyWith(
+                                    style: t.textTheme.labelLarge?.copyWith(
+                                      color: t.colorScheme.primary,
+                                      fontWeight: FontWeight.bold,
                                       fontFamily: 'monospace',
-                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    '${cmd.description}$hint',
-                                    style: t.textTheme.bodySmall,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      '${cmd.description}$hint',
+                                      style: t.textTheme.bodyMedium?.copyWith(
+                                        color: t.colorScheme.onSurfaceVariant,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                   child: Row(
                     children: [
                       if (modelLabel != null)
@@ -523,15 +560,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               ? () => _showConfigSheet(context, cs)
                               : null,
                         ),
-                      const Spacer(),
                     ],
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
+                      if (canSendImages)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: IconButton(
+                            onPressed: (isBusy || daemonDown) ? null : _pickFile,
+                            icon: Icon(
+                              Icons.add_circle_outline,
+                              size: 28,
+                              color: t.colorScheme.primary,
+                            ),
+                            tooltip: 'Attach image',
+                          ),
+                        ),
+                      const SizedBox(width: 4),
                       Expanded(
                         child: TextField(
                           controller: _textController,
@@ -539,53 +589,70 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           onSubmitted: (_) => _sendMessage(),
                           readOnly: isBusy || daemonDown,
                           minLines: 1,
-                          maxLines: 5,
+                          maxLines: 6,
+                          style: t.textTheme.bodyLarge,
                           decoration: InputDecoration(
                             hintText: daemonDown
                                 ? 'Daemon not connected'
                                 : isBusy
                                     ? 'Agent is responding...'
-                                    : 'Type a message...',
+                                    : 'Message...',
+                            hintStyle: t.textTheme.bodyLarge?.copyWith(
+                              color: t.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                            ),
+                            filled: true,
+                            fillColor: t.colorScheme.surfaceContainerHigh,
                             contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(28),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(28),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(28),
+                              borderSide: BorderSide.none,
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      if (canSendImages)
-                        IconButton(
-                          onPressed: (isBusy || daemonDown) ? null : _pickFile,
-                          icon: Icon(
-                            Icons.attach_file,
-                            color: t.colorScheme.onSurfaceVariant,
-                          ),
-                          tooltip: 'Attach image',
-                          style: IconButton.styleFrom(
-                            backgroundColor: t.colorScheme.surfaceContainerHigh,
-                          ),
-                        ),
-                      const SizedBox(width: 4),
-                      SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: isBusy
-                            ? const Center(
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: SizedBox(
+                          width: 46,
+                          height: 46,
+                          child: isBusy
+                              ? Center(
+                                  child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: t.colorScheme.primary,
+                                    ),
+                                  ),
+                                )
+                              : IconButton.filled(
+                                  onPressed: daemonDown ||
+                                          (_textController.text.trim().isEmpty &&
+                                              _attachments.isEmpty)
+                                      ? null
+                                      : _sendMessage,
+                                  icon: const Icon(Icons.arrow_upward, size: 24),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: t.colorScheme.primary,
+                                    foregroundColor: t.colorScheme.onPrimary,
+                                    disabledBackgroundColor: t.colorScheme.surfaceContainerHighest,
+                                    disabledForegroundColor: t.colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
-                              )
-                            : IconButton.filled(
-                                onPressed: daemonDown ||
-                                        (_textController.text.trim().isEmpty &&
-                                            _attachments.isEmpty)
-                                    ? null
-                                    : _sendMessage,
-                                icon: const Icon(Icons.arrow_upward),
-                              ),
+                        ),
                       ),
                     ],
                   ),

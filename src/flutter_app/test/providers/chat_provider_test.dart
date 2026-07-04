@@ -7,6 +7,7 @@ import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'package:acp_remote/core/database/app_database.dart';
+import 'package:acp_remote/core/models/assistant_segment.dart';
 import 'package:acp_remote/core/models/chat_message.dart';
 import 'package:acp_remote/core/models/connection_state.dart';
 import 'package:acp_remote/core/providers/connection_provider.dart';
@@ -142,7 +143,7 @@ void main() {
       expect(state.valueOrNull!.messages.length, 1);
       expect(state.valueOrNull!.messages.first.content, 'hello');
       expect(state.valueOrNull!.messages.first.role, ChatMessageRole.user);
-      expect(state.valueOrNull!.isBusy, isFalse);
+      expect(state.valueOrNull!.isBusy, isTrue);
 
       container.dispose();
     });
@@ -160,6 +161,7 @@ void main() {
           as MockConnectionNotifier;
       mock.injectMessage({
         'result': {
+          'sessionId': 'test-session',
           'configOptions': [
             {
               'id': 'model',
@@ -182,6 +184,42 @@ void main() {
       expect(state.valueOrNull!.configOptions.length, 1);
       expect(state.valueOrNull!.configOptions.first.currentValue, 'gpt-3.5');
       expect(state.valueOrNull!.currentModel, 'gpt-3.5');
+
+      container.dispose();
+    });
+
+    test('ignores configOptions from another session', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+      // Inject configOptions with a different sessionId — must be ignored
+      mock.injectMessage({
+        'result': {
+          'sessionId': 'other-session',
+          'configOptions': [
+            {
+              'id': 'model',
+              'name': 'Model',
+              'category': 'model',
+              'currentValue': 'other-model',
+              'options': [
+                {'value': 'other-model', 'name': 'Other Model'},
+              ],
+            },
+          ],
+        },
+      });
+
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.configOptions, isEmpty);
+      expect(state.valueOrNull!.currentModel, isNull);
 
       container.dispose();
     });
@@ -299,6 +337,761 @@ void main() {
 
       final state = container.read(chatProvider(('test-session', '/home')));
       expect(state.valueOrNull!.permissionRequest, isNull);
+
+      container.dispose();
+    });
+
+    // ── Streaming types ──────────────────────────────────────────────
+
+    test('stream thought_chunk adds thought segment', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'agent_thought_chunk',
+            'content': 'I am thinking...',
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.messages.length, 1);
+      expect(state.valueOrNull!.messages.first.isStreaming, isTrue);
+      expect(state.valueOrNull!.messages.first.segments.length, 1);
+      expect(state.valueOrNull!.messages.first.segments.first.kind, SegmentKind.thought);
+      expect(state.valueOrNull!.messages.first.segments.first.text, 'I am thinking...');
+
+      container.dispose();
+    });
+
+    test('stream thought_chunk accumulates into existing thought', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'agent_thought_chunk',
+            'content': 'First part ',
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'agent_thought_chunk',
+            'content': 'second part',
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.messages.first.segments.length, 1);
+      expect(state.valueOrNull!.messages.first.segments.first.text, 'First part second part');
+
+      container.dispose();
+    });
+
+    test('stream tool_call adds toolCall segment', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'tool_call',
+            'title': 'read_file',
+            'toolCallId': 'tool-1',
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.messages.length, 1);
+      expect(state.valueOrNull!.messages.first.segments.length, 1);
+      expect(state.valueOrNull!.messages.first.segments.first.kind, SegmentKind.toolCall);
+      expect(state.valueOrNull!.messages.first.segments.first.id, 'tool-1');
+
+      container.dispose();
+    });
+
+    test('stream tool_call_update appends output', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'tool_call',
+            'title': 'bash',
+            'toolCallId': 'tool-1',
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'tool_call_update',
+            'toolCallId': 'tool-1',
+            'content': [
+              {'type': 'text', 'text': 'Command output'},
+            ],
+            'status': 'completed',
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      final seg = state.valueOrNull!.messages.first.segments.first;
+      expect(seg.metadata['output'], 'Command output');
+      expect(seg.metadata['status'], 'completed');
+
+      container.dispose();
+    });
+
+    test('stream tool_call_update with diffs and terminalId', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'tool_call',
+            'title': 'edit',
+            'toolCallId': 'tool-2',
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'tool_call_update',
+            'toolCallId': 'tool-2',
+            'content': [
+              {
+                'type': 'diff',
+                'path': 'file.txt',
+                'oldText': 'old content',
+                'newText': 'new content',
+              },
+              {'type': 'terminal', 'terminalId': 'term-42'},
+            ],
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      final seg = state.valueOrNull!.messages.first.segments.first;
+      expect(seg.metadata['diffs'], isList);
+      expect((seg.metadata['diffs'] as List).length, 1);
+      expect((seg.metadata['diffs'] as List).first['path'], 'file.txt');
+      expect(seg.metadata['terminalId'], 'term-42');
+
+      container.dispose();
+    });
+
+    test('stream plan adds plan segment', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'plan',
+            'entries': [
+              {'content': 'Step 1: Analyze'},
+              {'content': 'Step 2: Implement'},
+            ],
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.messages.first.segments.length, 1);
+      expect(state.valueOrNull!.messages.first.segments.first.kind, SegmentKind.plan);
+      expect(state.valueOrNull!.messages.first.segments.first.text, contains('Step 1'));
+      expect(state.valueOrNull!.messages.first.segments.first.text, contains('Step 2'));
+
+      container.dispose();
+    });
+
+    test('stream config_option_update refreshes config options', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'config_option_update',
+            'configOptions': [
+              {
+                'id': 'model',
+                'name': 'Model',
+                'category': 'model',
+                'currentValue': 'claude-3',
+                'options': [
+                  {'value': 'claude-3', 'name': 'Claude 3'},
+                  {'value': 'gpt-4', 'name': 'GPT-4'},
+                ],
+              },
+              {
+                'id': 'mode',
+                'name': 'Mode',
+                'category': 'mode',
+                'currentValue': 'plan',
+                'options': [],
+              },
+            ],
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.configOptions.length, 2);
+      expect(state.valueOrNull!.currentModel, 'claude-3');
+      expect(state.valueOrNull!.currentMode, 'plan');
+
+      container.dispose();
+    });
+
+    test('stream available_commands_update updates slash commands', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'available_commands_update',
+            'availableCommands': [
+              {'name': '/help', 'description': 'Show help'},
+              {'name': '/clear', 'description': 'Clear chat'},
+            ],
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.availableCommands.length, 2);
+      expect(state.valueOrNull!.availableCommands.first.name, '/help');
+
+      container.dispose();
+    });
+
+    test('multiple agent_message_chunks accumulate in one message', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      // Same messageId — should accumulate
+      for (final chunk in ['Hello ', 'world', '!']) {
+        mock.injectMessage({
+          'method': 'session/update',
+          'params': {
+            'sessionId': 'test-session',
+            'update': {
+              'sessionUpdate': 'agent_message_chunk',
+              'content': chunk,
+              'messageId': 'msg-chunk',
+            },
+          },
+        });
+      }
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.messages.length, 1);
+      expect(state.valueOrNull!.messages.first.content, 'Hello world!');
+
+      container.dispose();
+    });
+
+    test('agent_message_chunk without msgId appends to last streaming message',
+        () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'agent_message_chunk',
+            'content': 'First ',
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'agent_message_chunk',
+            'content': 'Second',
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.messages.length, 1);
+      expect(state.valueOrNull!.messages.first.content, 'First Second');
+
+      container.dispose();
+    });
+
+    test('JSON-RPC response finalizes streaming and clears isBusy', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      final notifier = container.read(
+        chatProvider(('test-session', '/home')).notifier,
+      );
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      await notifier.sendMessage('hello');
+      var state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.isBusy, isTrue);
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      // Inject a JSON-RPC response for the pending prompt request (id = 102)
+      mock.injectMessage({
+        'id': 102,
+        'result': {'status': 'ok'},
+      });
+      await Future.delayed(Duration.zero);
+
+      state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.isBusy, isFalse);
+
+      container.dispose();
+    });
+
+    test('session/notification finalizes streaming', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      // Start a streaming assistant message
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'agent_message_chunk',
+            'content': 'streaming...',
+          },
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      var state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.messages.first.isStreaming, isTrue);
+
+      // Legacy notification with isStreaming=false finalizes
+      mock.injectMessage({
+        'method': 'session/notification',
+        'params': {
+          'sessionId': 'test-session',
+          'isStreaming': false,
+          'content': [],
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.messages.first.isStreaming, isFalse);
+
+      container.dispose();
+    });
+
+    // ── Multi-model selection ────────────────────────────────────────
+
+    test('config options from session/new set model and mode', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'result': {
+          'sessionId': 'test-session',
+          'configOptions': [
+            {
+              'id': 'model',
+              'name': 'Model',
+              'category': 'model',
+              'currentValue': 'claude-opus',
+              'options': [
+                {'value': 'claude-opus', 'name': 'Claude Opus'},
+                {'value': 'gpt-4', 'name': 'GPT-4'},
+              ],
+            },
+            {
+              'id': 'mode',
+              'name': 'Mode',
+              'category': 'mode',
+              'currentValue': 'architect',
+              'options': [],
+            },
+          ],
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.currentModel, 'claude-opus');
+      expect(state.valueOrNull!.currentMode, 'architect');
+
+      container.dispose();
+    });
+
+    test('setConfigOption switches model and updates state', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      final notifier = container.read(
+        chatProvider(('test-session', '/home')).notifier,
+      );
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      // Pre-populate config options
+      mock.injectMessage({
+        'result': {
+          'sessionId': 'test-session',
+          'configOptions': [
+            {
+              'id': 'model',
+              'name': 'Model',
+              'category': 'model',
+              'currentValue': 'gpt-4',
+              'options': [
+                {'value': 'gpt-4', 'name': 'GPT-4'},
+              ],
+            },
+          ],
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      // Switch model
+      await notifier.setConfigOption('model', 'claude-opus');
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.currentModel, 'claude-opus');
+      expect(state.valueOrNull!.configOptions.first.currentValue, 'claude-opus');
+
+      container.dispose();
+    });
+
+    test('config option with mode category sets currentMode', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      final notifier = container.read(
+        chatProvider(('test-session', '/home')).notifier,
+      );
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'result': {
+          'sessionId': 'test-session',
+          'configOptions': [
+            {
+              'id': 'mode',
+              'name': 'Mode',
+              'category': 'mode',
+              'currentValue': 'code',
+              'options': [],
+            },
+          ],
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      var state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.currentMode, 'code');
+
+      await notifier.setConfigOption('mode', 'architect');
+      state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.currentMode, 'architect');
+
+      container.dispose();
+    });
+
+    test('config options from different sessionId are filtered', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      mock.injectMessage({
+        'result': {
+          'sessionId': 'wrong-session',
+          'configOptions': [
+            {
+              'id': 'model',
+              'name': 'Model',
+              'category': 'model',
+              'currentValue': 'wrong-model',
+              'options': [],
+            },
+          ],
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.currentModel, isNull);
+
+      container.dispose();
+    });
+
+    // ── Message persistence ──────────────────────────────────────────
+
+    test('sendMessage saves user message to database', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      final notifier = container.read(
+        chatProvider(('test-session', '/home')).notifier,
+      );
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      await notifier.sendMessage('persist this');
+
+      final saved = await db.getMessages('test-session');
+      expect(saved.length, 1);
+      expect(saved.first.role, 'user');
+      expect(saved.first.content, 'persist this');
+
+      container.dispose();
+    });
+
+    test('loadMessages loads persisted messages from database', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+
+      // Pre-save messages to DB
+      await db.saveMessage(
+        id: 'existing-1',
+        sessionId: 'test-session',
+        role: 'user',
+        content: 'Hello from before',
+        isStreaming: false,
+        createdAt: 1000,
+      );
+      await db.saveMessage(
+        id: 'existing-2',
+        sessionId: 'test-session',
+        role: 'assistant',
+        content: 'Response from before',
+        isStreaming: false,
+        createdAt: 2000,
+      );
+
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      // Should have loaded the pre-existing messages
+      expect(state.valueOrNull!.messages.isNotEmpty, isTrue);
+      expect(state.valueOrNull!.messages.map((m) => m.id),
+          containsAll(['existing-1', 'existing-2']));
+
+      container.dispose();
+    });
+
+    test('populateFromLoad saves assistant messages to database', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      // Simulate the load response (id=101 is the mock's loadSession return)
+      mock.injectMessage({
+        'id': 101,
+        'result': {
+          'messages': [
+            {
+              'id': 'loaded-msg-1',
+              'role': 'assistant',
+              'content': 'I was loaded from agent',
+              'segments': [],
+              'createdAt': 3000,
+            },
+          ],
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      // Verify message is in the buffer
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.messages.any((m) => m.id == 'loaded-msg-1'), isTrue);
+
+      // Verify it's persisted to DB
+      final saved = await db.getMessages('test-session');
+      expect(saved.any((m) => m.id == 'loaded-msg-1'), isTrue);
+
+      container.dispose();
+    });
+
+    test('populateFromLoad deduplicates existing messages', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+
+      // Save a message that will already be in the buffer
+      await db.saveMessage(
+        id: 'existing-load',
+        sessionId: 'test-session',
+        role: 'assistant',
+        content: 'Existing content',
+        isStreaming: false,
+        createdAt: 4000,
+      );
+
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      // Load response includes message that's already in buffer + new one
+      mock.injectMessage({
+        'id': 101,
+        'result': {
+          'messages': [
+            {
+              'id': 'existing-load',
+              'role': 'assistant',
+              'content': 'Existing content',
+              'segments': [],
+              'createdAt': 4000,
+            },
+            {
+              'id': 'new-load',
+              'role': 'assistant',
+              'content': 'New content from load',
+              'segments': [],
+              'createdAt': 5000,
+            },
+          ],
+        },
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      // existing-load should only appear once
+      final existingCount = state.valueOrNull!.messages
+          .where((m) => m.id == 'existing-load').length;
+      expect(existingCount, 1);
+      // new-load should be present
+      expect(state.valueOrNull!.messages.any((m) => m.id == 'new-load'), isTrue);
 
       container.dispose();
     });

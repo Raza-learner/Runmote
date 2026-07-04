@@ -11,6 +11,7 @@ import '../models/agent_info.dart';
 import '../models/agent_capabilities.dart';
 import 'database_provider.dart';
 import 'preferences_provider.dart';
+import 'session_list_provider.dart';
 
 class AcpAgent {
   final String id;
@@ -120,6 +121,12 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   int _reconnectAttempts = 0;
   final Ref _ref;
 
+  /// Set to true when a `daemon/disconnected` message is received, so that
+  /// the subsequent WebSocket `onDone`/`onError` (Path B) skips duplicate
+  /// work and avoids scheduling a reconnect — the daemon is offline, not the
+  /// relay connection.
+  bool _daemonDisconnected = false;
+
   final _messageController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get messages => _messageController.stream;
 
@@ -158,6 +165,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
       state = state.copyWith(channel: channel);
       _reconnectAttempts = 0;
+      _daemonDisconnected = false;
 
       // Send auth/pair with the pairing code
       final pairCompleter = Completer<void>();
@@ -250,8 +258,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       // Handle daemon/disconnected
       if (method == 'daemon/disconnected') {
         debugPrint('[ACP] daemon/disconnected');
+        _daemonDisconnected = true;
+        _reconnectTimer?.cancel();
         _agentCapabilities.clear();
         _agentInfos.clear();
+        _ref.read(activeSessionsProvider.notifier).clear();
         state = state.copyWith(
           daemonId: null,
           agents: const [],
@@ -500,8 +511,21 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   void _onDisconnected(String reason) {
     _sub?.cancel();
     _sub = null;
+    // If Path A (daemon/disconnected message) already handled cleanup,
+    // skip the expensive re-clear and don't schedule reconnect — the
+    // daemon is offline, not the relay connection.
+    if (_daemonDisconnected) {
+      _daemonDisconnected = false;
+      state = state.copyWith(
+        clearChannel: true,
+        state: const AcpConnectionState.disconnected(),
+        error: reason,
+      );
+      return;
+    }
     _agentCapabilities.clear();
     _agentInfos.clear();
+    _ref.read(activeSessionsProvider.notifier).clear();
     state = state.copyWith(
       clearChannel: true,
       state: const AcpConnectionState.disconnected(),
@@ -514,13 +538,22 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
   void _scheduleReconnect() {
     if (state.pairingCode == null) return;
+    // Stop after 5 failed attempts (~1+2+4+8+16=31s total) to avoid
+    // an indefinite reconnect storm. User can manually re-pair.
+    if (_reconnectAttempts >= 5) {
+      _reconnectAttempts = 0;
+      return;
+    }
     _reconnectTimer?.cancel();
     final delay = Duration(
       seconds: min(pow(2, _reconnectAttempts).toInt(), 30),
     );
     _reconnectAttempts++;
-    state = state.copyWith(state: const AcpConnectionState.reconnecting());
     _reconnectTimer = Timer(delay, () {
+      // Move to reconnecting only when the timer actually fires — avoids an
+      // immediate state transition storm after _onDisconnected already set
+      // the state to disconnected.
+      state = state.copyWith(state: const AcpConnectionState.reconnecting());
       final code = state.pairingCode;
       final url = state.relayUrl;
       if (code != null) connect(code, relayUrl: url);

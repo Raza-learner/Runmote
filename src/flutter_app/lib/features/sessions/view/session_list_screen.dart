@@ -238,7 +238,12 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
                 _LocalOnlyBanner(),
               Expanded(
                 child: _buildSessionList(
-                  theme, filtered, sessions, _searchQuery, activeIds,
+                  theme,
+                  filtered,
+                  sessions,
+                  _searchQuery,
+                  activeIds,
+                  !connection.daemonConnected,
                 ),
               ),
             ],
@@ -258,6 +263,7 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     List<AcpSession> sessions,
     String searchQuery,
     Set<String> activeIds,
+    bool isDaemonOffline,
   ) {
     if (sessions.isEmpty) {
       return Center(
@@ -320,13 +326,14 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
               cwd: session.cwd,
               timeAgo: _timeAgo(session.updatedAt),
               isActive: activeIds.contains(session.id),
-                    onTap: () {
-                      final cwd = session.cwd;
-                      final path = cwd.isNotEmpty
-                          ? '/chat/${session.id}?cwd=${Uri.encodeComponent(cwd)}'
-                          : '/chat/${session.id}';
-                      context.push(path);
-                    },
+              isOffline: isDaemonOffline,
+              onTap: () {
+                final cwd = session.cwd;
+                final path = cwd.isNotEmpty
+                    ? '/chat/${session.id}?cwd=${Uri.encodeComponent(cwd)}'
+                    : '/chat/${session.id}';
+                context.push(path);
+              },
               onDelete: () {
                 _confirmDelete(session);
               },
@@ -364,30 +371,40 @@ class _LocalOnlyBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      color: theme.colorScheme.tertiaryContainer,
-      child: Row(
-        children: [
-          Icon(
-            Icons.info_outline,
-            size: 16,
-            color: theme.colorScheme.onTertiaryContainer,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: theme.colorScheme.tertiary.withValues(alpha: 0.2),
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              'This agent doesn\'t support session listing from remote device — showing locally stored sessions',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onTertiaryContainer,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.cloud_off_outlined,
+              size: 16,
+              color: theme.colorScheme.onTertiaryContainer,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Agent doesn\'t support remote listing — showing local sessions',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onTertiaryContainer,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

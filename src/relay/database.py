@@ -19,7 +19,8 @@ class Database:
                 agent_id TEXT NOT NULL DEFAULT '',
                 name TEXT NOT NULL DEFAULT '',
                 daemon_id TEXT NOT NULL DEFAULT '',
-                created_at REAL NOT NULL
+                created_at REAL NOT NULL,
+                cwd TEXT NOT NULL DEFAULT ''
             )
         """)
         self._conn.execute("""
@@ -30,6 +31,7 @@ class Database:
         """)
         self._conn.commit()
         self._migrate_add_agent_id()
+        self._migrate_add_cwd()
 
     def load_all_sessions(self) -> list[dict]:
         rows = self._conn.execute("SELECT * FROM sessions").fetchall()
@@ -43,10 +45,11 @@ class Database:
         name: str,
         daemon_id: str,
         created_at: float,
+        cwd: str = "",
     ):
         self._conn.execute(
-            "INSERT OR REPLACE INTO sessions VALUES (?, ?, ?, ?, ?, ?)",
-            (session_id, client_id, agent_id, name, daemon_id, created_at),
+            "INSERT OR REPLACE INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (session_id, client_id, agent_id, name, daemon_id, created_at, cwd),
         )
         self._conn.commit()
 
@@ -87,6 +90,16 @@ class Database:
         """Add agent_id column to existing sessions table (pre-v2 schema)."""
         try:
             self._conn.execute("ALTER TABLE sessions ADD COLUMN agent_id TEXT NOT NULL DEFAULT ''")
+            self._conn.commit()
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" in str(e).lower():
+                return
+            raise
+
+    def _migrate_add_cwd(self):
+        """Add cwd column to existing sessions table (when upgrading from an older schema)."""
+        try:
+            self._conn.execute("ALTER TABLE sessions ADD COLUMN cwd TEXT NOT NULL DEFAULT ''")
             self._conn.commit()
         except sqlite3.OperationalError as e:
             if "duplicate column name" in str(e).lower():

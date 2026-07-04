@@ -18,77 +18,97 @@ class MessageBubble extends StatelessWidget {
     final isUser = message.role == ChatMessageRole.user;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment:
-            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.82,
-            ),
-            decoration: BoxDecoration(
-              color: isUser
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: isUser
-                  ? null
-                  : [
+          if (!isUser) ...[
+            _MessageAvatar(isUser: false),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment:
+                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isUser
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: Radius.circular(isUser ? 20 : 4),
+                      bottomRight: Radius.circular(isUser ? 4 : 20),
+                    ),
+                    boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
                       ),
                     ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (message.content.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: isUser
-                          ? SelectableText(
-                              message.content,
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: theme.colorScheme.onPrimary,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (message.content.isNotEmpty)
+                        isUser
+                            ? Text(
+                                message.content,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: theme.colorScheme.onPrimary,
+                                  height: 1.4,
+                                ),
+                              )
+                            : SelectionArea(
+                                child: SafeMarkdownBody(
+                                  data: message.content,
+                                  theme: theme,
+                                ),
                               ),
-                            )
-                          : SelectionArea(
-                              child: SafeMarkdownBody(
-                                data: message.content,
-                                theme: theme,
-                              ),
-                            ),
-                    ),
-                ..._buildSegments(theme),
-                if (message.isStreaming)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6),
-                    child: Row(
-                      children: [
-                        _TypingDot(delay: 0),
-                        _TypingDot(delay: 200),
-                        _TypingDot(delay: 400),
-                      ],
+                      if (message.segments.isNotEmpty && !isUser)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: _buildSegments(theme),
+                          ),
+                        ),
+                      if (message.isStreaming && !isUser)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8, bottom: 2),
+                          child: _StreamingIndicator(),
+                        ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
+                  child: Text(
+                    _formatTime(message.createdAt),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 10,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                     ),
                   ),
+                ),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: 4, left: 6, right: 6),
-            child: Text(
-              _formatTime(message.createdAt),
-              style: TextStyle(
-                fontSize: 11,
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
+          if (isUser) ...[
+            const SizedBox(width: 8),
+            _MessageAvatar(isUser: true),
+          ],
         ],
       ),
     );
@@ -160,37 +180,45 @@ class MessageBubble extends StatelessWidget {
 MarkdownStyleSheet _markdownStyle(ThemeData theme) {
   final cs = theme.colorScheme;
   return MarkdownStyleSheet(
-    p: TextStyle(fontSize: 15, color: cs.onSurface, height: 1.4),
+    p: TextStyle(fontSize: 15, color: cs.onSurface, height: 1.5, letterSpacing: 0.1),
     h1: TextStyle(
-      fontSize: 20, fontWeight: FontWeight.w600, color: cs.onSurface,
+      fontSize: 20, fontWeight: FontWeight.bold, color: cs.onSurface, height: 1.3,
     ),
     h2: TextStyle(
-      fontSize: 17, fontWeight: FontWeight.w600, color: cs.onSurface,
+      fontSize: 18, fontWeight: FontWeight.bold, color: cs.onSurface, height: 1.3,
     ),
     h3: TextStyle(
-      fontSize: 15, fontWeight: FontWeight.w600, color: cs.onSurface,
+      fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface, height: 1.3,
     ),
     code: TextStyle(
-      fontSize: 13, fontFamily: 'monospace', color: cs.onSurface,
-      backgroundColor: cs.surfaceContainerHighest,
+      fontSize: 13,
+      fontFamily: 'monospace',
+      color: cs.onSecondaryContainer,
+      backgroundColor: cs.secondaryContainer.withValues(alpha: 0.5),
     ),
     codeblockDecoration: BoxDecoration(
-      color: cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(10),
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.8),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
     ),
-    codeblockPadding: const EdgeInsets.all(12),
+    codeblockPadding: const EdgeInsets.all(16),
     blockquoteDecoration: BoxDecoration(
-      border: Border(left: BorderSide(color: cs.primary, width: 3)),
+      border: Border(left: BorderSide(color: cs.primary, width: 4)),
       color: cs.surfaceContainerLow,
+      borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
     ),
-    listBullet: TextStyle(color: cs.onSurfaceVariant),
+    listBullet: TextStyle(color: cs.primary, fontWeight: FontWeight.bold),
     horizontalRuleDecoration: BoxDecoration(
-      border: Border(top: BorderSide(color: cs.outlineVariant)),
+      border: Border(top: BorderSide(color: cs.outlineVariant, width: 1)),
     ),
-    strong: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface),
+    strong: TextStyle(fontWeight: FontWeight.bold, color: cs.onSurface),
     em: TextStyle(fontStyle: FontStyle.italic, color: cs.onSurface),
-    a: TextStyle(color: cs.primary, decoration: TextDecoration.underline),
-    blockSpacing: 8,
+    a: TextStyle(
+      color: cs.primary,
+      decoration: TextDecoration.underline,
+      fontWeight: FontWeight.w500,
+    ),
+    blockSpacing: 12,
   );
 }
 
@@ -268,13 +296,12 @@ class _ToolCallGroupState extends State<ToolCallGroup>
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(top: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      margin: const EdgeInsets.only(top: 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(10),
+        color: theme.colorScheme.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -282,27 +309,49 @@ class _ToolCallGroupState extends State<ToolCallGroup>
         children: [
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.terminal,
-                    size: 16,
-                    color: theme.colorScheme.primary,
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.settings_input_component,
+                      size: 14,
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: counts.entries.map((e) {
-                        return _ToolChip(
-                          name: e.key,
-                          count: e.value,
-                        );
-                      }).toList(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Executing Tools',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: counts.entries.map((e) {
+                            return Text(
+                              e.value > 1 ? '${e.key} (${e.value})' : e.key,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontSize: 10,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                     ),
                   ),
                   if (anyRunning)
@@ -385,60 +434,60 @@ class _ToolChip extends StatelessWidget {
   }
 }
 
-class _TypingDot extends StatefulWidget {
-  final int delay;
+class _MessageAvatar extends StatelessWidget {
+  final bool isUser;
 
-  const _TypingDot({required this.delay});
-
-  @override
-  State<_TypingDot> createState() => _TypingDotState();
-}
-
-class _TypingDotState extends State<_TypingDot>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late CurvedAnimation _curved;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-    _curved = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
-    _animation = Tween<double>(begin: 0.3, end: 1.0).animate(_curved);
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) _controller.repeat(reverse: true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _curved.dispose();
-    _controller.dispose();
-    super.dispose();
-  }
+  const _MessageAvatar({required this.isUser});
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Opacity(
-          opacity: _animation.value,
-          child: Container(
-            width: 6,
-            height: 6,
-            margin: const EdgeInsets.only(right: 3),
-            decoration: const BoxDecoration(
-              color: Colors.grey,
-              shape: BoxShape.circle,
-            ),
+    final theme = Theme.of(context);
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: isUser
+            ? theme.colorScheme.secondaryContainer
+            : theme.colorScheme.tertiaryContainer,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        isUser ? Icons.person : Icons.smart_toy,
+        size: 16,
+        color: isUser
+            ? theme.colorScheme.onSecondaryContainer
+            : theme.colorScheme.onTertiaryContainer,
+      ),
+    );
+  }
+}
+
+class _StreamingIndicator extends StatelessWidget {
+  const _StreamingIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 12,
+          height: 12,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: theme.colorScheme.primary.withValues(alpha: 0.5),
           ),
-        );
-      },
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'Agent is typing...',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            fontSize: 10,
+          ),
+        ),
+      ],
     );
   }
 }

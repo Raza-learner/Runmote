@@ -3,17 +3,18 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../../core/models/connection_state.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/discovery_provider.dart';
-import '../../../core/models/connection_state.dart';
 import '../../../core/theme/app_spacing.dart';
 
 class PairScreen extends ConsumerStatefulWidget {
   const PairScreen({super.key});
 
   @override
-  ConsumerState<PairScreen> createState() => _PairScreenState();
+  _PairScreenState createState() => _PairScreenState();
 }
 
 class _PairScreenState extends ConsumerState<PairScreen> {
@@ -22,8 +23,12 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   final _manualPortController = TextEditingController(text: '8000');
   bool _discoveryStarted = false;
   bool _isConnecting = false;
-  bool _showManualEntry = false;
+  bool _showScanner = false;
+  bool _showCodeEntry = false;
   String? _error;
+
+  MobileScannerController? _scannerController;
+  bool _qrScanned = false;
 
   @override
   void initState() {
@@ -37,14 +42,8 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     _codeController.dispose();
     _manualHostController.dispose();
     _manualPortController.dispose();
+    _scannerController?.dispose();
     super.dispose();
-  }
-
-  String? get _manualRelayUrl {
-    final host = _manualHostController.text.trim();
-    final port = _manualPortController.text.trim();
-    if (host.isEmpty || port.isEmpty) return null;
-    return 'ws://$host:$port';
   }
 
   void _onCodeChanged() {
@@ -66,21 +65,31 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     setState(() {});
   }
 
-  Future<void> _connect() async {
-    final code = _codeController.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (code.length != 6) {
+  Future<void> _connect({String? code}) async {
+    final pairingCode = (code ?? _codeController.text)
+        .replaceAll(RegExp(r'[^0-9]'), '');
+    if (pairingCode.length != 6) {
       setState(() => _error = 'Please enter a 6-digit pairing code');
       return;
     }
-
     setState(() {
       _isConnecting = true;
       _error = null;
     });
-
     final discovery = ref.read(relayDiscoveryProvider);
-    final url = discovery.url ?? _manualRelayUrl;
-    ref.read(connectionProvider.notifier).connect(code, relayUrl: url);
+    final url = discovery.url;
+    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: url);
+  }
+
+  void _onQrDetect(BarcodeCapture capture) {
+    if (_qrScanned || _isConnecting) return;
+    final barcode = capture.barcodes.firstOrNull;
+    final raw = barcode?.rawValue;
+    if (raw != null && raw.length == 6 && RegExp(r'^\d{6}$').hasMatch(raw)) {
+      _qrScanned = true;
+      _scannerController?.stop();
+      _connect(code: raw);
+    }
   }
 
   @override
@@ -98,12 +107,17 @@ class _PairScreenState extends ConsumerState<PairScreen> {
 
     ref.listen<AcpConnection>(connectionProvider, (prev, next) {
       if (next.paired && next.state is Connected) {
-        setState(() => _isConnecting = false);
+        setState(() {
+          _isConnecting = false;
+          _showScanner = false;
+          _showCodeEntry = false;
+        });
         context.go('/agents');
       } else if (next.state is Failed) {
         setState(() {
           _isConnecting = false;
           _error = next.error ?? 'Connection failed';
+          _qrScanned = false;
         });
       }
     });
@@ -183,9 +197,63 @@ class _PairScreenState extends ConsumerState<PairScreen> {
       return _buildSearching(isDark);
     } else if (discovery.error != null) {
       return _buildError(discovery.error!, isDark);
-    } else {
+    } else if (_showScanner) {
+      return _buildQrScanner(isDark);
+    } else if (_showCodeEntry) {
       return _buildCodeInput(isDark);
     }
+    return _buildOptions(isDark);
+  }
+
+  Widget _buildOptions(bool isDark) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.wifi, size: 20, color: Colors.white.withValues(alpha: 0.7)),
+            const SizedBox(width: 8),
+            Text(
+              'Relay found!',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        _OptionCard(
+          icon: Icons.qr_code_scanner_rounded,
+          title: 'Scan QR Code',
+          subtitle: 'Point camera at the QR\ncode in the daemon terminal',
+          isDark: isDark,
+          onTap: () => setState(() {
+            _showScanner = true;
+            _error = null;
+          }),
+        ),
+        const SizedBox(height: 16),
+        _OptionCard(
+          icon: Icons.keyboard_rounded,
+          title: 'Enter Code',
+          subtitle: 'Type the 6-digit pairing\ncode shown in the terminal',
+          isDark: isDark,
+          onTap: () => setState(() {
+            _showCodeEntry = true;
+            _error = null;
+          }),
+        ),
+        const SizedBox(height: 24),
+        TextButton(
+          onPressed: _showHelp,
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white.withValues(alpha: 0.7),
+          ),
+          child: const Text('How to get your code?'),
+        ),
+      ],
+    );
   }
 
   Widget _buildSearching(bool isDark) {
@@ -232,125 +300,79 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      ref.read(relayDiscoveryProvider.notifier).startDiscovery();
-                    },
-                    icon: const Icon(Icons.refresh, color: Colors.white),
-                    label: const Text('Retry', style: TextStyle(color: Colors.white)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white38),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      setState(() => _showManualEntry = true);
-                    },
-                    icon: const Icon(Icons.edit, color: Colors.white),
-                    label: const Text('Manual', style: TextStyle(color: Colors.white)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white38),
-                    ),
-                  ),
-                ],
+              OutlinedButton.icon(
+                onPressed: () {
+                  ref.read(relayDiscoveryProvider.notifier).startDiscovery();
+                },
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                label: const Text('Retry', style: TextStyle(color: Colors.white)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.white38),
+                ),
               ),
             ],
           ),
         ),
-        if (_showManualEntry) ...[
-          const SizedBox(height: 16),
-          _buildManualEntry(isDark),
-          const SizedBox(height: 16),
-          _buildCodeInput(isDark),
-        ],
       ],
     );
   }
 
-  Widget _buildManualEntry(bool isDark) {
+  Widget _buildQrScanner(bool isDark) {
     return _GlassCard(
       isDark: isDark,
       child: Column(
         children: [
-          const Text(
-            'Enter relay address',
-            style: TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-          const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                flex: 3,
-                child: TextField(
-                  controller: _manualHostController,
-                  decoration: InputDecoration(
-                    hintText: 'IP address',
-                    hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      fontSize: 14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.08),
-                  ),
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                ),
+              IconButton(
+                icon: Icon(Icons.arrow_back, color: Colors.white.withValues(alpha: 0.7)),
+                onPressed: () => setState(() {
+                  _showScanner = false;
+                  _scannerController?.stop();
+                  _qrScanned = false;
+                }),
               ),
               const SizedBox(width: 8),
-              Expanded(
-                flex: 1,
-                child: TextField(
-                  controller: _manualPortController,
-                  decoration: InputDecoration(
-                    hintText: 'Port',
-                    hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      fontSize: 14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.08),
-                  ),
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  keyboardType: TextInputType.number,
+              Text(
+                'Scan QR Code',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Text(
+            'Point at the QR code in your daemon terminal',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.6),
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 260,
+              height: 260,
+              child: MobileScanner(
+                controller: _scannerController,
+                onDetect: _onQrDetect,
+                overlayBuilder: (context, constraints) {
+                  return _QrOverlay(constraints);
+                },
+              ),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 13),
+            ),
+          ],
         ],
       ),
     );
@@ -359,68 +381,81 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   Widget _buildCodeInput(bool isDark) {
     return Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.wifi, size: 20, color: Colors.white.withValues(alpha: 0.7)),
-            const SizedBox(width: 8),
-            Text(
-              'Relay found!',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
         _GlassCard(
           isDark: isDark,
           child: Column(
             children: [
-              TextField(
-                controller: _codeController,
-                textInputAction: TextInputAction.go,
-                onSubmitted: (_) => _connect(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  letterSpacing: 4,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'XXX-XXX',
-                  hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    fontSize: 28,
-                    letterSpacing: 4,
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.arrow_back, color: Colors.white.withValues(alpha: 0.7)),
+                    onPressed: () => setState(() {
+                      _showCodeEntry = false;
+                      _error = null;
+                    }),
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.2),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Enter Code',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.2),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _codeController,
+                      textInputAction: TextInputAction.go,
+                      onSubmitted: (_) => _connect(),
+                      textAlign: TextAlign.center,
+                      autofocus: true,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        letterSpacing: 4,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'XXX-XXX',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          fontSize: 28,
+                          letterSpacing: 4,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 20,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.08),
+                      ),
                     ),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 20,
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.08),
-                ),
+                ],
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
@@ -458,14 +493,6 @@ class _PairScreenState extends ConsumerState<PairScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 24),
-        TextButton(
-          onPressed: _showHelp,
-          style: TextButton.styleFrom(
-            foregroundColor: Colors.white.withValues(alpha: 0.7),
-          ),
-          child: const Text('How to get your code?'),
-        ),
       ],
     );
   }
@@ -481,11 +508,9 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           children: [
             Text('1. Make sure the ACP daemon is running on your PC'),
             SizedBox(height: 8),
-            Text('2. Look for the pairing code in the terminal where the daemon is running'),
+            Text('2. Look for the QR code in the terminal where the daemon is running'),
             SizedBox(height: 8),
-            Text('3. It will look like: "847293"'),
-            SizedBox(height: 8),
-            Text('4. Enter that code here to connect'),
+            Text('3. Use the QR scanner to scan it, or type the 6-digit code shown below it'),
           ],
         ),
         actions: [
@@ -494,6 +519,70 @@ class _PairScreenState extends ConsumerState<PairScreen> {
             child: const Text('Got it'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OptionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _OptionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: _GlassCard(
+        isDark: isDark,
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: Colors.white, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.4)),
+          ],
+        ),
       ),
     );
   }
@@ -526,6 +615,91 @@ class _GlassCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _QrOverlay extends StatelessWidget {
+  final BoxConstraints constraints;
+
+  const _QrOverlay(this.constraints);
+
+  @override
+  Widget build(BuildContext context) {
+    final width = constraints.maxWidth * 0.6;
+    final height = constraints.maxHeight * 0.6;
+    final left = (constraints.maxWidth - width) / 2;
+    final top = (constraints.maxHeight - height) / 2;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _QrOverlayPainter(
+              scanRect: Rect.fromLTWH(left, top, width, height),
+            ),
+          ),
+        ),
+        _buildCorner(left - 4, top - 4, 1, 1),
+        _buildCorner(constraints.maxWidth - left - width - 4, top - 4, -1, 1),
+        _buildCorner(left - 4, constraints.maxHeight - top - height - 4, 1, -1),
+        _buildCorner(constraints.maxWidth - left - width - 4, constraints.maxHeight - top - height - 4, -1, -1),
+      ],
+    );
+  }
+
+  Widget _buildCorner(double left, double top, int dirX, int dirY) {
+    return Positioned(
+      left: left,
+      top: top,
+      child: CustomPaint(
+        size: const Size(24, 24),
+        painter: _CornerPainter(dirX: dirX, dirY: dirY),
+      ),
+    );
+  }
+}
+
+class _QrOverlayPainter extends CustomPainter {
+  final Rect scanRect;
+
+  _QrOverlayPainter({required this.scanRect});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black.withValues(alpha: 0.4);
+    canvas.drawPath(
+      Path.combine(
+        PathOperation.difference,
+        Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)),
+        Path()..addRect(scanRect),
+      ),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _QrOverlayPainter oldDelegate) => true;
+}
+
+class _CornerPainter extends CustomPainter {
+  final int dirX;
+  final int dirY;
+
+  _CornerPainter({required this.dirX, required this.dirY});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+    const len = 20.0;
+    final ox = dirX > 0 ? 0.0 : size.width;
+    final oy = dirY > 0 ? 0.0 : size.height;
+    canvas.drawLine(Offset(ox, oy), Offset(ox + len * dirX, oy), paint);
+    canvas.drawLine(Offset(ox, oy), Offset(ox, oy + len * dirY), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CornerPainter oldDelegate) => false;
 }
 
 class _PulsingDots extends StatefulWidget {

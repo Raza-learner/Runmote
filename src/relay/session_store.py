@@ -21,7 +21,7 @@ class SessionStore:
                     "clientId": s["client_id"],
                     "name": s["name"],
                     "title": s["name"],
-                    "cwd": "",
+                    "cwd": s.get("cwd", ""),
                     "agentId": s.get("agent_id", ""),
                     "daemonId": s["daemon_id"],
                     "createdAt": s["created_at"],
@@ -65,7 +65,7 @@ class SessionStore:
         if self._db:
             try:
                 self._db.insert_session(
-                    session_id, client_id, agent_id, display_name, self._daemon_id, timestamp
+                    session_id, client_id, agent_id, display_name, self._daemon_id, timestamp, cwd
                 )
             except Exception as e:
                 print(f"DB write failed: {e}")

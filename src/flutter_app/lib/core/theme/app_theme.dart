@@ -26,10 +26,18 @@ ThemeData buildFlexTheme({
       scheme: scheme,
       subThemesData: sub,
       surfaceMode: FlexSurfaceMode.highBackgroundLowScaffold,
+      blendLevel: 7,
     );
   }
   return FlexThemeData.dark(
     scheme: scheme,
-    subThemesData: sub,
+    subThemesData: sub.copyWith(
+      cardElevation: 0,
+    ),
+    surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
+    blendLevel: 15,
+    darkIsTrueBlack: false,
+    surface: const Color(0xFF121212),
+    scaffoldBackground: const Color(0xFF0F0F0F),
   );
 }

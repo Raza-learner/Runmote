@@ -161,6 +161,14 @@ async def daemon_endpoint(websocket: WebSocket):
                                 for cs in state.store.list_sessions(agent_id=agent_id):
                                     if cs["sessionId"] not in agent_sids:
                                         filtered.append(cs)
+                            # Patch cwd from store for sessions that lack it
+                            # (some agents don't echo cwd in session/list).
+                            for s in filtered:
+                                if isinstance(s, dict) and not s.get("cwd"):
+                                    sid = s.get("sessionId") or s.get("id") or ""
+                                    stored = state.store.get(sid)
+                                    if stored and stored.get("cwd"):
+                                        s["cwd"] = stored["cwd"]
                             fwd["result"]["sessions"] = filtered
                     await client.send_text(json.dumps(fwd))
                 except Exception:

@@ -81,9 +81,17 @@ class _AnimatedDotState extends State<_AnimatedDot>
     _animation = Tween<double>(begin: 0.3, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
+    
+    _updateAnimation();
+  }
+
+  void _updateAnimation() {
     if (widget.color == AppColors.connecting) {
-      _controller.repeat(reverse: true);
+      if (!_controller.isAnimating) {
+        _controller.repeat(reverse: true);
+      }
     } else {
+      _controller.stop();
       _controller.value = 1;
     }
   }
@@ -91,11 +99,8 @@ class _AnimatedDotState extends State<_AnimatedDot>
   @override
   void didUpdateWidget(_AnimatedDot oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.color == AppColors.connecting && !_controller.isAnimating) {
-      _controller.repeat(reverse: true);
-    } else if (widget.color != AppColors.connecting && _controller.isAnimating) {
-      _controller.stop();
-      _controller.value = 1;
+    if (widget.color != oldWidget.color) {
+      _updateAnimation();
     }
   }
 
@@ -113,7 +118,9 @@ class _AnimatedDotState extends State<_AnimatedDot>
         width: widget.size,
         height: widget.size,
         decoration: BoxDecoration(
-          color: widget.color.withValues(alpha: _animation.value),
+          color: widget.color.withValues(
+            alpha: widget.color == AppColors.connecting ? _animation.value : 1.0,
+          ),
           shape: BoxShape.circle,
         ),
       ),
