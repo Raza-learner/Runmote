@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 INSTALL_DIR="$(cd "$SELF_DIR/.." && pwd)"
 PYTHON="$INSTALL_DIR/.venv/bin/python"
 
@@ -15,6 +15,8 @@ else
     n() { :; }
     BOLD=""; DIM=""; RESET=""; RED=""; GREEN=""; YELLOW=""; BLUE=""; CYAN=""; WHITE=""
 fi
+
+ESC=$'\033'
 
 case "$(uname -s)" in
     Linux)   OS="linux" ;;
@@ -158,12 +160,26 @@ uninstall_daemon() {
     echo "  ${GREEN}ACP daemon uninstalled.${RESET}"
 }
 
+# ── Logo ─────────────────────────────────────────────────────────────
+_logo() {
+    echo ""
+    echo "  ${BOLD}${CYAN}   █████╗  ██████╗ ██████╗${RESET}"
+    echo "  ${BOLD}${CYAN}  ██╔══██╗██╔════╝ ██╔══██╗${RESET}"
+    echo "  ${BOLD}${CYAN}  ███████║██║      ██████╔╝${RESET}"
+    echo "  ${BOLD}${CYAN}  ██╔══██║██║      ██╔═══╝${RESET}"
+    echo "  ${BOLD}${CYAN}  ██║  ██║╚██████╗ ██║${RESET}"
+    echo "  ${BOLD}${CYAN}  ╚═╝  ╚═╝ ╚═════╝ ╚═╝${RESET}"
+    echo ""
+    echo "  ${DIM}Agent Communication Protocol${RESET}"
+    echo ""
+}
+
 # ── Menu (arrow-key TTY) ────────────────────────────────────────────
 _menu_draw() {
     local sel=$1 W=42
     local hl hl_off name
-    hl="${BOLD}\033[7m"
-    hl_off="\033[0m${RESET}"
+    hl="${BOLD}${ESC}[7m"
+    hl_off="${ESC}[0m${RESET}"
     name="$(get_daemon_name)"
 
     local status_color status_text
@@ -176,29 +192,32 @@ _menu_draw() {
     box_top() { echo "  ${BOLD}${CYAN}╔$(printf '═%.0s' $(eval "echo {1..$W}"))╗${RESET}"; }
     box_mid() { echo "  ${BOLD}${CYAN}╠$(printf '═%.0s' $(eval "echo {1..$W}"))╣${RESET}"; }
     box_bot() { echo "  ${BOLD}${CYAN}╚$(printf '═%.0s' $(eval "echo {1..$W}"))╝${RESET}"; }
-    box_row() { printf "  ${BOLD}${CYAN}║${RESET}%-${W}s${BOLD}${CYAN}║${RESET}\n" "$1"; }
+    _strip_ansi() { printf '%s' "$1" | sed 's/'$'\033''\[[0-9;]*[a-zA-Z]//g'; }
+    _vlen() { _strip_ansi "$1" | wc -m; }
+    box_row() { local c="$1" v vpad; v=$(_vlen "$c"); vpad=$((W - v)); printf "  ${BOLD}${CYAN}║${RESET}%s%*s${BOLD}${CYAN}║${RESET}\n" "$1" "$vpad" ""; }
 
+    local dot="${CYAN}·${RESET}"
     local items=(
         ""
-        "   ${CYAN}Start${RESET} daemon"
-        "   ${RED}Stop${RESET} daemon"
-        "   Show pairing ${CYAN}QR code${RESET}"
-        "   Show pairing ${CYAN}code${RESET} ${DIM}(text)${RESET}"
-        "   ${RED}Uninstall${RESET} daemon"
-        "   Quit"
+        "    ${CYAN}Start${RESET} daemon"
+        "    ${RED}Stop${RESET} daemon"
+        "    Show pairing ${CYAN}QR code${RESET}"
+        "    Show pairing ${CYAN}code${RESET} ${DIM}(text)${RESET}"
+        "    ${RED}Uninstall${RESET} daemon"
+        "    Quit"
     )
 
     box_top
-    box_row "      ${WHITE}${BOLD}ACP Daemon Control${RESET}"
+    box_row "    ${WHITE}${BOLD}ACP Daemon Control${RESET}"
     box_mid
-    box_row "${status_color}  ${status_text}${RESET}"
-    box_row "${DIM}  Daemon: ${name}${RESET}"
+    box_row "    ${status_color}${status_text}${RESET}"
+    box_row "    ${DIM}Daemon: ${name}${RESET}"
     box_mid
 
     local i
     for i in 1 2 3 4 5 6; do
         if [[ $i -eq $sel ]]; then
-            box_row "${hl}${items[$i]}${hl_off}"
+            box_row "${hl}  ${dot} ${items[$i]:4}${hl_off}"
         else
             box_row "${items[$i]}"
         fi
@@ -231,11 +250,11 @@ show_menu() {
             name="$(get_daemon_name)"
 
             echo ""
-            echo "  ${BOLD}${CYAN}ACP Daemon Control${RESET}   ${status_color}${status_text}${RESET}   ${DIM}Daemon: ${name}${RESET}"
+            echo "  ${BOLD}${CYAN}ACP Daemon Control${RESET}  ${status_color}${status_text}${RESET}  ${DIM}Daemon: ${name}${RESET}"
             echo ""
-            echo "  1) Start daemon       2) Stop daemon"
-            echo "  3) Show QR code       4) Show code (text)"
-            echo "  5) Uninstall daemon   q) Quit"
+            echo "  1) Start daemon        2) Stop daemon"
+            echo "  3) Show QR code        4) Show code (text)"
+            echo "  5) Uninstall daemon    q) Quit"
             echo ""
             read -r -p "  Choice: " choice || exit 0
             case "$choice" in
@@ -251,11 +270,15 @@ show_menu() {
     fi
 
     # TTY: arrow-key menu
+    local sel=1
     local old_stty=$(stty -g) 2>/dev/null || true
     stty -echo -icanon min 1 time 0 2>/dev/null || true
-    trap 'stty "$old_stty" 2>/dev/null; printf "\033[0m\n"' EXIT
+    trap 'stty "${old_stty:-}" 2>/dev/null; printf "${ESC}[2J${ESC}[H${ESC}[?1049l${ESC}[2J${ESC}[H"' EXIT
 
-    local sel=1
+    printf "${ESC}[?1049h"
+    printf "${ESC}[H${ESC}[J"
+    _logo
+    printf "${ESC}[s"
     _menu_draw $sel
 
     while true; do
@@ -271,19 +294,22 @@ show_menu() {
                 esac
                 ;;
             q|Q)
-                stty "$old_stty" 2>/dev/null
-                printf "\033[0m\n"
                 exit 0
                 ;;
             $'\n'|$'\r'|'')
                 stty "$old_stty" 2>/dev/null
-                printf "\033[0m\n\n"
+                printf "${ESC}[?1049l${ESC}[0m"
+                echo
                 if ! _exec_action $sel; then return; fi
                 stty -echo -icanon min 1 time 0 2>/dev/null || true
+                printf "${ESC}[2J${ESC}[H"
+                printf "${ESC}[?1049h"
+                _logo
+                printf "${ESC}[s"
                 ;;
         esac
 
-        printf '\033[16A\033[J\r' 2>/dev/null || true
+        printf "${ESC}[u${ESC}[J"
         _menu_draw $sel
     done
 }

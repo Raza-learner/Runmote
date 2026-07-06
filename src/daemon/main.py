@@ -311,6 +311,11 @@ async def run_daemon():
 
                         method = data.get("method")
                         msg_id = data.get("id")
+                        if method == "pairing/complete":
+                            from pathlib import Path
+                            Path("/tmp/acp-paired").write_text("paired")
+                            continue
+
                         if method == "agent/list":
                             detected = {a["id"]: a for a in _detect_acp_agents()
                                         if a.get("id") != "default"}

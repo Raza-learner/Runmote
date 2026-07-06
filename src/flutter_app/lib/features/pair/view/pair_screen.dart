@@ -8,6 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/models/connection_state.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/discovery_provider.dart';
+import '../../../core/providers/database_provider.dart';
 import '../../../core/theme/app_spacing.dart';
 
 class PairScreen extends ConsumerStatefulWidget {
@@ -34,6 +35,19 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   void initState() {
     super.initState();
     _codeController.addListener(_onCodeChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autoConnectWithToken());
+  }
+
+  Future<void> _autoConnectWithToken() async {
+    final p = await ref.read(preferencesServiceProvider.future);
+    final token = p.getAuthToken();
+    final relayUrl = p.getRelayUrl();
+    if (token != null && relayUrl != null) {
+      final ok = await ref.read(connectionProvider.notifier).connectWithToken(token, relayUrl);
+      if (ok && mounted) {
+        context.go('/agents');
+      }
+    }
   }
 
   @override

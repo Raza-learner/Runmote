@@ -32,18 +32,18 @@ esac
 
 if [[ $ACP_INTERACTIVE -eq 1 ]]; then
 
-RESET="\033[0m"
-BOLD="\033[1m"
-DIM="\033[2m"
+RESET=$'\033[0m'
+BOLD=$'\033[1m'
+DIM=$'\033[2m'
 
-BLACK="\033[30m"
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-BLUE="\033[34m"
-MAGENTA="\033[35m"
-CYAN="\033[36m"
-WHITE="\033[97m"
+BLACK=$'\033[30m'
+RED=$'\033[31m'
+GREEN=$'\033[32m'
+YELLOW=$'\033[33m'
+BLUE=$'\033[34m'
+MAGENTA=$'\033[35m'
+CYAN=$'\033[36m'
+WHITE=$'\033[97m'
 
 else
 
@@ -76,6 +76,10 @@ terminal_width() {
         w=70
     fi
 
+    if [[ "$w" -gt 120 ]]; then
+        w=120
+    fi
+
     echo "$w"
 
 }
@@ -91,7 +95,9 @@ center() {
 
     local text="$1"
 
-    printf "%*s\n" $(((${#text}+width)/2)) "$text"
+    local pad=$(( (width - ${#text}) / 2 ))
+
+    printf "%*s%s\n" "$pad" "" "$text"
 
 }
 
@@ -104,13 +110,15 @@ divider() {
     local width
     width=$(terminal_width)
 
-    printf '%*s\n' "$width" '' | if [[ $ACP_UNICODE -eq 1 ]]; then
-    char="─"
-else
-    char="-"
-fi
+    local char="━"
+    [[ $ACP_UNICODE -ne 1 ]] && char="-"
 
-printf '%*s\n' "$width" '' | tr ' ' "$char"
+    local line=""
+    for ((i=0; i<width; i++)); do
+        line+="$char"
+    done
+
+    echo "$line"
 
 }
 
@@ -125,35 +133,42 @@ clear_screen() {
 }
 
 # ----------------------------------------------------------
+# Screen header (clear + logo, no divider)
+# ----------------------------------------------------------
+
+screen_header() {
+
+    clear_screen
+    show_logo
+
+}
+
+# ----------------------------------------------------------
 # Logo
 # ----------------------------------------------------------
 
 show_logo() {
 
-clear_screen
-
 echo
 
 echo -e "${CYAN}"
 
-center " █████╗  ██████╗ ██████╗ "
-center "██╔══██╗██╔════╝██╔══██╗"
-center "███████║██║     ██████╔╝"
-center "██╔══██║██║     ██╔═══╝ "
-center "██║  ██║╚██████╗██║     "
-center "╚═╝  ╚═╝ ╚═════╝╚═╝     "
+echo " █████╗  ██████╗ ██████╗ "
+echo "██╔══██╗██╔════╝██╔══██╗"
+echo "███████║██║     ██████╔╝"
+echo "██╔══██║██║     ██╔═══╝ "
+echo "██║  ██║╚██████╗██║     "
+echo "╚═╝  ╚═╝ ╚═════╝╚═╝     "
 
 echo -e "${RESET}"
 
-center "ACP Remote"
+echo "ACP Remote"
 
 echo
 
-center "AI Agent Remote Platform"
+echo "AI Agent Remote Platform"
 
 echo
-
-divider
 
 }
 
@@ -205,6 +220,8 @@ echo -e "${RED}✗${RESET} $1"
 
 press_enter() {
 
+    [[ $ACP_INTERACTIVE -ne 1 ]] && return
+
 echo
 
 read -rp "Press ENTER to continue..."
@@ -229,17 +246,14 @@ case "${ans,,}" in
 ""|y|yes)
 
 return 0
-
 ;;
 
 n|no)
 
 return 1
-
 ;;
 
 *)
-
 ;;
 
 esac
@@ -277,14 +291,6 @@ done
 printf "\r\033[K"
 
 }
-
-# ----------------------------------------------------------
-# Run command with spinner
-# ----------------------------------------------------------
-
-
-
-
 
 # ----------------------------------------------------------
 # Simple menu
@@ -334,26 +340,6 @@ divider
 echo
 
 echo "$1"
-
-echo
-
-divider
-
-}
-
-# ----------------------------------------------------------
-# Goodbye
-# ----------------------------------------------------------
-
-finish_screen() {
-
-echo
-
-divider
-
-echo
-
-echo -e "${GREEN}${BOLD}✓ ACP installation completed successfully.${RESET}"
 
 echo
 

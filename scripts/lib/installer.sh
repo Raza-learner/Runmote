@@ -21,7 +21,7 @@ fi
 # Installer Variables
 # ----------------------------------------------------------
 
-ACP_PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ACP_PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 ACP_INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/acp}"
 
@@ -179,15 +179,26 @@ install_project_files() {
 
             info "Copying project files..."
 
-            rsync -a \
-                --delete \
-                --exclude ".git" \
-                --exclude ".venv" \
-                --exclude "__pycache__" \
-                --exclude ".pytest_cache" \
-                --exclude "logs" \
-                "$ACP_PROJECT_DIR/" \
-                "$ACP_INSTALL_DIR/"
+            if command -v rsync >/dev/null 2>&1; then
+                rsync -a \
+                    --delete \
+                    --exclude ".git" \
+                    --exclude ".venv" \
+                    --exclude "__pycache__" \
+                    --exclude ".pytest_cache" \
+                    --exclude "logs" \
+                    "$ACP_PROJECT_DIR/" \
+                    "$ACP_INSTALL_DIR/"
+            else
+                rm -rf "$ACP_INSTALL_DIR"
+                cp -rp "$ACP_PROJECT_DIR" "$ACP_INSTALL_DIR"
+                rm -rf "$ACP_INSTALL_DIR/.git" \
+                       "$ACP_INSTALL_DIR/.venv" \
+                       "$ACP_INSTALL_DIR/__pycache__" \
+                       "$ACP_INSTALL_DIR/.pytest_cache" \
+                       "$ACP_INSTALL_DIR/logs" \
+                       2>/dev/null || true
+            fi
 
         fi
 
@@ -284,6 +295,8 @@ install_launcher() {
 
     local launcher="$ACP_BIN_DIR/acp-remote"
 
+    rm -f "$launcher"
+
     cat > "$launcher" <<EOF
 #!/usr/bin/env bash
 exec "$ACP_INSTALL_DIR/scripts/acp-remote" "\$@"
@@ -369,6 +382,56 @@ install_autostart() {
 
 }
 # ----------------------------------------------------------
+# Install Agent Adapters
+# ----------------------------------------------------------
+
+install_agents() {
+
+    section "Agent Adapters"
+
+    if [[ "${ACP_ENABLE_AGENTS:-true}" == false ]]; then
+
+        info "Agent adapters skipped"
+
+        return 0
+
+    fi
+
+    case "$ACP_OS" in
+
+        Linux|Darwin)
+
+            bash "$ACP_INSTALL_DIR/scripts/setup-agents.sh" \
+                --install
+
+            ;;
+
+        MINGW*|MSYS*|CYGWIN*)
+
+            powershell.exe \
+                -NoProfile \
+                -ExecutionPolicy Bypass \
+                -File "$ACP_INSTALL_DIR/scripts/setup-agents.ps1" \
+                -Install
+
+            ;;
+
+        *)
+
+            warn "Agent adapters unsupported"
+
+            return 0
+
+            ;;
+
+    esac
+
+    success "Agent adapters configured"
+
+    return 0
+
+}
+# ----------------------------------------------------------
 # Start Daemon
 # ----------------------------------------------------------
 
@@ -382,7 +445,7 @@ start_daemon() {
 
             if command -v acp-remote >/dev/null 2>&1; then
 
-                acp-remote start >/dev/null 2>&1 || true
+                timeout 10 acp-remote start >/dev/null 2>&1 || true
 
             fi
 
@@ -458,7 +521,7 @@ verify_installation() {
 
 install_acp() {
 
-    progress_init 8
+    progress_init 9
 
     progress_section "Installing ACP"
 
@@ -479,6 +542,9 @@ install_acp() {
 
     run_task "Configuring auto-start" \
         install_autostart || return 1
+
+    run_task "Installing agent adapters" \
+        install_agents || return 1
 
     run_task "Starting daemon" \
         start_daemon || return 1

@@ -1,0 +1,19 @@
+{
+  "name": "acp-remote",
+  "version": "1.0.0",
+  "description": "Universal ACP installer — installs the ACP daemon and agent adapters on Linux, macOS, and Windows",
+  "bin": {
+    "acp-remote": "src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Raza-learner/acp-remote.git"
+  },
+  "keywords": [
+    "acp",
+    "agent-client-protocol",
+    "installer"
+  ],
+  "license": "Apache-2.0",
+  "type": "commonjs"
+}

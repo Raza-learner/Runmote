@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 DEFAULT_DIR="$(cd "$SELF_DIR/.." && pwd)"
 PROJECT_DIR="$DEFAULT_DIR"
 MODE="install"

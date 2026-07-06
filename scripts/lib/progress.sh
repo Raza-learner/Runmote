@@ -31,10 +31,10 @@ progress_init() {
 }
 
 # ----------------------------------------------------------
-# Draw progress bar
+# Build progress bar string
 # ----------------------------------------------------------
 
-progress_draw() {
+progress_bar_str() {
 
     local current="$ACP_PROGRESS_CURRENT"
     local total="$ACP_PROGRESS_TOTAL"
@@ -45,17 +45,29 @@ progress_draw() {
     local filled=$(( current * ACP_PROGRESS_WIDTH / total ))
     local empty=$(( ACP_PROGRESS_WIDTH - filled ))
 
-    printf "\r["
+    local bar="["
 
     for ((i=0;i<filled;i++)); do
-        printf "█"
+        bar+="█"
     done
 
     for ((i=0;i<empty;i++)); do
-        printf " "
+        bar+="░"
     done
 
-    printf "] %3d%%" "$percent"
+    bar+="]"
+
+    printf "%s %3d%%" "$bar" "$percent"
+}
+
+# ----------------------------------------------------------
+# Draw progress bar
+# ----------------------------------------------------------
+
+progress_draw() {
+
+    progress_bar_str
+
 }
 
 # ----------------------------------------------------------
@@ -69,8 +81,6 @@ progress_step() {
     if (( ACP_PROGRESS_CURRENT > ACP_PROGRESS_TOTAL )); then
         ACP_PROGRESS_CURRENT="$ACP_PROGRESS_TOTAL"
     fi
-
-    progress_draw
 }
 
 # ----------------------------------------------------------
@@ -81,13 +91,13 @@ progress_finish() {
 
     ACP_PROGRESS_CURRENT="$ACP_PROGRESS_TOTAL"
 
-    progress_draw
+    progress_bar_str
 
     echo
 }
 
 # ----------------------------------------------------------
-# Execute a task with spinner
+# Execute a task with spinner (inline)
 # ----------------------------------------------------------
 
 run_task() {
@@ -95,23 +105,29 @@ run_task() {
     local title="$1"
     shift
 
-    printf "\n"
-
-    info "$title"
+    progress_bar_str
+    printf "  %s " "$title"
 
     "$@" >/tmp/acp-install.log 2>&1 &
     local pid=$!
 
-    spinner "$pid"
+    local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local i=0
+
+    while kill -0 "$pid" 2>/dev/null; do
+        printf "\r%s  %s %s" "$(progress_bar_str)" "$title" "${spin:$i:1}"
+        i=$(( (i + 1) % ${#spin} ))
+        sleep 0.09
+    done
 
     wait "$pid"
     local rc=$?
 
     if [[ $rc -eq 0 ]]; then
-        success "$title"
         progress_step
+        printf "\r%s  %s ${GREEN}✓${RESET}\n" "$(progress_bar_str)" "$title"
     else
-        error "$title"
+        printf "\r%s  %s ${RED}✗${RESET}\n" "$(progress_bar_str)" "$title"
 
         echo
         echo "────────────────────────────────────────────"
@@ -151,10 +167,6 @@ progress_section() {
 
     echo
     section "$1"
-
-    progress_draw
-
-    echo
 }
 
 # ----------------------------------------------------------
@@ -176,26 +188,3 @@ progress_summary() {
     divider
 }
 
-
-# ----------------------------------------------------------
-# Example
-# ----------------------------------------------------------
-#
-# progress_init 5
-#
-# progress_section "Installing ACP"
-#
-# run_cmd "Creating directories" "mkdir -p ~/.local/share/acp"
-#
-# run_cmd "Installing dependencies" "uv sync"
-#
-# run_cmd "Creating launcher" "./setup.sh"
-#
-# run_cmd "Starting daemon" "systemctl --user start acp-daemon"
-#
-# run_cmd "Checking installation" "acp-remote doctor"
-#
-# progress_finish
-#
-# progress_summary
-#

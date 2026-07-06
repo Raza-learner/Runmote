@@ -6,6 +6,8 @@ import '../models/mcp_server.dart';
 
 class PreferencesService {
   static const _keyPairingCode = 'pairing_code';
+  static const _keyAuthToken = 'auth_token';
+  static const _keyRelayUrl = 'relay_url';
   static const _keyDeviceName = 'device_name';
   static const _keyDefaultCwd = 'default_cwd';
   static const _keyThemeMode = 'theme_mode';
@@ -19,6 +21,16 @@ class PreferencesService {
   Future<void> setPairingCode(String code) =>
       _prefs.setString(_keyPairingCode, code);
   Future<void> clearPairingCode() => _prefs.remove(_keyPairingCode);
+
+  String? getAuthToken() => _prefs.getString(_keyAuthToken);
+  Future<void> setAuthToken(String token) =>
+      _prefs.setString(_keyAuthToken, token);
+  Future<void> clearAuthToken() => _prefs.remove(_keyAuthToken);
+
+  String? getRelayUrl() => _prefs.getString(_keyRelayUrl);
+  Future<void> setRelayUrl(String url) =>
+      _prefs.setString(_keyRelayUrl, url);
+  Future<void> clearRelayUrl() => _prefs.remove(_keyRelayUrl);
 
   String? getDeviceName() => _prefs.getString(_keyDeviceName);
   Future<void> setDeviceName(String name) =>
@@ -47,6 +59,8 @@ class PreferencesService {
 
   Future<void> clearAll() async {
     await clearPairingCode();
+    await clearAuthToken();
+    await clearRelayUrl();
     await clearDeviceName();
     await _prefs.remove(_keyMcpServers);
   }

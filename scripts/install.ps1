@@ -126,6 +126,15 @@ if ($skipAutostart) {
     Write-Host "  Done."
 }
 
+if ($env:ACP_ENABLE_AGENTS -ne "false") {
+    Write-Host "[4/4] Installing agent adapters..."
+    & (Join-Path $installDir "scripts" "setup-agents.ps1") -Install
+    Write-Host "  Done."
+} else {
+    Write-Host ""
+    Write-Host "  Agent adapters skipped (ACP_ENABLE_AGENTS=false)" -ForegroundColor DarkGray
+}
+
 Write-Host ""
 Write-Host "  Installation Complete" -ForegroundColor Green
 Write-Host ""

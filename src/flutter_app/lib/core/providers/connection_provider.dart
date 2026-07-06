@@ -10,7 +10,6 @@ import '../models/connection_state.dart';
 import '../models/agent_info.dart';
 import '../models/agent_capabilities.dart';
 import 'database_provider.dart';
-import 'preferences_provider.dart';
 import 'session_list_provider.dart';
 
 class AcpAgent {
@@ -42,6 +41,7 @@ class AcpConnection {
   final WebSocketChannel? channel;
   final AcpConnectionState state;
   final String? pairingCode;
+  final String? token;
   final String? relayUrl;
   final String? daemonId;
   final List<AcpAgent> agents;
@@ -56,6 +56,7 @@ class AcpConnection {
     this.channel,
     this.state = const AcpConnectionState.disconnected(),
     this.pairingCode,
+    this.token,
     this.relayUrl,
     this.daemonId,
     this.agents = const [],
@@ -78,6 +79,7 @@ class AcpConnection {
     WebSocketChannel? channel,
     AcpConnectionState? state,
     String? pairingCode,
+    String? token,
     String? relayUrl,
     String? daemonId,
     List<AcpAgent>? agents,
@@ -97,6 +99,7 @@ class AcpConnection {
       channel: clearChannel ? null : channel ?? this.channel,
       state: state ?? this.state,
       pairingCode: pairingCode ?? this.pairingCode,
+      token: token ?? this.token,
       relayUrl: relayUrl ?? this.relayUrl,
       daemonId: daemonId ?? this.daemonId,
       agents: agents ?? this.agents,
@@ -199,6 +202,12 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       final p = await _ref.read(preferencesServiceProvider.future);
       await p.setPairingCode(code);
 
+      // Save token for reconnection
+      if (state.token != null) {
+        await p.setAuthToken(state.token!);
+        await p.setRelayUrl(url);
+      }
+
       sendRaw({
         'jsonrpc': '2.0',
         'id': _nextId,
@@ -219,6 +228,155 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     }
   }
 
+  Future<bool> connectWithToken(String token, String relayUrl) async {
+    if (state.state case AcpConnectionState()
+        when state.state is Connected || state.state is Connecting) {
+      return true;
+    }
+
+    state = state.copyWith(
+      state: const AcpConnectionState.connecting(),
+      relayUrl: relayUrl,
+      error: null,
+    );
+
+    try {
+      final uri = Uri.parse('$relayUrl/app');
+      final channel = WebSocketChannel.connect(uri);
+      await channel.ready;
+
+      state = state.copyWith(channel: channel, token: token);
+      _reconnectAttempts = 0;
+      _daemonDisconnected = false;
+
+      final authCompleter = Completer<bool>();
+      final authId = _nextId;
+      sendRaw({
+        'jsonrpc': '2.0',
+        'id': authId,
+        'method': 'auth/token',
+        'params': {'token': token},
+      });
+
+      _sub = channel.stream.listen(
+        (data) => _handleTokenAuth(data, authId, authCompleter),
+        onError: (e) => _onDisconnected('Connection error: $e'),
+        onDone: () => _onDisconnected('Connection closed'),
+        cancelOnError: false,
+      );
+
+      final ok = await authCompleter.future.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => false,
+      );
+
+      if (ok) {
+        state = state.copyWith(
+          state: const AcpConnectionState.connected(),
+          paired: true,
+        );
+        sendRaw({
+          'jsonrpc': '2.0',
+          'id': _nextId,
+          'method': 'agent/list',
+          'params': {},
+        });
+        return true;
+      } else {
+        state = state.copyWith(
+          state: const AcpConnectionState.disconnected(),
+          clearChannel: true,
+        );
+        return false;
+      }
+    } catch (e) {
+      debugPrint('[ACP] connectWithToken error: $e');
+      state = state.copyWith(
+        state: AcpConnectionState.failed('$e'),
+        error: '$e',
+      );
+      return false;
+    }
+  }
+
+  void _handleTokenAuth(
+      dynamic data, int authId, Completer<bool> completer) {
+    try {
+      final json = jsonDecode(data as String) as Map<String, dynamic>;
+      final method = json['method'] as String?;
+
+      // Handle auth/token response
+      if (json['id'] == authId && !completer.isCompleted) {
+        final result = json['result'] as Map<String, dynamic>?;
+        if (result != null && result['authenticated'] == true) {
+          final daemonId = result['daemonId'] as String?;
+          state = state.copyWith(
+            daemonId: daemonId,
+            daemonConnected: daemonId != null,
+          );
+          completer.complete(true);
+          return;
+        }
+        completer.complete(false);
+        return;
+      }
+
+      // After auth, handle regular messages the same way as _handleMessage
+      if (method == 'daemon/identified') {
+        final params = json['params'] as Map<String, dynamic>?;
+        final di = params?['daemonId'] as String?;
+        if (di != null) {
+          state = state.copyWith(daemonId: di, daemonConnected: true);
+        } else {
+          state = state.copyWith(daemonConnected: true);
+        }
+        return;
+      }
+
+      if (method == 'daemon/disconnected') {
+        debugPrint('[ACP] daemon/disconnected');
+        _daemonDisconnected = true;
+        _reconnectTimer?.cancel();
+        _agentCapabilities.clear();
+        _agentInfos.clear();
+        _ref.read(activeSessionsProvider.notifier).clear();
+        state = state.copyWith(
+          daemonId: null,
+          agents: const [],
+          clearSelectedAgent: true,
+          clearAgentInfo: true,
+          clearCapabilities: true,
+          daemonConnected: false,
+        );
+        return;
+      }
+
+      if (method == 'agent/list') {
+        final params = json['params'] as Map<String, dynamic>?;
+        if (params != null) {
+          _handleAgentList(params);
+          return;
+        }
+      }
+
+      final result = json['result'] as Map<String, dynamic>?;
+      if (result != null && result['agents'] is List<dynamic>) {
+        _handleAgentList(result);
+        return;
+      }
+
+      if (result != null && result['agentCapabilities'] is Map<String, dynamic>) {
+        _handleInitialize(result);
+        return;
+      }
+
+      // Route other messages to chat/session providers
+      _messageController.add(json);
+    } catch (e) {
+      debugPrint('[ACP] _handleTokenAuth error: $e');
+    }
+  }
+
   void _handleMessage(dynamic data, int pairId, Completer<void> pairCompleter) {
     try {
       final json = jsonDecode(data as String) as Map<String, dynamic>;
@@ -229,8 +387,10 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         final result = json['result'] as Map<String, dynamic>?;
         if (result != null && result['paired'] == true) {
           final daemonId = result['daemonId'] as String?;
+          final token = result['token'] as String?;
           state = state.copyWith(
             daemonId: daemonId,
+            token: token,
             daemonConnected: daemonId != null,
           );
           pairCompleter.complete();

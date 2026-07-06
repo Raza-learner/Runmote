@@ -486,9 +486,13 @@ class SettingsScreen extends ConsumerWidget {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               ref.read(connectionProvider.notifier).disconnect();
-              Navigator.of(ctx).pop();
+              final p = await ref.read(preferencesServiceProvider.future);
+              await p.clearAuthToken();
+              await p.clearPairingCode();
+              await p.clearRelayUrl();
+              if (ctx.mounted) Navigator.of(ctx).pop();
               context.go('/');
             },
             child: const Text('Unpair'),

@@ -27,11 +27,8 @@ cleanup_and_exit() {
 
     local code="${1:-0}"
 
-    echo
-
-    if [[ "$code" -eq 0 ]]; then
-        success "Installer finished."
-    else
+    if [[ "$code" -ne 0 ]]; then
+        echo
         error "Installer failed."
     fi
 
@@ -73,16 +70,7 @@ main() {
 
     wizard_start
 
-    wizard_device_name
-    wizard_device_summary
-
-    wizard_relay
-    wizard_relay_summary
-
-    wizard_autostart
-    wizard_autostart_summary
-
-    wizard_confirm
+    run_wizard
 
     #
     # Install ACP
@@ -109,8 +97,6 @@ main() {
     #
 
     wizard_install_complete
-
-    wizard_finish
 
 }
 

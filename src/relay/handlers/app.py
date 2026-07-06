@@ -63,13 +63,6 @@ async def app_endpoint(websocket: WebSocket):
                 if method == "auth/pair":
                     client_ip = websocket.client.host if hasattr(websocket.client, 'host') else 'unknown'
                     now = time.time()
-                    attempts = _pair_attempts[client_ip]
-                    attempts[:] = [t for t in attempts if now - t < _PAIR_WINDOW_SEC]
-                    if len(attempts) >= _MAX_PAIR_ATTEMPTS:
-                        print(f"  → client {client_id} rate limited (IP: {client_ip})", flush=True)
-                        await _send_error(websocket, msg_id, -32029, "too many attempts — try again later")
-                        continue
-                    attempts.append(now)
 
                     params = data.get("params") or {}
                     code = params.get("code", "").strip().upper()
@@ -79,6 +72,16 @@ async def app_endpoint(websocket: WebSocket):
                         await _send_error(websocket, msg_id, -32002, "pairing code expired — generate a new one")
                         print(f"  → client {client_id} auth failed (expired code)", flush=True)
                         continue
+
+                    # Rate limit only on actual pairing attempts (not expired codes)
+                    attempts = _pair_attempts[client_ip]
+                    attempts[:] = [t for t in attempts if now - t < _PAIR_WINDOW_SEC]
+                    if len(attempts) >= _MAX_PAIR_ATTEMPTS:
+                        print(f"  → client {client_id} rate limited (IP: {client_ip})", flush=True)
+                        await _send_error(websocket, msg_id, -32029, "too many attempts — try again later")
+                        continue
+                    attempts.append(now)
+
                     token = state.code_to_token.get(code)
                     if token is None:
                         await _send_error(websocket, msg_id, -32002, "invalid pairing code")
@@ -93,6 +96,7 @@ async def app_endpoint(websocket: WebSocket):
                             "result": {
                                 "paired": True,
                                 "daemonId": daemon_id,
+                                "token": token,
                             },
                         }))
                         # Send current daemon status immediately after pairing
@@ -102,6 +106,38 @@ async def app_endpoint(websocket: WebSocket):
                                 "method": "daemon/identified",
                                 "params": {"daemonId": daemon_id},
                             }))
+                        # Notify daemon that pairing is complete
+                        if state.daemon_websocket is not None:
+                            await state.daemon_websocket.send_text(json.dumps({
+                                "jsonrpc": "2.0",
+                                "method": "pairing/complete",
+                                "params": {"clientId": client_id},
+                            }))
+                    continue
+
+                if method == "auth/token":
+                    params = data.get("params") or {}
+                    token = params.get("token", "").strip()
+                    if token and token in state.token_to_daemons:
+                        daemon_id = state.token_to_daemons[token]
+                        state.app_to_token[client_id] = token
+                        await websocket.send_text(json.dumps({
+                            "jsonrpc": "2.0",
+                            "id": msg_id,
+                            "result": {
+                                "authenticated": True,
+                                "daemonId": daemon_id,
+                            },
+                        }))
+                        # Send current daemon status
+                        if state.daemon_websocket is not None:
+                            await websocket.send_text(json.dumps({
+                                "jsonrpc": "2.0",
+                                "method": "daemon/identified",
+                                "params": {"daemonId": daemon_id},
+                            }))
+                    else:
+                        await _send_error(websocket, msg_id, -32002, "invalid token")
                     continue
 
                 if not await _require_auth(websocket, client_id, msg_id):

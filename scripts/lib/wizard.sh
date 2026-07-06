@@ -90,9 +90,7 @@ wizard_init() {
 
 wizard_welcome() {
 
-    show_logo
-
-    box "Welcome to ACP Remote"
+    section "Welcome to ACP Remote"
 
     echo
     echo "ACP securely connects your computer"
@@ -107,10 +105,7 @@ wizard_welcome() {
     success "Pair your mobile device"
     echo
 
-    divider
-
-    echo
-    read -rp "Press ENTER to continue..."
+    press_enter
 }
 
 # ----------------------------------------------------------
@@ -119,7 +114,7 @@ wizard_welcome() {
 
 wizard_intro() {
 
-    clear_screen
+    screen_header
 
     section "Installation Wizard"
 
@@ -162,6 +157,8 @@ wizard_start() {
 
     wizard_init
 
+    screen_header
+
     wizard_welcome
 
     wizard_intro
@@ -201,7 +198,7 @@ wizard_device_name() {
 
     while true; do
 
-        clear_screen
+        screen_header
 
         section "Device Configuration"
 
@@ -242,102 +239,11 @@ wizard_device_name() {
 
 wizard_device_summary() {
 
-    clear_screen
+    screen_header
 
     section "Device"
 
     printf " %-18s %s\n" "Device Name:" "$ACP_DEVICE_NAME"
-
-    divider
-
-    echo
-
-    press_enter
-
-}
-# ----------------------------------------------------------
-# Relay URL Validation
-# ----------------------------------------------------------
-
-validate_relay_url() {
-
-    local url="$1"
-
-    # Allow empty (default relay)
-    [[ -z "$url" ]] && return 0
-
-    if [[ "$url" =~ ^wss?://.+$ ]]; then
-        return 0
-    fi
-
-    return 1
-}
-
-# ----------------------------------------------------------
-# Relay Configuration
-# ----------------------------------------------------------
-
-wizard_relay() {
-
-    while true; do
-
-        clear_screen
-
-        section "Relay Configuration"
-
-        echo
-        info "ACP uses a relay server to connect your devices."
-        echo
-
-        echo "Examples:"
-        echo "  ws://localhost:8000/daemon"
-        echo "  wss://relay.example.com/daemon"
-        echo
-
-        read -rp "Relay URL [Default]: " input
-
-        if validate_relay_url "$input"; then
-
-            ACP_RELAY_URL="$input"
-
-            break
-
-        fi
-
-        echo
-        error "Invalid Relay URL."
-        echo
-        echo "The URL must start with:"
-        echo
-        echo "  ws://"
-        echo "  wss://"
-        echo
-
-        press_enter
-
-    done
-
-}
-
-# ----------------------------------------------------------
-# Relay Summary
-# ----------------------------------------------------------
-
-wizard_relay_summary() {
-
-    clear_screen
-
-    section "Relay Configuration"
-
-    if [[ -z "$ACP_RELAY_URL" ]]; then
-
-        printf " %-18s %s\n" "Relay:" "Default"
-
-    else
-
-        printf " %-18s %s\n" "Relay:" "$ACP_RELAY_URL"
-
-    fi
 
     divider
 
@@ -354,7 +260,7 @@ wizard_autostart() {
 
     while true; do
 
-        clear_screen
+        screen_header
 
         section "Auto-start"
 
@@ -402,7 +308,7 @@ wizard_autostart() {
 
 wizard_autostart_summary() {
 
-    clear_screen
+    screen_header
 
     section "Auto-start"
 
@@ -423,6 +329,22 @@ wizard_autostart_summary() {
     press_enter
 
 }
+
+# ----------------------------------------------------------
+# Relay status check
+# ----------------------------------------------------------
+
+relay_status() {
+
+    if (command -v nc >/dev/null 2>&1 && nc -z localhost 8000 2>/dev/null) || \
+       (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ':8000'); then
+        echo "Connected"
+    else
+        echo "Disconnected"
+    fi
+
+}
+
 # ----------------------------------------------------------
 # Confirmation Screen
 # ----------------------------------------------------------
@@ -431,7 +353,7 @@ wizard_confirm() {
 
     while true; do
 
-        clear_screen
+        screen_header
 
         section "Review Configuration"
 
@@ -441,11 +363,7 @@ wizard_confirm() {
 
         printf " %-22s %s\n" "Install Directory:" "$ACP_INSTALL_DIR"
 
-        if [[ -z "$ACP_RELAY_URL" ]]; then
-            printf " %-22s %s\n" "Relay:" "Default"
-        else
-            printf " %-22s %s\n" "Relay:" "$ACP_RELAY_URL"
-        fi
+        printf " %-22s %s\n" "Relay:" "$(relay_status)"
 
         if [[ "$ACP_ENABLE_AUTOSTART" == true ]]; then
             printf " %-22s %s\n" "Auto-start:" "Enabled"
@@ -461,9 +379,8 @@ wizard_confirm() {
         echo
         echo "  1) Start Installation"
         echo "  2) Edit Device Name"
-        echo "  3) Edit Relay"
-        echo "  4) Edit Auto-start"
-        echo "  5) Cancel"
+        echo "  3) Edit Auto-start"
+        echo "  4) Cancel"
         echo
 
         read -rp "Selection [1]: " choice
@@ -480,14 +397,10 @@ wizard_confirm() {
                 ;;
 
             "3")
-                wizard_relay
-                ;;
-
-            "4")
                 wizard_autostart
                 ;;
 
-            "5")
+            "4")
                 echo
                 warn "Installation cancelled."
                 exit 0
@@ -509,20 +422,26 @@ wizard_confirm() {
 
 wizard_pairing() {
 
-    clear_screen
+    local paired_file="$HOME/.config/acp/paired"
+
+    # Already paired — skip
+    if [[ -f "$paired_file" ]]; then
+        screen_header
+        section "Pair Your Device"
+        echo
+        info "Phone is already paired."
+        echo
+        press_enter
+        return 0
+    fi
+
+    screen_header
 
     section "Pair Your Device"
 
     echo
     info "ACP is now ready to pair with your mobile device."
     echo
-
-    if ! command -v acp-remote >/dev/null 2>&1; then
-        warn "ACP launcher not found."
-        echo
-        press_enter
-        return 1
-    fi
 
     echo "The daemon will now start and generate a pairing code."
     echo
@@ -531,21 +450,49 @@ wizard_pairing() {
 
         echo
 
-        run_task "Starting daemon" \
-            bash -c "acp-remote start"
+        echo "  ${DIM}Starting daemon...${RESET}"
+        systemctl --user start acp-daemon.service 2>/dev/null || true
+        sleep 1
 
         echo
+        echo "  ${DIM}Fetching pairing code...${RESET}"
 
-        run_task "Generating pairing code" \
-            bash -c "acp-remote code"
+        local code=""
+        for i in $(seq 1 12); do
+            code=$(journalctl --user -u acp-daemon.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1 || true)
+            [[ -n "$code" ]] && break
+            sleep 1
+        done
+
+        if [[ -z "$code" ]]; then
+            echo "  ${YELLOW}Pairing code not available yet.${RESET}"
+        else
+            local qr_code
+            local python="python3"
+            [[ -x "${ACP_PROJECT_DIR:-.}/.venv/bin/python3" ]] && python="${ACP_PROJECT_DIR:-.}/.venv/bin/python3"
+            [[ -x "${ACP_PROJECT_DIR:-.}/.venv/bin/python" ]] && python="${ACP_PROJECT_DIR:-.}/.venv/bin/python"
+            qr_code=$("$python" -c "
+import sys
+sys.path.insert(0, '${ACP_PROJECT_DIR:-.}/src')
+from daemon.main import _pairing_banner
+print(_pairing_banner('$code'))
+" 2>/dev/null) && echo "$qr_code" || {
+                local formatted="${code:0:4}-${code:4}"
+                echo ""
+                echo "  ${BOLD}┌─────────────────────────────┐${RESET}"
+                printf "  ${BOLD}│${RESET}  ${CYAN}Pairing Code:${RESET} ${GREEN}${BOLD}%-12s${RESET}  ${BOLD}│${RESET}\n" "$formatted"
+                echo "  ${BOLD}│${RESET}                             ${BOLD}│${RESET}"
+                echo "  ${BOLD}│${RESET}  ${DIM}Enter this in the app${RESET}      ${BOLD}│${RESET}"
+                echo "  ${BOLD}└─────────────────────────────┘${RESET}"
+                echo ""
+            }
+        fi
 
     else
 
         warn "Pairing skipped."
 
         press_enter
-
-        return 0
 
     fi
 
@@ -568,7 +515,14 @@ wizard_pairing() {
 
 wizard_wait_for_pairing() {
 
-    clear_screen
+    local paired_file="$HOME/.config/acp/paired"
+
+    # Already paired — skip
+    if [[ -f "$paired_file" ]]; then
+        return 0
+    fi
+
+    screen_header
 
     section "Waiting for Mobile Device"
 
@@ -584,21 +538,15 @@ wizard_wait_for_pairing() {
 
         printf "\rWaiting... %3d seconds remaining " "$((timeout - elapsed))"
 
-        #
-        # TODO:
-        # Replace this with your actual pairing check.
-        #
-        # Example:
-        # if acp-remote status | grep -q "Paired"; then
-        #
         if [[ -f "/tmp/acp-paired" ]]; then
 
-            echo
-            echo
-
+            printf "\r%*s\r" 40 " "
             success "Phone paired successfully!"
+            echo
 
             rm -f /tmp/acp-paired
+            mkdir -p "$HOME/.config/acp"
+            : > "$HOME/.config/acp/paired"
 
             press_enter
 
@@ -642,7 +590,7 @@ wizard_wait_for_pairing() {
 
 wizard_install_complete() {
 
-    clear_screen
+    screen_header
 
     section "Installation Complete"
 
@@ -654,13 +602,13 @@ wizard_install_complete() {
 
     printf " %-20s %s\n" "Device Name:" "$ACP_DEVICE_NAME"
 
-    printf " %-20s %s\n" "Install Path:" "$ACP_INSTALL_DIR"
-
-    if [[ -z "$ACP_RELAY_URL" ]]; then
-        printf " %-20s %s\n" "Relay:" "Default"
+    if [[ "${ACP_IS_LOCAL:-0}" -eq 1 && -n "${ACP_PROJECT_DIR:-}" ]]; then
+        printf " %-20s %s\n" "Install Path:" "$ACP_PROJECT_DIR (live)"
     else
-        printf " %-20s %s\n" "Relay:" "$ACP_RELAY_URL"
+        printf " %-20s %s\n" "Install Path:" "$ACP_INSTALL_DIR"
     fi
+
+    printf " %-20s %s\n" "Relay:" "$(relay_status)"
 
     if [[ "$ACP_ENABLE_AUTOSTART" == true ]]; then
         printf " %-20s %s\n" "Auto-start:" "Enabled"
@@ -674,44 +622,21 @@ wizard_install_complete() {
 
     echo
 
-}
-# ----------------------------------------------------------
-# Installation Complete
-# ----------------------------------------------------------
-
-wizard_install_complete() {
-
-    clear_screen
-
-    section "Installation Complete"
+    section "Available Commands"
 
     echo
 
-    success "ACP has been installed successfully."
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote" "Interactive menu"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote start" "Start the daemon"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote stop" "Stop the daemon"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote status" "Show daemon status"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote code" "Display QR pairing code"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote text" "Display text pairing code"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote uninstall" "Uninstall ACP daemon"
 
     echo
 
-    printf " %-20s %s\n" "Device Name:" "$ACP_DEVICE_NAME"
-
-    printf " %-20s %s\n" "Install Path:" "$ACP_INSTALL_DIR"
-
-    if [[ -z "$ACP_RELAY_URL" ]]; then
-        printf " %-20s %s\n" "Relay:" "Default"
-    else
-        printf " %-20s %s\n" "Relay:" "$ACP_RELAY_URL"
-    fi
-
-    if [[ "$ACP_ENABLE_AUTOSTART" == true ]]; then
-        printf " %-20s %s\n" "Auto-start:" "Enabled"
-    else
-        printf " %-20s %s\n" "Auto-start:" "Disabled"
-    fi
-
-    echo
-
-    divider
-
-    echo
+    success "Installer finished."
 
 }
 # ----------------------------------------------------------
@@ -720,15 +645,16 @@ wizard_install_complete() {
 
 run_wizard() {
 
-    wizard_start
-
     wizard_device_name
 
     wizard_device_summary
 
-    wizard_relay
-
-    wizard_relay_summary
+    # Auto-detect local relay silently
+    local default_relay="ws://localhost:8000/daemon"
+    if (command -v nc >/dev/null 2>&1 && nc -z localhost 8000 2>/dev/null) || \
+       (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ':8000'); then
+        ACP_RELAY_URL="$default_relay"
+    fi
 
     wizard_autostart
 
@@ -738,14 +664,8 @@ run_wizard() {
 
     #
     # Installation happens in installer.sh
+    # Pairing happens after installation in install.sh (wizard_pairing + wizard_wait_for_pairing)
+    # wizard_install_complete shown after pairing in install.sh
     #
-
-    wizard_pairing
-
-    wizard_wait_for_pairing
-
-    wizard_install_complete
-
-    wizard_finish
 
 }

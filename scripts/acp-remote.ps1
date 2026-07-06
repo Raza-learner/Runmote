@@ -142,18 +142,18 @@ function Draw-Menu($sel) {
 
     $items = @(
         ""
-        "   Start daemon"
-        "   Stop daemon"
-        "   Show pairing QR code"
-        "   Show pairing code (text)"
-        "   Uninstall daemon"
-        "   Quit"
+        "    · Start daemon"
+        "    · Stop daemon"
+        "    · Show pairing QR code"
+        "    · Show pairing code (text)"
+        "    · Uninstall daemon"
+        "    · Quit"
     )
 
     Write-Host ""
     Write-Host ("  " + ("═" * (14 + $W + 14)))
     Write-Host "  ╔══════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "  ║      ACP Daemon Control                  ║" -ForegroundColor Cyan
+    Write-Host "  ║     ACP Daemon Control                   ║" -ForegroundColor Cyan
     Write-Host "  ╠══════════════════════════════════════════╣" -ForegroundColor Cyan
 
     Write-Host "  ║$(" " * 42)║" -ForegroundColor Cyan -NoNewline
@@ -247,9 +247,9 @@ function Show-Menu {
             Write-Host ""
             Write-Host ("  ACP Daemon Control   " + $statusText + "   Daemon: " + $name) -ForegroundColor Cyan
             Write-Host ""
-            Write-Host "  1) Start daemon       2) Stop daemon"
-            Write-Host "  3) Show QR code       4) Show code (text)"
-            Write-Host "  5) Uninstall daemon   q) Quit"
+            Write-Host "  1) · Start daemon       2) · Stop daemon"
+            Write-Host "  3) · Show QR code       4) · Show code (text)"
+            Write-Host "  5) · Uninstall daemon   q) · Quit"
             Write-Host ""
 
             $choice = Read-Host "  Choice"

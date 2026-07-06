@@ -91,6 +91,7 @@ async def daemon_endpoint(websocket: WebSocket):
                     pairing_code = generate_pairing_code(set(state.code_to_token.keys()))
                     state.token_to_daemons[token] = daemon_id
                     state.code_to_token[pairing_code] = token
+                    state.save_auth_state()
                     state.store.set_daemon_id(daemon_id)
                     print(f"  → daemon identified as {daemon_id}")
                     print(f"  → pairing code: {pairing_code}")
