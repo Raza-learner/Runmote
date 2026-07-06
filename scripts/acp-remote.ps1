@@ -101,11 +101,16 @@ function Show-QR {
         return
     }
     Write-Host ""
+    $publicUrl = ""
+    $pubFile = "$env:USERPROFILE\.config\acp\public_url"
+    if (Test-Path $pubFile) {
+        $publicUrl = Get-Content $pubFile -Raw | ForEach-Object { $_.Trim() }
+    }
     if ((Test-Path $python) -and (Test-Path "$installDir\src")) {
         & $python -c @"
 import sys; sys.path.insert(0, r'$installDir\src')
 from daemon.main import _pairing_banner
-print(_pairing_banner('$code'))
+print(_pairing_banner('$code', '$publicUrl'))
 "@ 2>$null
         if ($LASTEXITCODE -eq 0) { return }
     }

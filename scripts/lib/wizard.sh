@@ -21,7 +21,10 @@ fi
 ACP_DEVICE_NAME=""
 ACP_INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/acp}"
 ACP_RELAY_URL="${ACP_RELAY_URL:-}"
+ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-}"
+ACP_RELAY_PUBLIC_URL="${ACP_RELAY_PUBLIC_URL:-}"
 ACP_ENABLE_AUTOSTART=true
+ACP_CLOUD_MODE=false
 
 ACP_INSTALL_MODE="install"
 
@@ -55,6 +58,9 @@ wizard_reset() {
     ACP_INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/acp}"
 
     ACP_RELAY_URL="${ACP_RELAY_URL:-}"
+    ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-}"
+    ACP_RELAY_PUBLIC_URL="${ACP_RELAY_PUBLIC_URL:-}"
+    ACP_CLOUD_MODE=false
 
     ACP_ENABLE_AUTOSTART=true
 
@@ -71,6 +77,8 @@ wizard_export() {
     export ACP_DIR="$ACP_INSTALL_DIR"
 
     export ACP_RELAY_URL="$ACP_RELAY_URL"
+    export ACP_DAEMON_TOKEN="$ACP_RELAY_TOKEN"
+    export ACP_RELAY_PUBLIC_URL="$ACP_RELAY_PUBLIC_URL"
 
 }
 
@@ -331,6 +339,125 @@ wizard_autostart_summary() {
 }
 
 # ----------------------------------------------------------
+# Cloud Relay Configuration
+# ----------------------------------------------------------
+
+wizard_cloud_relay() {
+
+    while true; do
+
+        screen_header
+
+        section "Cloud Relay"
+
+        echo
+        info "ACP can connect through a cloud relay so you can"
+        echo "access your computer from anywhere in the world."
+        echo
+        echo "You need a relay server deployed on Render, Fly.io,"
+        echo "or any public server running the ACP relay."
+        echo
+        echo "  1) Use local relay ${DIM}(LAN only)${RESET}"
+        echo "  2) Use cloud relay ${DIM}(access from anywhere)${RESET}"
+        echo
+
+        read -rp "Select [1]: " choice
+
+        case "$choice" in
+
+            ""|"1")
+                ACP_CLOUD_MODE=false
+                ACP_RELAY_URL=""
+                ACP_RELAY_TOKEN=""
+                ACP_RELAY_PUBLIC_URL=""
+                break
+                ;;
+
+            "2")
+                ACP_CLOUD_MODE=true
+
+                echo
+                echo "${DIM}────────────────────────────────────────${RESET}"
+
+                while true; do
+                    echo
+                    read -rp "Relay WebSocket URL [wss://relay.example.com/daemon]: " input
+                    if [[ -z "$input" ]]; then
+                        echo
+                        error "Relay URL is required for cloud mode."
+                    else
+                        ACP_RELAY_URL="$input"
+                        break
+                    fi
+                done
+
+                echo
+                echo "${DIM}────────────────────────────────────────${RESET}"
+                read -rp "Authentication token (optional): " input
+                ACP_RELAY_TOKEN="$input"
+
+                echo
+                echo "${DIM}────────────────────────────────────────${RESET}"
+                echo
+                echo "Public URL is the HTTPS address of your relay."
+                echo "It is encoded in the QR code so the mobile app"
+                echo "knows where to connect."
+                echo
+                read -rp "Public URL [https://relay.example.com]: " input
+                if [[ -n "$input" ]]; then
+                    ACP_RELAY_PUBLIC_URL="$input"
+                else
+                    # Derive from WebSocket URL
+                    base="${ACP_RELAY_URL%/daemon}"
+                    base="${base/#wss:/https:}"
+                    base="${base/#ws:/http:}"
+                    ACP_RELAY_PUBLIC_URL="$base"
+                fi
+
+                break
+                ;;
+
+            *)
+                error "Invalid selection."
+                press_enter
+                ;;
+
+        esac
+
+    done
+
+}
+
+
+wizard_cloud_summary() {
+
+    screen_header
+
+    section "Relay Configuration"
+
+    if [[ "$ACP_CLOUD_MODE" == true ]]; then
+        success "Mode: Cloud"
+        printf " %-18s %s\n" "Relay URL:" "$ACP_RELAY_URL"
+        if [[ -n "$ACP_RELAY_TOKEN" ]]; then
+            printf " %-18s %s\n" "Token:" "********"
+        else
+            printf " %-18s %s\n" "Token:" "${DIM}(none)${RESET}"
+        fi
+        printf " %-18s %s\n" "Public URL:" "$ACP_RELAY_PUBLIC_URL"
+    else
+        success "Mode: Local (LAN)"
+    fi
+
+    divider
+
+    echo
+
+    press_enter
+
+}
+
+
+# ----------------------------------------------------------
 # Relay status check
 # ----------------------------------------------------------
 
@@ -363,7 +490,11 @@ wizard_confirm() {
 
         printf " %-22s %s\n" "Install Directory:" "$ACP_INSTALL_DIR"
 
-        printf " %-22s %s\n" "Relay:" "$(relay_status)"
+        if [[ "$ACP_CLOUD_MODE" == true ]]; then
+            printf " %-22s %s\n" "Relay:" "Cloud ($ACP_RELAY_URL)"
+        else
+            printf " %-22s %s\n" "Relay:" "$(relay_status)"
+        fi
 
         if [[ "$ACP_ENABLE_AUTOSTART" == true ]]; then
             printf " %-22s %s\n" "Auto-start:" "Enabled"
@@ -379,8 +510,9 @@ wizard_confirm() {
         echo
         echo "  1) Start Installation"
         echo "  2) Edit Device Name"
-        echo "  3) Edit Auto-start"
-        echo "  4) Cancel"
+        echo "  3) Edit Cloud Relay"
+        echo "  4) Edit Auto-start"
+        echo "  5) Cancel"
         echo
 
         read -rp "Selection [1]: " choice
@@ -397,10 +529,14 @@ wizard_confirm() {
                 ;;
 
             "3")
-                wizard_autostart
+                wizard_cloud_relay
                 ;;
 
             "4")
+                wizard_autostart
+                ;;
+
+            "5")
                 echo
                 warn "Installation cancelled."
                 exit 0
@@ -655,6 +791,10 @@ run_wizard() {
        (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ':8000'); then
         ACP_RELAY_URL="$default_relay"
     fi
+
+    wizard_cloud_relay
+
+    wizard_cloud_summary
 
     wizard_autostart
 

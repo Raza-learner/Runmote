@@ -4,12 +4,18 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir .
+ENV PIP_ROOT_USER_ACTION=ignore
+RUN pip install --no-cache-dir . && mkdir -p /data
 
 EXPOSE 8000
 
 ENV ACP_RELAY_HOST=0.0.0.0
 ENV ACP_RELAY_PORT=8000
 ENV ACP_RELAY_DB=/data/acp_relay.db
+
+VOLUME /data
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"
 
 CMD ["python", "-m", "src.relay.main"]

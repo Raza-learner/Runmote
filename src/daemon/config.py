@@ -10,7 +10,6 @@ RELAY_URL = os.environ.get(
     "ACP_RELAY_URL",
     f"ws://{RELAY_HOST}:{RELAY_PORT}/daemon",
 )
-
 _raw_agent_command = os.environ.get("ACP_AGENT_COMMAND", '["opencode", "acp"]')
 AGENT_COMMAND = json.loads(_raw_agent_command)
 

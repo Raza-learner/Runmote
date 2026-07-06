@@ -114,11 +114,15 @@ show_qr() {
         return 1
     fi
     echo ""
+    local public_url=""
+    if [[ -f "$HOME/.config/acp/public_url" ]]; then
+        public_url="$(cat "$HOME/.config/acp/public_url")"
+    fi
     if [[ -f "$PYTHON" ]] && [[ -d "$INSTALL_DIR/src" ]]; then
         "$PYTHON" -c "
 import sys; sys.path.insert(0, '$INSTALL_DIR/src')
 from daemon.main import _pairing_banner
-print(_pairing_banner('$code'))
+print(_pairing_banner('$code', '$public_url'))
 " 2>/dev/null && return 0
     fi
     show_code_fallback

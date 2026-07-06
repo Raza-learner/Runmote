@@ -3,11 +3,11 @@ from fastapi import APIRouter, WebSocket
 
 try:
     from .. import state
-    from ..config import RELAY_TOKEN
+    from ..config import RELAY_TOKEN, PUBLIC_URL
     from ..pairing import generate_pairing_code, cleanup_expired_codes
 except ImportError:
     import state
-    from config import RELAY_TOKEN
+    from config import RELAY_TOKEN, PUBLIC_URL
     from pairing import generate_pairing_code, cleanup_expired_codes
 
 router = APIRouter()
@@ -97,10 +97,13 @@ async def daemon_endpoint(websocket: WebSocket):
                     print(f"  → pairing code: {pairing_code}")
 
                     if msg_id:
+                        result = {"pairingCode": pairing_code}
+                        if PUBLIC_URL:
+                            result["publicUrl"] = PUBLIC_URL
                         await websocket.send_text(json.dumps({
                             "jsonrpc": "2.0",
                             "id": msg_id,
-                            "result": {"pairingCode": pairing_code},
+                            "result": result,
                         }))
 
                     forward = {

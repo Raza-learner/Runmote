@@ -22,14 +22,26 @@ def log(msg: str):
     print(msg, flush=True)
 
 
-def _pairing_banner(code: str) -> str:
-    """Generate a pairing banner with QR code (primary) and text code (secondary)."""
+def _pairing_banner(code: str, public_url: str = "") -> str:
+    """Generate a pairing banner with QR code (primary) and text code (secondary).
+
+    If *public_url* is provided, the QR encodes an acp:// URL so the
+    mobile app connects via a cloud relay instead of LAN mDNS.
+    """
     if len(code) == 6:
         formatted = f"{code[:3]}-{code[3:]}"
     else:
         formatted = f"{code[:4]}-{code[4:]}"
+
+    if public_url:
+        qr_data = f"acp://{public_url}/connect?code={code}"
+        title = "Scan to connect from anywhere"
+    else:
+        qr_data = code
+        title = "Scan QR Code"
+
     qr = qrcode.QRCode(border=2, box_size=1)
-    qr.add_data(code)
+    qr.add_data(qr_data)
     qr.make(fit=True)
     buf = StringIO()
     qr.print_ascii(out=buf, invert=False)
@@ -38,7 +50,6 @@ def _pairing_banner(code: str) -> str:
     inner_width = max(qr_width, 32)
     lines = [f"╔{'═' * (inner_width + 2)}╗"]
     lines.append(f"║{' ' * (inner_width + 2)}║")
-    title = "Scan QR Code"
     pad = (inner_width - len(title)) // 2
     lines.append(f"║  {' ' * pad}{title}{' ' * (inner_width - pad - len(title))}  ║")
     lines.append(f"║{' ' * (inner_width + 2)}║")
@@ -56,6 +67,8 @@ def _pairing_banner(code: str) -> str:
     lines.append(f"║  {' ' * pad3}{code_line}{' ' * (inner_width - pad3 - len(code_line))}  ║")
     lines.append(f"║{' ' * (inner_width + 2)}║")
     lines.append(f"╚{'═' * (inner_width + 2)}╝")
+    if public_url:
+        lines.append(f"  Relay: {public_url}")
     return "\n" + "\n".join(lines) + "\n"
 
 # Tracks request info (cwd, method) keyed by message id, so
@@ -283,8 +296,14 @@ async def run_daemon():
                             result = data.get("result") or {}
                             pairing_code = result.get("pairingCode", "")
                             if pairing_code:
+                                public_url = result.get("publicUrl", "")
                                 log(f"← pairing code: {pairing_code}")
-                                print(_pairing_banner(pairing_code), flush=True)
+                                print(_pairing_banner(pairing_code, public_url), flush=True)
+                                # Persist public URL for acp-remote script
+                                if public_url:
+                                    config_dir = Path.home() / ".config" / "acp"
+                                    config_dir.mkdir(parents=True, exist_ok=True)
+                                    (config_dir / "public_url").write_text(public_url)
                             break
                     except json.JSONDecodeError:
                         log(f"Invalid JSON from relay during identify: {msg[:200]}")

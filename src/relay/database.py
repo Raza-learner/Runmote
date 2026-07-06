@@ -1,12 +1,14 @@
 import os
 import sqlite3
 import time
+from pathlib import Path
 
 DB_PATH = os.environ.get("ACP_RELAY_DB", "acp_relay.db")
 
 
 class Database:
     def __init__(self, db_path: str = DB_PATH):
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._init_db()

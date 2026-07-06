@@ -72,17 +72,19 @@ OS="$(detect_os)"
 # Build env var directives for each platform
 _build_env_systemd() {
     local out="Environment=PATH=%h/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:%h/.local/bin"
-    [[ -n "${ACP_DAEMON_TOKEN:-}" ]] && out="$out${out:+$'\n'}Environment=ACP_DAEMON_TOKEN=$ACP_DAEMON_TOKEN"
-    [[ -n "${ACP_DAEMON_ID:-}" ]]    && out="$out${out:+$'\n'}Environment=ACP_DAEMON_ID=$ACP_DAEMON_ID"
-    [[ -n "${ACP_RELAY_URL:-}" ]]    && out="$out${out:+$'\n'}Environment=ACP_RELAY_URL=$ACP_RELAY_URL"
+    [[ -n "${ACP_DAEMON_TOKEN:-}" ]]    && out="$out${out:+$'\n'}Environment=ACP_DAEMON_TOKEN=$ACP_DAEMON_TOKEN"
+    [[ -n "${ACP_DAEMON_ID:-}" ]]       && out="$out${out:+$'\n'}Environment=ACP_DAEMON_ID=$ACP_DAEMON_ID"
+    [[ -n "${ACP_RELAY_URL:-}" ]]       && out="$out${out:+$'\n'}Environment=ACP_RELAY_URL=$ACP_RELAY_URL"
+    [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]] && out="$out${out:+$'\n'}Environment=ACP_RELAY_PUBLIC_URL=$ACP_RELAY_PUBLIC_URL"
     echo "$out"
 }
 
 _build_env_launchd() {
     local out=""
-    [[ -n "${ACP_DAEMON_TOKEN:-}" ]] && out="$out        <key>ACP_DAEMON_TOKEN</key><string>$ACP_DAEMON_TOKEN</string>"$'\n'
-    [[ -n "${ACP_DAEMON_ID:-}" ]]    && out="$out        <key>ACP_DAEMON_ID</key><string>$ACP_DAEMON_ID</string>"$'\n'
-    [[ -n "${ACP_RELAY_URL:-}" ]]    && out="$out        <key>ACP_RELAY_URL</key><string>$ACP_RELAY_URL</string>"$'\n'
+    [[ -n "${ACP_DAEMON_TOKEN:-}" ]]    && out="$out        <key>ACP_DAEMON_TOKEN</key><string>$ACP_DAEMON_TOKEN</string>"$'\n'
+    [[ -n "${ACP_DAEMON_ID:-}" ]]       && out="$out        <key>ACP_DAEMON_ID</key><string>$ACP_DAEMON_ID</string>"$'\n'
+    [[ -n "${ACP_RELAY_URL:-}" ]]       && out="$out        <key>ACP_RELAY_URL</key><string>$ACP_RELAY_URL</string>"$'\n'
+    [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]] && out="$out        <key>ACP_RELAY_PUBLIC_URL</key><string>$ACP_RELAY_PUBLIC_URL</string>"$'\n'
     echo "$out"
 }
 
