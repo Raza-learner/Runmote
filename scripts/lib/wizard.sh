@@ -212,9 +212,9 @@ validate_device_name() {
 
 wizard_device_name() {
 
-    # Non-interactive with pre-set name — skip prompt
-    if [[ $ACP_INTERACTIVE -eq 0 && -n "${ACP_DAEMON_ID:-}" ]]; then
-        ACP_DEVICE_NAME="$ACP_DAEMON_ID"
+    # Non-interactive — skip prompt
+    if [[ $ACP_INTERACTIVE -eq 0 ]]; then
+        ACP_DEVICE_NAME="${ACP_DAEMON_ID:-$(hostname 2>/dev/null || echo acp-device)}"
         return 0
     fi
 
@@ -368,17 +368,19 @@ wizard_autostart_summary() {
 
 wizard_cloud_relay() {
 
-    # Non-interactive with pre-set relay URL — skip prompt
-    if [[ $ACP_INTERACTIVE -eq 0 && -n "${ACP_RELAY_URL:-}" ]]; then
-        ACP_CLOUD_MODE=true
-        ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-}"
-        if [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]]; then
-            ACP_RELAY_PUBLIC_URL="$ACP_RELAY_PUBLIC_URL"
-        else
-            base="${ACP_RELAY_URL%/daemon}"
-            base="${base/#wss:/https:}"
-            base="${base/#ws:/http:}"
-            ACP_RELAY_PUBLIC_URL="$base"
+    # Non-interactive — skip prompt
+    if [[ $ACP_INTERACTIVE -eq 0 ]]; then
+        if [[ -n "${ACP_RELAY_URL:-}" ]]; then
+            ACP_CLOUD_MODE=true
+            ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-}"
+            if [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]]; then
+                ACP_RELAY_PUBLIC_URL="$ACP_RELAY_PUBLIC_URL"
+            else
+                base="${ACP_RELAY_URL%/daemon}"
+                base="${base/#wss:/https:}"
+                base="${base/#ws:/http:}"
+                ACP_RELAY_PUBLIC_URL="$base"
+            fi
         fi
         return 0
     fi
