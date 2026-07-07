@@ -626,14 +626,30 @@ wizard_pairing() {
             sleep 1
         done
         if [[ -n "$code" ]]; then
-            local formatted="${code:0:4}-${code:4}"
-            echo ""
-            echo "  ┌─────────────────────────────┐"
-            printf "  │  Pairing Code: %-12s  │\n" "$formatted"
-            echo "  │                             │"
-            echo "  │  Enter this in the app      │"
-            echo "  └─────────────────────────────┘"
-            echo ""
+            local qr_output=""
+            local qr_python
+            [[ -x "$ACP_INSTALL_DIR/.venv/bin/python3" ]] && qr_python="$ACP_INSTALL_DIR/.venv/bin/python3"
+            [[ -x "$ACP_INSTALL_DIR/.venv/bin/python" ]] && qr_python="$ACP_INSTALL_DIR/.venv/bin/python"
+            if [[ -n "${qr_python:-}" ]]; then
+                qr_output=$("$qr_python" -c "
+import sys
+sys.path.insert(0, '$ACP_INSTALL_DIR/src')
+from daemon.main import _pairing_banner
+print(_pairing_banner('$code'))
+" 2>/dev/null) || qr_output=""
+            fi
+            if [[ -n "$qr_output" ]]; then
+                echo "$qr_output"
+            else
+                local formatted="${code:0:4}-${code:4}"
+                echo ""
+                echo "  ┌─────────────────────────────┐"
+                printf "  │  Pairing Code: %-12s  │\n" "$formatted"
+                echo "  │                             │"
+                echo "  │  Enter this in the app      │"
+                echo "  └─────────────────────────────┘"
+                echo ""
+            fi
         else
             echo "  Run 'runmote code' after daemon connects to get pairing code."
         fi
