@@ -609,8 +609,34 @@ wizard_pairing() {
 
     local paired_file="$HOME/.config/runmote/paired"
 
-    # Non-interactive or already paired — skip
-    if [[ $ACP_INTERACTIVE -eq 0 || -f "$paired_file" ]]; then
+    # Already paired — skip
+    if [[ -f "$paired_file" ]]; then
+        return 0
+    fi
+
+    local code=""
+
+    if [[ $ACP_INTERACTIVE -eq 0 ]]; then
+        # Non-interactive: fetch pairing code from journal, print it plainly
+        echo ""
+        echo "  Fetching pairing code..."
+        for i in $(seq 1 12); do
+            code=$(journalctl --user -u runmote.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1 || true)
+            [[ -n "$code" ]] && break
+            sleep 1
+        done
+        if [[ -n "$code" ]]; then
+            local formatted="${code:0:4}-${code:4}"
+            echo ""
+            echo "  ┌─────────────────────────────┐"
+            printf "  │  Pairing Code: %-12s  │\n" "$formatted"
+            echo "  │                             │"
+            echo "  │  Enter this in the app      │"
+            echo "  └─────────────────────────────┘"
+            echo ""
+        else
+            echo "  Run 'runmote code' after daemon connects to get pairing code."
+        fi
         return 0
     fi
 
@@ -630,15 +656,14 @@ wizard_pairing() {
         echo
 
         echo "  ${DIM}Starting daemon...${RESET}"
-        systemctl --user start acp-daemon.service 2>/dev/null || true
+        systemctl --user start runmote.service 2>/dev/null || true
         sleep 1
 
         echo
         echo "  ${DIM}Fetching pairing code...${RESET}"
 
-        local code=""
         for i in $(seq 1 12); do
-            code=$(journalctl --user -u acp-daemon.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1 || true)
+            code=$(journalctl --user -u runmote.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1 || true)
             [[ -n "$code" ]] && break
             sleep 1
         done
