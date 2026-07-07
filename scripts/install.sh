@@ -10,16 +10,16 @@ if [[ ! -f "$(dirname "$0")/lib/utils.sh" ]]; then
     echo "Downloading ACP installer..."
 
     BRANCH="${ACP_BRANCH:-dev}"
-    REPO="${ACP_REMOTE:-https://github.com/Raza-learner/acp-remote.git}"
+    REPO="${ACP_REMOTE:-https://github.com/Raza-learner/Runmote.git}"
     TMP_DIR="$(mktemp -d)"
     SCRIPT_DIR="$TMP_DIR/acp-remote"
 
     # Try archive download first (fast)
     if command -v curl &>/dev/null; then
-        ARCHIVE="https://github.com/Raza-learner/acp-remote/archive/$BRANCH.tar.gz"
+        ARCHIVE="https://github.com/Raza-learner/Runmote/archive/$BRANCH.tar.gz"
         curl -sL "$ARCHIVE" -o "$TMP_DIR/repo.tar.gz" 2>/dev/null && \
         tar -xzf "$TMP_DIR/repo.tar.gz" -C "$TMP_DIR" 2>/dev/null && \
-        mv "$TMP_DIR/acp-remote-$BRANCH" "$SCRIPT_DIR" 2>/dev/null
+        mv "$TMP_DIR"/*-"$BRANCH" "$SCRIPT_DIR" 2>/dev/null
     fi
 
     # Fallback: shallow git clone
@@ -31,7 +31,7 @@ if [[ ! -f "$(dirname "$0")/lib/utils.sh" ]]; then
         echo "Cloning repository (this may take a moment)..."
         # Try HTTPS first, then SSH (for private repos with keys)
         git clone --depth 1 --branch "$BRANCH" "$REPO" "$SCRIPT_DIR" 2>/dev/null || \
-        git clone --depth 1 --branch "$BRANCH" "git@github.com:Raza-learner/acp-remote.git" "$SCRIPT_DIR" || {
+        git clone --depth 1 --branch "$BRANCH" "git@github.com:Raza-learner/Runmote.git" "$SCRIPT_DIR" || {
             echo "Error: failed to clone repository."
             echo "Make sure the repo is accessible or use a public repo."
             exit 1
