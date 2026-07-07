@@ -98,6 +98,8 @@ wizard_init() {
 
 wizard_welcome() {
 
+    [[ $ACP_INTERACTIVE -eq 0 ]] && return 0
+
     section "Welcome to ACP Remote"
 
     echo
@@ -121,6 +123,8 @@ wizard_welcome() {
 # ----------------------------------------------------------
 
 wizard_intro() {
+
+    [[ $ACP_INTERACTIVE -eq 0 ]] && return 0
 
     screen_header
 
@@ -165,6 +169,10 @@ wizard_start() {
 
     wizard_init
 
+    if [[ $ACP_INTERACTIVE -eq 0 ]]; then
+        return 0
+    fi
+
     screen_header
 
     wizard_welcome
@@ -203,6 +211,12 @@ validate_device_name() {
 # ----------------------------------------------------------
 
 wizard_device_name() {
+
+    # Non-interactive with pre-set name — skip prompt
+    if [[ $ACP_INTERACTIVE -eq 0 && -n "${ACP_DAEMON_ID:-}" ]]; then
+        ACP_DEVICE_NAME="$ACP_DAEMON_ID"
+        return 0
+    fi
 
     while true; do
 
@@ -247,6 +261,8 @@ wizard_device_name() {
 
 wizard_device_summary() {
 
+    [[ $ACP_INTERACTIVE -eq 0 ]] && return 0
+
     screen_header
 
     section "Device"
@@ -265,6 +281,12 @@ wizard_device_summary() {
 # ----------------------------------------------------------
 
 wizard_autostart() {
+
+    # Non-interactive — accept env var default (true) or pre-set value
+    if [[ $ACP_INTERACTIVE -eq 0 ]]; then
+        ACP_ENABLE_AUTOSTART="${ACP_ENABLE_AUTOSTART:-true}"
+        return 0
+    fi
 
     while true; do
 
@@ -316,6 +338,8 @@ wizard_autostart() {
 
 wizard_autostart_summary() {
 
+    [[ $ACP_INTERACTIVE -eq 0 ]] && return 0
+
     screen_header
 
     section "Auto-start"
@@ -343,6 +367,21 @@ wizard_autostart_summary() {
 # ----------------------------------------------------------
 
 wizard_cloud_relay() {
+
+    # Non-interactive with pre-set relay URL — skip prompt
+    if [[ $ACP_INTERACTIVE -eq 0 && -n "${ACP_RELAY_URL:-}" ]]; then
+        ACP_CLOUD_MODE=true
+        ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-}"
+        if [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]]; then
+            ACP_RELAY_PUBLIC_URL="$ACP_RELAY_PUBLIC_URL"
+        else
+            base="${ACP_RELAY_URL%/daemon}"
+            base="${base/#wss:/https:}"
+            base="${base/#ws:/http:}"
+            ACP_RELAY_PUBLIC_URL="$base"
+        fi
+        return 0
+    fi
 
     while true; do
 
@@ -431,6 +470,8 @@ wizard_cloud_relay() {
 
 wizard_cloud_summary() {
 
+    [[ $ACP_INTERACTIVE -eq 0 ]] && return 0
+
     screen_header
 
     section "Relay Configuration"
@@ -477,6 +518,12 @@ relay_status() {
 # ----------------------------------------------------------
 
 wizard_confirm() {
+
+    # Non-interactive — skip review, just export
+    if [[ $ACP_INTERACTIVE -eq 0 ]]; then
+        wizard_export
+        return 0
+    fi
 
     while true; do
 
@@ -560,14 +607,8 @@ wizard_pairing() {
 
     local paired_file="$HOME/.config/acp/paired"
 
-    # Already paired — skip
-    if [[ -f "$paired_file" ]]; then
-        screen_header
-        section "Pair Your Device"
-        echo
-        info "Phone is already paired."
-        echo
-        press_enter
+    # Non-interactive or already paired — skip
+    if [[ $ACP_INTERACTIVE -eq 0 || -f "$paired_file" ]]; then
         return 0
     fi
 
@@ -653,8 +694,8 @@ wizard_wait_for_pairing() {
 
     local paired_file="$HOME/.config/acp/paired"
 
-    # Already paired — skip
-    if [[ -f "$paired_file" ]]; then
+    # Non-interactive or already paired — skip
+    if [[ $ACP_INTERACTIVE -eq 0 || -f "$paired_file" ]]; then
         return 0
     fi
 
@@ -726,6 +767,11 @@ wizard_wait_for_pairing() {
 
 wizard_install_complete() {
 
+    if [[ $ACP_INTERACTIVE -eq 0 ]]; then
+        echo "ACP installed. Use 'acp-remote' to manage the daemon."
+        return 0
+    fi
+
     screen_header
 
     section "Installation Complete"
@@ -786,10 +832,11 @@ run_wizard() {
     wizard_device_summary
 
     # Auto-detect local relay silently
-    local default_relay="ws://localhost:8000/daemon"
-    if (command -v nc >/dev/null 2>&1 && nc -z localhost 8000 2>/dev/null) || \
-       (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ':8000'); then
-        ACP_RELAY_URL="$default_relay"
+    if [[ -z "${ACP_RELAY_URL:-}" ]]; then
+        if (command -v nc >/dev/null 2>&1 && nc -z localhost 8000 2>/dev/null) || \
+           (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ':8000'); then
+            ACP_RELAY_URL="ws://localhost:8000/daemon"
+        fi
     fi
 
     wizard_cloud_relay
