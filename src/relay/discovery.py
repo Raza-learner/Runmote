@@ -24,7 +24,7 @@ class RelayDiscovery:
         self._az = AsyncZeroconf()
         info = ServiceInfo(
             "_acp-relay._tcp.local.",
-            f"ACP Relay on {ip}._acp-relay._tcp.local.",
+            f"Runmote Relay on {ip}._acp-relay._tcp.local.",
             addresses=[socket.inet_aton(ip)],
             port=self._port,
             properties={},

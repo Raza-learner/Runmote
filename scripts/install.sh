@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ==========================================================
-# ACP Installer
+# Runmote Installer
 # ==========================================================
 
 # ── Bootstrap: detect pipe mode and download ──────────────
@@ -12,7 +12,7 @@ if [[ ! -f "$(dirname "$0")/lib/utils.sh" ]]; then
     BRANCH="${ACP_BRANCH:-dev}"
     REPO="${ACP_REMOTE:-https://github.com/Raza-learner/Runmote.git}"
     TMP_DIR="$(mktemp -d)"
-    SCRIPT_DIR="$TMP_DIR/acp-remote"
+    SCRIPT_DIR="$TMP_DIR/runmote"
 
     # Try archive download first (fast)
     if command -v curl &>/dev/null; then

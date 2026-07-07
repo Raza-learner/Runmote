@@ -22,7 +22,7 @@ app_clients: dict[str, WebSocket] = {}
 recently_deleted_sessions: set = store.deleted_sessions()
 
 # Auth state
-_AUTH_STATE_PATH = Path(os.environ.get("ACP_CONFIG_DIR", Path.home() / ".config" / "acp")) / "relay_auth.json"
+_AUTH_STATE_PATH = Path(os.environ.get("ACP_CONFIG_DIR", Path.home() / ".config" / "runmote")) / "relay_auth.json"
 token_to_daemons: dict[str, str] = {}
 code_to_token: dict[str, str] = {}
 app_to_token: dict[str, str] = {}

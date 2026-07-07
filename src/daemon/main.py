@@ -299,9 +299,9 @@ async def run_daemon():
                                 public_url = result.get("publicUrl", "")
                                 log(f"← pairing code: {pairing_code}")
                                 print(_pairing_banner(pairing_code, public_url), flush=True)
-                                # Persist public URL for acp-remote script
+                                # Persist public URL for runmote script
                                 if public_url:
-                                    config_dir = Path.home() / ".config" / "acp"
+                                    config_dir = Path.home() / ".config" / "runmote"
                                     config_dir.mkdir(parents=True, exist_ok=True)
                                     (config_dir / "public_url").write_text(public_url)
                             break

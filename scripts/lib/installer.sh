@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ==========================================================
-# ACP Installer
+# Runmote Installer
 # Handles installation, updates and verification
 # ==========================================================
 
@@ -23,13 +23,13 @@ fi
 
 ACP_PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-ACP_INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/acp}"
+ACP_INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/runmote}"
 
 ACP_BIN_DIR="$HOME/.local/bin"
 
-ACP_SERVICE_NAME="acp-daemon"
+ACP_SERVICE_NAME="runmoted"
 
-ACP_REMOTE="${ACP_REMOTE:-https://github.com/Raza-learner/acp-remote.git}"
+ACP_REMOTE="${ACP_REMOTE:-https://github.com/Raza-learner/Runmote.git}"
 
 ACP_BRANCH="${ACP_BRANCH:-main}"
 
@@ -166,7 +166,7 @@ create_directories() {
 
 install_project_files() {
 
-    section "Installing ACP Files"
+    section "Installing Runmote Files"
 
     #
     # Local Repository
@@ -207,7 +207,7 @@ install_project_files() {
     #
     else
 
-        info "Downloading ACP..."
+        info "Downloading Runmote..."
 
         if [[ -d "$ACP_INSTALL_DIR/.git" ]]; then
 
@@ -237,7 +237,7 @@ install_project_files() {
 
     if [[ ! -f "$ACP_INSTALL_DIR/pyproject.toml" ]]; then
 
-        error "ACP project files missing."
+        error "Runmote project files missing."
 
         return 1
 
@@ -293,13 +293,13 @@ install_launcher() {
 
     mkdir -p "$ACP_BIN_DIR"
 
-    local launcher="$ACP_BIN_DIR/acp-remote"
+    local launcher="$ACP_BIN_DIR/runmote"
 
     rm -f "$launcher"
 
     cat > "$launcher" <<EOF
 #!/usr/bin/env bash
-exec "$ACP_INSTALL_DIR/scripts/acp-remote" "\$@"
+exec "$ACP_INSTALL_DIR/scripts/runmote" "\$@"
 EOF
 
     chmod +x "$launcher"
@@ -437,15 +437,15 @@ install_agents() {
 
 start_daemon() {
 
-    section "Starting ACP Daemon"
+    section "Starting Runmote Daemon"
 
     case "$ACP_OS" in
 
         Linux|Darwin)
 
-            if command -v acp-remote >/dev/null 2>&1; then
+            if command -v runmote >/dev/null 2>&1; then
 
-                timeout 10 acp-remote start >/dev/null 2>&1 || true
+                timeout 10 runmote start >/dev/null 2>&1 || true
 
             fi
 
@@ -456,7 +456,7 @@ start_daemon() {
             powershell.exe \
                 -NoProfile \
                 -ExecutionPolicy Bypass \
-                -Command "acp-remote start" \
+                -Command "runmote start" \
                 >/dev/null 2>&1 || true
 
             ;;
@@ -496,7 +496,7 @@ verify_installation() {
         failed=1
     }
 
-    command -v acp-remote >/dev/null 2>&1 || {
+    command -v runmote >/dev/null 2>&1 || {
         error "Launcher missing"
         failed=1
     }
@@ -516,14 +516,14 @@ verify_installation() {
 }
 
 # ----------------------------------------------------------
-# Install ACP
+# Install Runmote
 # ----------------------------------------------------------
 
 install_acp() {
 
     progress_init 9
 
-    progress_section "Installing ACP"
+    progress_section "Installing Runmote"
 
     run_task "Installing uv" \
         ensure_uv || return 1

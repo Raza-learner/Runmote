@@ -34,37 +34,37 @@ get_daemon_name() {
 
 start_daemon() {
     case "$OS" in
-        linux)   systemctl --user start acp-daemon.service 2>/dev/null ;;
-        darwin)  launchctl start com.acp.daemon 2>/dev/null || true ;;
-        windows) powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/acp-remote.ps1" -Start; return ;;
+        linux)   systemctl --user start runmote.service 2>/dev/null ;;
+        darwin)  launchctl start com.runmote.daemon 2>/dev/null || true ;;
+        windows) powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/runmote.ps1" -Start; return ;;
     esac
     echo "  ${GREEN}Daemon started.${RESET}"
 }
 
 stop_daemon() {
     case "$OS" in
-        linux)   systemctl --user stop acp-daemon.service 2>/dev/null ;;
-        darwin)  launchctl stop com.acp.daemon 2>/dev/null || true ;;
-        windows) powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/acp-remote.ps1" -Stop; return ;;
+        linux)   systemctl --user stop runmote.service 2>/dev/null ;;
+        darwin)  launchctl stop com.runmote.daemon 2>/dev/null || true ;;
+        windows) powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/runmote.ps1" -Stop; return ;;
     esac
     echo "  ${YELLOW}Daemon stopped.${RESET}"
 }
 
 is_running() {
     case "$OS" in
-        linux)   systemctl --user is-active --quiet acp-daemon.service 2>/dev/null ;;
-        darwin)  launchctl list com.acp.daemon &>/dev/null ;;
+        linux)   systemctl --user is-active --quiet runmote.service 2>/dev/null ;;
+        darwin)  launchctl list com.runmote.daemon &>/dev/null ;;
         windows) powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
-            "Get-ScheduledTask -TaskName 'ACP Daemon' -ErrorAction SilentlyContinue | Where-Object State -eq 'Running'" 2>/dev/null | grep -q Running ;;
+            "Get-ScheduledTask -TaskName 'Runmote Daemon' -ErrorAction SilentlyContinue | Where-Object State -eq 'Running'" 2>/dev/null | grep -q Running ;;
     esac
 }
 
 get_pairing_code() {
     case "$OS" in
-        linux)   journalctl --user -u acp-daemon.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1 ;;
-        darwin)  grep -oP 'pairing code:\s+\K\S+' ~/Library/Logs/acp-daemon.log 2>/dev/null | tail -1 ;;
+        linux)   journalctl --user -u runmote.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1 ;;
+        darwin)  grep -oP 'pairing code:\s+\K\S+' ~/Library/Logs/runmote-daemon.log 2>/dev/null | tail -1 ;;
         windows) powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
-            "Select-String -Path (\"\$env:TEMP\acp-daemon.log\") -Pattern 'pairing code:\s+(\S+)' | Select-Object -Last 1 | ForEach-Object { \$_.Matches.Groups[1].Value }" 2>/dev/null ;;
+            "Select-String -Path (\"\$env:TEMP\runmote-daemon.log\") -Pattern 'pairing code:\s+(\S+)' | Select-Object -Last 1 | ForEach-Object { \$_.Matches.Groups[1].Value }" 2>/dev/null ;;
     esac
 }
 
@@ -115,8 +115,8 @@ show_qr() {
     fi
     echo ""
     local public_url=""
-    if [[ -f "$HOME/.config/acp/public_url" ]]; then
-        public_url="$(cat "$HOME/.config/acp/public_url")"
+    if [[ -f "$HOME/.config/runmote/public_url" ]]; then
+        public_url="$(cat "$HOME/.config/runmote/public_url")"
     fi
     if [[ -f "$PYTHON" ]] && [[ -d "$INSTALL_DIR/src" ]]; then
         "$PYTHON" -c "
@@ -131,7 +131,7 @@ print(_pairing_banner('$code', '$public_url'))
 # ── Uninstall ────────────────────────────────────────────────────────
 uninstall_daemon() {
     echo ""
-    read -r -p "  ${RED}${BOLD}Uninstall ACP daemon?${RESET} This removes all files and auto-start. ${DIM}[y/N]${RESET}: " confirm
+    read -r -p "  ${RED}${BOLD}Uninstall Runmote daemon?${RESET} This removes all files and auto-start. ${DIM}[y/N]${RESET}: " confirm
     case "${confirm,,}" in
         y|yes) ;;
         *) echo "  ${DIM}Cancelled.${RESET}"; return 0 ;;
@@ -144,24 +144,24 @@ uninstall_daemon() {
     echo "  Removing auto-start..."
     case "$OS" in
         linux)
-            systemctl --user disable --now acp-daemon.service 2>/dev/null || true
-            rm -f "$HOME/.config/systemd/user/acp-daemon.service"
+            systemctl --user disable --now runmote.service 2>/dev/null || true
+            rm -f "$HOME/.config/systemd/user/runmote.service"
             systemctl --user daemon-reload 2>/dev/null || true ;;
         darwin)
-            launchctl unload -w "$HOME/Library/LaunchAgents/com.acp.daemon.plist" 2>/dev/null || true
-            rm -f "$HOME/Library/LaunchAgents/com.acp.daemon.plist" ;;
+            launchctl unload -w "$HOME/Library/LaunchAgents/com.runmote.daemon.plist" 2>/dev/null || true
+            rm -f "$HOME/Library/LaunchAgents/com.runmote.daemon.plist" ;;
         windows)
             powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/setup-autostart.ps1" -Remove ;;
     esac
 
-    echo "  Removing acp-remote command..."
-    rm -f "$HOME/.local/bin/acp-remote"
+    echo "  Removing runmote command..."
+    rm -f "$HOME/.local/bin/runmote"
 
     echo "  Removing $INSTALL_DIR..."
     rm -rf "$INSTALL_DIR"
 
     echo ""
-    echo "  ${GREEN}ACP daemon uninstalled.${RESET}"
+    echo "  ${GREEN}Runmote daemon uninstalled.${RESET}"
 }
 
 # ── Logo ─────────────────────────────────────────────────────────────
@@ -174,7 +174,7 @@ _logo() {
     echo "  ${BOLD}${CYAN}  ██║  ██║╚██████╗ ██║${RESET}"
     echo "  ${BOLD}${CYAN}  ╚═╝  ╚═╝ ╚═════╝ ╚═╝${RESET}"
     echo ""
-    echo "  ${DIM}Agent Communication Protocol${RESET}"
+    echo "  ${DIM}Runmote${RESET}"
     echo ""
 }
 
@@ -212,7 +212,7 @@ _menu_draw() {
     )
 
     box_top
-    box_row "    ${WHITE}${BOLD}ACP Daemon Control${RESET}"
+    box_row "    ${WHITE}${BOLD}Runmote Daemon Control${RESET}"
     box_mid
     box_row "    ${status_color}${status_text}${RESET}"
     box_row "    ${DIM}Daemon: ${name}${RESET}"
@@ -254,7 +254,7 @@ show_menu() {
             name="$(get_daemon_name)"
 
             echo ""
-            echo "  ${BOLD}${CYAN}ACP Daemon Control${RESET}  ${status_color}${status_text}${RESET}  ${DIM}Daemon: ${name}${RESET}"
+            echo "  ${BOLD}${CYAN}Runmote Daemon Control${RESET}  ${status_color}${status_text}${RESET}  ${DIM}Daemon: ${name}${RESET}"
             echo ""
             echo "  1) Start daemon        2) Stop daemon"
             echo "  3) Show QR code        4) Show code (text)"
@@ -334,7 +334,7 @@ case "${1:-}" in
         fi
         exit 0 ;;
     "")     show_menu ;;
-    *)      echo "Usage: acp-remote [start|stop|code|text|uninstall|status]"
-            echo "       acp-remote          (interactive menu)"
+    *)      echo "Usage: runmote [start|stop|code|text|uninstall|status]"
+            echo "       runmote          (interactive menu)"
             exit 1 ;;
 esac

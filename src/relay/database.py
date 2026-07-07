@@ -3,7 +3,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-DB_PATH = os.environ.get("ACP_RELAY_DB", "acp_relay.db")
+DB_PATH = os.environ.get("ACP_RELAY_DB", "runmote_relay.db")
 
 
 class Database:

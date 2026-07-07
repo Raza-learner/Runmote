@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ==========================================================
-# ACP Wizard
+# Runmote Wizard
 # Interactive Installation Wizard
 # ==========================================================
 
@@ -19,7 +19,7 @@ fi
 # ----------------------------------------------------------
 
 ACP_DEVICE_NAME="${ACP_DAEMON_ID:-}"
-ACP_INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/acp}"
+ACP_INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/runmote}"
 ACP_RELAY_URL="${ACP_RELAY_URL:-}"
 ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-}"
 ACP_RELAY_PUBLIC_URL="${ACP_RELAY_PUBLIC_URL:-}"
@@ -55,7 +55,7 @@ wizard_reset() {
 
     ACP_DEVICE_NAME="$(wizard_default_device_name)"
 
-    ACP_INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/acp}"
+    ACP_INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/runmote}"
 
     ACP_RELAY_URL="${ACP_RELAY_URL:-}"
     ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-}"
@@ -100,16 +100,16 @@ wizard_welcome() {
 
     [[ $ACP_INTERACTIVE -eq 0 ]] && return 0
 
-    section "Welcome to ACP Remote"
+    section "Welcome to Runmote"
 
     echo
-    echo "ACP securely connects your computer"
-    echo "to the ACP Mobile App."
+    echo "Runmote securely connects your computer"
+    echo "to the Runmote Mobile App."
     echo
     echo "This installer will:"
     echo
     success "Check your system"
-    success "Install ACP"
+    success "Install Runmote"
     success "Configure the daemon"
     success "Enable auto-start"
     success "Pair your mobile device"
@@ -131,7 +131,7 @@ wizard_intro() {
     section "Installation Wizard"
 
     echo
-    info "We'll ask a few questions before installing ACP."
+    info "We'll ask a few questions before installing Runmote."
     echo
 
     printf "  %-20s %s\n" "Operating System:" "$(uname -s)"
@@ -226,7 +226,7 @@ wizard_device_name() {
 
         echo
         info "Choose a name for this computer."
-        echo "This name will appear in the ACP mobile app."
+        echo "This name will appear in the Runmote mobile app."
         echo
 
         read -rp "Device Name [$ACP_DEVICE_NAME]: " input
@@ -295,7 +295,7 @@ wizard_autostart() {
         section "Auto-start"
 
         echo
-        info "ACP can automatically start when you log in."
+        info "Runmote can automatically start when you log in."
         echo
         echo "Recommended: Enable"
         echo
@@ -392,11 +392,11 @@ wizard_cloud_relay() {
         section "Cloud Relay"
 
         echo
-        info "ACP can connect through a cloud relay so you can"
+        info "Runmote can connect through a cloud relay so you can"
         echo "access your computer from anywhere in the world."
         echo
         echo "You need a relay server deployed on Render, Fly.io,"
-        echo "or any public server running the ACP relay."
+        echo "or any public server running the Runmote relay."
         echo
         echo "  1) Use local relay ${DIM}(LAN only)${RESET}"
         echo "  2) Use cloud relay ${DIM}(access from anywhere)${RESET}"
@@ -607,7 +607,7 @@ wizard_confirm() {
 
 wizard_pairing() {
 
-    local paired_file="$HOME/.config/acp/paired"
+    local paired_file="$HOME/.config/runmote/paired"
 
     # Non-interactive or already paired — skip
     if [[ $ACP_INTERACTIVE -eq 0 || -f "$paired_file" ]]; then
@@ -619,7 +619,7 @@ wizard_pairing() {
     section "Pair Your Device"
 
     echo
-    info "ACP is now ready to pair with your mobile device."
+    info "Runmote is now ready to pair with your mobile device."
     echo
 
     echo "The daemon will now start and generate a pairing code."
@@ -677,7 +677,7 @@ print(_pairing_banner('$code'))
 
     echo
 
-    info "Scan the QR code using the ACP Mobile App."
+    info "Scan the QR code using the Runmote Mobile App."
 
     echo
 
@@ -694,7 +694,7 @@ print(_pairing_banner('$code'))
 
 wizard_wait_for_pairing() {
 
-    local paired_file="$HOME/.config/acp/paired"
+    local paired_file="$HOME/.config/runmote/paired"
 
     # Non-interactive or already paired — skip
     if [[ $ACP_INTERACTIVE -eq 0 || -f "$paired_file" ]]; then
@@ -724,8 +724,8 @@ wizard_wait_for_pairing() {
             echo
 
             rm -f /tmp/acp-paired
-            mkdir -p "$HOME/.config/acp"
-            : > "$HOME/.config/acp/paired"
+            mkdir -p "$HOME/.config/runmote"
+            : > "$HOME/.config/runmote/paired"
 
             press_enter
 
@@ -755,7 +755,7 @@ wizard_wait_for_pairing() {
 
         warn "You can pair later using:"
         echo
-        echo "    acp-remote pair"
+        echo "    runmote pair"
         echo
 
         press_enter
@@ -770,7 +770,7 @@ wizard_wait_for_pairing() {
 wizard_install_complete() {
 
     if [[ $ACP_INTERACTIVE -eq 0 ]]; then
-        echo "ACP installed. Use 'acp-remote' to manage the daemon."
+        echo "Runmote installed. Use 'runmote' to manage the daemon."
         return 0
     fi
 
@@ -780,7 +780,7 @@ wizard_install_complete() {
 
     echo
 
-    success "ACP has been installed successfully."
+    success "Runmote has been installed successfully."
 
     echo
 
@@ -810,13 +810,13 @@ wizard_install_complete() {
 
     echo
 
-    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote" "Interactive menu"
-    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote start" "Start the daemon"
-    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote stop" "Stop the daemon"
-    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote status" "Show daemon status"
-    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote code" "Display QR pairing code"
-    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote text" "Display text pairing code"
-    printf "  ${BOLD}%-20s${RESET}  %s\n" "acp-remote uninstall" "Uninstall ACP daemon"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "runmote" "Interactive menu"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "runmote start" "Start the daemon"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "runmote stop" "Stop the daemon"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "runmote status" "Show daemon status"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "runmote code" "Display QR pairing code"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "runmote text" "Display text pairing code"
+    printf "  ${BOLD}%-20s${RESET}  %s\n" "runmote uninstall" "Uninstall Runmote daemon"
 
     echo
 

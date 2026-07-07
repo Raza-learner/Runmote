@@ -10,7 +10,7 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [--install|--remove|--status] [--dir <path>]
 
-Configure ACP daemon to start automatically after login.
+Configure Runmote daemon to start automatically after login.
 
 Options:
   --install          Install and enable auto-start (default)
@@ -91,19 +91,19 @@ _build_env_launchd() {
 _install_symlink() {
     local bin_dir="$HOME/.local/bin"
     mkdir -p "$bin_dir"
-    ln -sf "$PROJECT_DIR/scripts/acp-remote" "$bin_dir/acp-remote"
-    echo "acp-remote command added to PATH: $bin_dir/acp-remote"
+    ln -sf "$PROJECT_DIR/scripts/runmote" "$bin_dir/runmote"
+    echo "runmote command added to PATH: $bin_dir/runmote"
 }
 
 _remove_symlink() {
-    rm -f "$HOME/.local/bin/acp-remote"
-    echo "acp-remote symlink removed"
+    rm -f "$HOME/.local/bin/runmote"
+    echo "runmote symlink removed"
 }
 
 # --- Linux: systemd user service ---
 linux_install() {
     local unit_dir="$HOME/.config/systemd/user"
-    local unit_file="$unit_dir/acp-daemon.service"
+    local unit_file="$unit_dir/runmote.service"
     local env_block
     env_block="$(_build_env_systemd)"
 
@@ -111,7 +111,7 @@ linux_install() {
 
     cat > "$unit_file" <<-SERVICEEOF
 [Unit]
-Description=ACP Daemon
+Description=Runmote Daemon
 After=network-online.target
 Wants=network-online.target
 
@@ -128,31 +128,31 @@ WantedBy=default.target
 SERVICEEOF
 
     systemctl --user daemon-reload
-    systemctl --user enable --now acp-daemon.service
+    systemctl --user enable --now runmote.service
     echo "systemd user service enabled: $unit_file"
 }
 
 linux_remove() {
-    systemctl --user disable --now acp-daemon.service 2>/dev/null || true
-    rm -f "$HOME/.config/systemd/user/acp-daemon.service"
+    systemctl --user disable --now runmote.service 2>/dev/null || true
+    rm -f "$HOME/.config/systemd/user/runmote.service"
     systemctl --user daemon-reload 2>/dev/null || true
     echo "systemd user service removed"
 }
 
 linux_status() {
-    if systemctl --user is-enabled acp-daemon.service &>/dev/null; then
-        echo "ACP daemon: ENABLED (systemd user service)"
-        systemctl --user status acp-daemon.service 2>/dev/null | grep -E "Active:|Process:"
+    if systemctl --user is-enabled runmote.service &>/dev/null; then
+        echo "Runmote daemon: ENABLED (systemd user service)"
+        systemctl --user status runmote.service 2>/dev/null | grep -E "Active:|Process:"
     else
-        echo "ACP daemon: NOT INSTALLED"
+        echo "Runmote daemon: NOT INSTALLED"
     fi
 }
 
 # --- macOS: launchd agent ---
 darwin_install() {
     local plist_dir="$HOME/Library/LaunchAgents"
-    local plist_file="$plist_dir/com.acp.daemon.plist"
-    local log_file="$HOME/Library/Logs/acp-daemon.log"
+    local plist_file="$plist_dir/com.runmote.daemon.plist"
+    local log_file="$HOME/Library/Logs/runmote-daemon.log"
     local env_block
     env_block="$(_build_env_launchd)"
 
@@ -164,7 +164,7 @@ darwin_install() {
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.acp.daemon</string>
+    <string>com.runmote.daemon</string>
     <key>ProgramArguments</key>
     <array>
         <string>$PYTHON</string>
@@ -193,18 +193,18 @@ PLISTEOF
 }
 
 darwin_remove() {
-    local plist_file="$HOME/Library/LaunchAgents/com.acp.daemon.plist"
+    local plist_file="$HOME/Library/LaunchAgents/com.runmote.daemon.plist"
     launchctl unload -w "$plist_file" 2>/dev/null || true
     rm -f "$plist_file"
     echo "launchd agent removed"
 }
 
 darwin_status() {
-    if [[ -f "$HOME/Library/LaunchAgents/com.acp.daemon.plist" ]]; then
-        echo "ACP daemon: ENABLED (launchd agent)"
-        launchctl list com.acp.daemon 2>/dev/null | grep -v "Could not"
+    if [[ -f "$HOME/Library/LaunchAgents/com.runmote.daemon.plist" ]]; then
+        echo "Runmote daemon: ENABLED (launchd agent)"
+        launchctl list com.runmote.daemon 2>/dev/null | grep -v "Could not"
     else
-        echo "ACP daemon: NOT INSTALLED"
+        echo "Runmote daemon: NOT INSTALLED"
     fi
 }
 
@@ -233,7 +233,7 @@ windows_status() {
     if [[ -f "$ps_script" ]]; then
         powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps_script" -Status
     else
-        echo "ACP daemon: NOT INSTALLED"
+        echo "Runmote daemon: NOT INSTALLED"
     fi
 }
 

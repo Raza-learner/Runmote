@@ -86,7 +86,7 @@ function Remove-AgentWrappers {
 }
 
 function Install-Agents {
-    Write-Host "Installing ACP agent adapters..."
+    Write-Host "Installing Runmote agent adapters..."
     Write-Host ""
 
     if (-not (Test-NpmInstalled)) {
@@ -105,7 +105,7 @@ function Install-Agents {
 }
 
 function Remove-Agents {
-    Write-Host "Removing ACP agent adapters..."
+    Write-Host "Removing Runmote agent adapters..."
     Write-Host ""
 
     if (-not (Test-NpmInstalled)) {
@@ -179,7 +179,7 @@ function Get-AllWrapperStatus {
 }
 
 function Status-Agents {
-    Write-Host "ACP Agent Adapters Status"
+    Write-Host "Runmote Agent Adapters Status"
     Write-Host ""
 
     Get-AllCliStatus
@@ -191,13 +191,13 @@ function Status-Agents {
 $npx = Get-Command npx -ErrorAction SilentlyContinue
 if ($npx) {
     if ($Install -or (-not $Remove -and -not $Status)) {
-        $result = & npx -y acp-remote agents 2>&1
+        $result = & npx -y runmote agents 2>&1
         if ($LASTEXITCODE -eq 0) { return }
     } elseif ($Remove) {
-        $result = & npx -y acp-remote uninstall 2>&1
+        $result = & npx -y runmote uninstall 2>&1
         if ($LASTEXITCODE -eq 0) { return }
     } elseif ($Status) {
-        $result = & npx -y acp-remote status 2>&1
+        $result = & npx -y runmote status 2>&1
         if ($LASTEXITCODE -eq 0) { return }
     }
 }

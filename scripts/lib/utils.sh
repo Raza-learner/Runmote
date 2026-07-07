@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ==========================================================
-# ACP Utilities
+# Runmote Utilities
 # Shared helper functions
 # ==========================================================
 

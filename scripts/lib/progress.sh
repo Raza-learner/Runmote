@@ -5,7 +5,7 @@ ACP_TMP_LOG="$(mktemp -t acp-install.XXXXXX.log)"
 # Remove it when the installer exits
 trap 'rm -f "$ACP_TMP_LOG"' EXIT
 # ==========================================================
-# ACP Progress Library
+# Runmote Progress Library
 # ==========================================================
 
 [[ -n "${ACP_PROGRESS_LOADED:-}" ]] && return

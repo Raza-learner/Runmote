@@ -5,20 +5,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.relay
-    container_name: acp-relay
+    container_name: runmote-relay
     restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:
-      - acp-relay-data:/data
+      - runmote-relay-data:/data
     environment:
       ACP_RELAY_HOST: "0.0.0.0"
       ACP_RELAY_PORT: "8000"
       ACP_RELAY_DB: "/data/acp_relay.db"
       # Cloud deployment — set in Render dashboard:
       # ACP_RELAY_TOKEN: "your-secret-token"
-      # ACP_RELAY_PUBLIC_URL: "https://acp-relay.onrender.com"
+      # ACP_RELAY_PUBLIC_URL: "https://runmote-relay.onrender.com"
       # ACP_RELAY_DISABLE_DISCOVERY: "true"
 
 volumes:
-  acp-relay-data:
+  runmote-relay-data:

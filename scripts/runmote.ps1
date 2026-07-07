@@ -9,8 +9,8 @@ param(
 
 $ErrorActionPreference = "Continue"
 
-$taskName = "ACP Daemon"
-$logFile = "$env:TEMP\acp-daemon.log"
+$taskName = "Runmote Daemon"
+$logFile = "$env:TEMP\runmote-daemon.log"
 
 $scriptDir = Split-Path -Parent $PSCommandPath
 $installDir = Split-Path -Parent $scriptDir
@@ -119,7 +119,7 @@ print(_pairing_banner('$code', '$publicUrl'))
 
 function Uninstall-Daemon {
     Write-Host ""
-    $confirm = Read-Host "  Uninstall ACP daemon? This removes all files and auto-start. [y/N]"
+    $confirm = Read-Host "  Uninstall Runmote daemon? This removes all files and auto-start. [y/N]"
     if ($confirm -notin @("y", "Y", "yes")) {
         Write-Host "  Cancelled." -ForegroundColor Gray
         return
@@ -129,14 +129,14 @@ function Uninstall-Daemon {
     Stop-Daemon
     Write-Host "  Removing scheduled task..."
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
-    Write-Host "  Removing acp-remote command..."
-    Remove-Item -Force "$env:USERPROFILE\.local\bin\acp-remote.cmd" -ErrorAction SilentlyContinue
+    Write-Host "  Removing runmote command..."
+    Remove-Item -Force "$env:USERPROFILE\.local\bin\runmote.cmd" -ErrorAction SilentlyContinue
     Write-Host "  Removing wrapper script..."
     Remove-Item -Force (Join-Path $scriptDir "run-daemon.ps1") -ErrorAction SilentlyContinue
     Write-Host "  Removing install directory: $installDir"
     Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
     Write-Host ""
-    Write-Host "  ACP daemon uninstalled." -ForegroundColor Green
+    Write-Host "  Runmote daemon uninstalled." -ForegroundColor Green
 }
 
 function Draw-Menu($sel) {
@@ -158,7 +158,7 @@ function Draw-Menu($sel) {
     Write-Host ""
     Write-Host ("  " + ("═" * (14 + $W + 14)))
     Write-Host "  ╔══════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "  ║     ACP Daemon Control                   ║" -ForegroundColor Cyan
+    Write-Host "  ║     Runmote Daemon Control                ║" -ForegroundColor Cyan
     Write-Host "  ╠══════════════════════════════════════════╣" -ForegroundColor Cyan
 
     Write-Host "  ║$(" " * 42)║" -ForegroundColor Cyan -NoNewline
@@ -250,7 +250,7 @@ function Show-Menu {
             $name = Get-DaemonName
 
             Write-Host ""
-            Write-Host ("  ACP Daemon Control   " + $statusText + "   Daemon: " + $name) -ForegroundColor Cyan
+            Write-Host ("  Runmote Daemon Control   " + $statusText + "   Daemon: " + $name) -ForegroundColor Cyan
             Write-Host ""
             Write-Host "  1) · Start daemon       2) · Stop daemon"
             Write-Host "  3) · Show QR code       4) · Show code (text)"

@@ -7,7 +7,7 @@ const os = require('os');
 const https = require('https');
 
 const BRANCH = process.env.ACP_BRANCH || 'dev';
-const RAW = `https://raw.githubusercontent.com/Raza-learner/acp-remote/${BRANCH}`;
+const RAW = `https://raw.githubusercontent.com/Raza-learner/Runmote/${BRANCH}`;
 const BIN_DIR = path.join(os.homedir(), '.local', 'bin');
 
 function detectOS() {
@@ -127,7 +127,7 @@ function hasNpm() {
 }
 
 async function installDaemon() {
-  status('\n  Installing ACP Daemon...\n');
+  status('\n  Installing Runmote Daemon...\n');
 
   if (OS === 'windows') {
     status('  Downloading Windows installer...');
@@ -213,7 +213,7 @@ function removeAgents() {
 }
 
 async function uninstall() {
-  status('\n  Uninstalling ACP...\n');
+  status('\n  Uninstalling Runmote...\n');
 
   removeAgents();
 
@@ -230,16 +230,16 @@ async function uninstall() {
       status(`  Download failed: ${err.message}`);
     }
   } else {
-    if (commandExists('acp-remote')) {
-      run('acp-remote uninstall');
+    if (commandExists('runmote')) {
+      run('runmote uninstall');
     } else {
-      status('  acp-remote not found — daemon may already be removed');
+      status('  runmote not found — daemon may already be removed');
     }
   }
 }
 
 function getStatus() {
-  status('\n  ACP Installation Status');
+  status('\n  Runmote Installation Status');
   status('');
 
   for (const cli of ['codex', 'claude', 'claude-code']) {
@@ -250,10 +250,10 @@ function getStatus() {
     }
   }
 
-  if (commandExists('acp-remote')) {
-    status(`  acp-remote: found (${runCapture('command -v acp-remote')})`);
+  if (commandExists('runmote')) {
+    status(`  runmote: found (${runCapture('command -v runmote')})`);
   } else {
-    status('  acp-remote: not found');
+    status('  runmote: not found');
   }
 
   status('');
@@ -270,15 +270,15 @@ function getStatus() {
 
 function help() {
   console.log(`
-  ACP Installer — universal cross-platform setup
+  Runmote Installer — universal cross-platform setup
 
   Usage:
-    npx acp-remote              Full install (daemon + agents)
-    npx acp-remote daemon        Install daemon only
-    npx acp-remote agents        Install agent adapters only
-    npx acp-remote status        Show installation status
-    npx acp-remote uninstall     Remove daemon + agents
-    npx acp-remote --help        Show this help
+    npx runmote                 Full install (daemon + agents)
+    npx runmote daemon           Install daemon only
+    npx runmote agents           Install agent adapters only
+    npx runmote status           Show installation status
+    npx runmote uninstall        Remove daemon + agents
+    npx runmote --help           Show this help
 
   Environment variables:
     ACP_BRANCH              Git branch (default: dev)

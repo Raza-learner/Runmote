@@ -1,7 +1,7 @@
 # Render Blueprint — https://render.com/docs/blueprint-spec
 services:
   - type: web
-    name: acp-relay
+    name: runmote-relay
     env: docker
     dockerfilePath: Dockerfile.relay
     healthCheckPath: /health
@@ -14,7 +14,7 @@ services:
       - key: ACP_RELAY_PORT
         value: "8000"
       - key: ACP_RELAY_DB
-        value: /data/acp_relay.db
+        value: /data/runmote_relay.db
       - key: ACP_RELAY_DISABLE_DISCOVERY
         value: "true"
       - key: ACP_RELAY_TOKEN

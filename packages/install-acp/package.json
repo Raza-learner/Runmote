@@ -1,7 +1,7 @@
 {
   "name": "acp-remote",
   "version": "1.0.0",
-  "description": "Universal ACP installer — installs the ACP daemon and agent adapters on Linux, macOS, and Windows",
+  "description": "Universal Runmote installer — installs the Runmote daemon and agent adapters on Linux, macOS, and Windows",
   "bin": {
     "acp-remote": "src/index.js"
   },

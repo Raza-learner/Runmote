@@ -9,12 +9,12 @@ usage() {
 Usage: $(basename "$0") [--install|--remove|--status]
 
 Detect coding agent CLIs (codex, claude) and install/uninstall their
-ACP adapters as global npm packages.
+Runmote adapters as global npm packages.
 
 Options:
-  --install          Install ACP adapters for detected CLIs (default)
-  --remove           Remove ACP adapter packages and symlinks
-  --status           Show installed ACP adapter status
+  --install          Install Runmote adapters for detected CLIs (default)
+  --remove           Remove Runmote adapter packages and symlinks
+  --status           Show installed Runmote adapter status
   --help             Show this help
 EOF
     exit 0
@@ -32,9 +32,9 @@ esac
 # Prefer the npm package as the canonical path
 if command -v npx &>/dev/null; then
     case "$MODE" in
-        install) npx -y acp-remote agents 2>/dev/null && exit 0 || true ;;
-        remove)  npx -y acp-remote uninstall 2>/dev/null && exit 0 || true ;;
-        status)  npx -y acp-remote status 2>/dev/null && exit 0 || true ;;
+        install) npx -y runmote agents 2>/dev/null && exit 0 || true ;;
+        remove)  npx -y runmote uninstall 2>/dev/null && exit 0 || true ;;
+        status)  npx -y runmote status 2>/dev/null && exit 0 || true ;;
     esac
 fi
 
@@ -104,7 +104,7 @@ _remove_package() {
 }
 
 install_agents() {
-    echo "Installing ACP agent adapters..."
+    echo "Installing Runmote agent adapters..."
     echo ""
 
     _ensure_npm || return 1
@@ -120,7 +120,7 @@ install_agents() {
 }
 
 remove_agents() {
-    echo "Removing ACP agent adapters..."
+    echo "Removing Runmote agent adapters..."
     echo ""
 
     _ensure_npm || return 0
@@ -135,7 +135,7 @@ remove_agents() {
 }
 
 status_agents() {
-    echo "ACP Agent Adapters Status"
+    echo "Runmote Agent Adapters Status"
     echo ""
 
     for cli in codex claude claude-code; do

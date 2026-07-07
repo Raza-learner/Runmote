@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ==========================================================
-# ACP UI Library
+# Runmote UI Library
 # ==========================================================
 
 [[ -n "${ACP_UI_LOADED:-}" ]] && return
@@ -164,7 +164,7 @@ echo "╚═╝  ╚═╝ ╚═════╝╚═╝     "
 
 echo -e "${RESET}"
 
-echo "ACP Remote"
+echo "Runmote"
 
 echo
 

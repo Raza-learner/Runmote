@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ==========================================================
-# ACP Doctor - Part 1
+# Runmote Doctor - Part 1
 # System & Dependency Checks
 # ==========================================================
 
@@ -18,7 +18,7 @@ DISTRO=""
 ARCH=""
 PYTHON_BIN=""
 PYTHON_VERSION=""
-INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/acp}"
+INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/runmote}"
 
 # ----------------------------------------------------------
 # Helpers
@@ -209,7 +209,7 @@ doctor_summary() {
     section "Summary"
 
     if [[ $DOCTOR_ERRORS -eq 0 ]]; then
-        doctor_ok "System ready for ACP installation"
+        doctor_ok "System ready for Runmote installation"
     else
         doctor_fail "$DOCTOR_ERRORS error(s) detected"
     fi
@@ -240,12 +240,12 @@ run_system_checks() {
 }
 
 # ==========================================================
-# ACP Doctor - Part 2
-# ACP Installation Checks
+# Runmote Doctor - Part 2
+# Runmote Installation Checks
 # ==========================================================
 
-SERVICE_NAME="acp-daemon"
-ACP_BINARY="$HOME/.local/bin/acp-remote"
+SERVICE_NAME="runmoted"
+ACP_BINARY="$HOME/.local/bin/runmote"
 
 # ----------------------------------------------------------
 # Existing installation
@@ -253,19 +253,19 @@ ACP_BINARY="$HOME/.local/bin/acp-remote"
 
 check_existing_installation() {
 
-    section "ACP Installation"
+    section "Runmote Installation"
 
     if [[ -d "$INSTALL_DIR" ]]; then
         doctor_ok "Installation directory exists"
 
         if [[ -f "$INSTALL_DIR/pyproject.toml" ]]; then
-            doctor_ok "ACP project detected"
+            doctor_ok "Runmote project detected"
         else
             doctor_warn "Installation directory exists but project files are missing"
         fi
 
     else
-        doctor_info "ACP is not installed"
+        doctor_info "Runmote is not installed"
     fi
 }
 
@@ -293,12 +293,12 @@ check_virtualenv() {
 }
 
 # ----------------------------------------------------------
-# ACP Launcher
+# Launcher
 # ----------------------------------------------------------
 
 check_launcher() {
 
-    section "ACP Launcher"
+    section "Runmote Launcher"
 
     if [[ -x "$ACP_BINARY" ]]; then
 
@@ -306,7 +306,7 @@ check_launcher() {
 
     else
 
-        doctor_warn "acp-remote launcher missing"
+        doctor_warn "runmote launcher missing"
 
     fi
 }
@@ -440,9 +440,9 @@ check_path() {
 
     section "PATH"
 
-    if command -v acp-remote >/dev/null 2>&1; then
+    if command -v runmote >/dev/null 2>&1; then
 
-        doctor_ok "acp-remote available"
+        doctor_ok "runmote available"
 
     else
 

@@ -11,7 +11,7 @@ EXPOSE 8000
 
 ENV ACP_RELAY_HOST=0.0.0.0
 ENV ACP_RELAY_PORT=8000
-ENV ACP_RELAY_DB=/data/acp_relay.db
+ENV ACP_RELAY_DB=/data/runmote_relay.db
 
 VOLUME /data
 
