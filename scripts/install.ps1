@@ -63,12 +63,12 @@ if ($mode -eq "remove") {
 # ── Interactive prompts ──────────────────────────────────────────────
 if ($interactive) {
     Write-Host ""
-    Write-Host "    █████╗  ██████╗ ██████╗ " -ForegroundColor Cyan
-    Write-Host "   ██╔══██╗██╔════╝ ██╔══██╗" -ForegroundColor Cyan
-    Write-Host "   ███████║██║  ███╗██████╔╝" -ForegroundColor Cyan
-    Write-Host "   ██╔══██║██║   ██║██╔═══╝ " -ForegroundColor Cyan
-    Write-Host "   ██║  ██║╚██████╔╝██║     " -ForegroundColor Cyan
-    Write-Host "   ╚═╝  ╚═╝ ╚═════╝ ╚═╝     " -ForegroundColor Cyan
+    Write-Host "   ██████╗ ██╗   ██╗███╗   ██╗███╗   ███╗ ██████╗ ████████╗███████╗" -ForegroundColor Cyan
+    Write-Host "   ██╔══██╗██║   ██║████╗  ██║████╗ ████║██╔═══██╗╚══██╔══╝██╔════╝" -ForegroundColor Cyan
+    Write-Host "   ██████╔╝██║   ██║██╔██╗ ██║██╔████╔██║██║   ██║   ██║   █████╗  " -ForegroundColor Cyan
+    Write-Host "   ██╔══██╗██║   ██║██║╚██╗██║██║╚██╔╝██║██║   ██║   ██║   ██╔══╝  " -ForegroundColor Cyan
+    Write-Host "   ██║  ██║╚██████╔╝██║ ╚████║██║ ╚═╝ ██║╚██████╔╝   ██║   ███████╗" -ForegroundColor Cyan
+    Write-Host "   ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝    ╚═╝   ╚══════╝" -ForegroundColor Cyan
     Write-Host "   Runmote  —  Daemon Setup" -ForegroundColor DarkGray
     Write-Host ""
 
