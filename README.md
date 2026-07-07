@@ -1,6 +1,7 @@
-# ACP
+# Runmote
 
-Agent Client Protocol relay and Claude Code wrapper.
+Remote AI agent daemon with cloud relay support.
 
-test:
-curl -sL https://raw.githubusercontent.com/Raza-learner/acp-remote/dev/scripts/install.sh | bash
+```bash
+curl -sL https://raw.githubusercontent.com/Raza-learner/Runmote/dev/scripts/install.sh | bash
+```
