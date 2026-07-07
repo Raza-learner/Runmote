@@ -18,13 +18,13 @@ fi
 # Wizard State
 # ----------------------------------------------------------
 
-ACP_DEVICE_NAME=""
+ACP_DEVICE_NAME="${ACP_DAEMON_ID:-}"
 ACP_INSTALL_DIR="${ACP_DIR:-$HOME/.local/share/acp}"
 ACP_RELAY_URL="${ACP_RELAY_URL:-}"
 ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-}"
 ACP_RELAY_PUBLIC_URL="${ACP_RELAY_PUBLIC_URL:-}"
-ACP_ENABLE_AUTOSTART=true
-ACP_CLOUD_MODE=false
+ACP_ENABLE_AUTOSTART="${ACP_ENABLE_AUTOSTART:-true}"
+ACP_CLOUD_MODE="${ACP_CLOUD_MODE:-false}"
 
 ACP_INSTALL_MODE="install"
 

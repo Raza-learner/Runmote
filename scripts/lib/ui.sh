@@ -11,10 +11,12 @@ ACP_UI_LOADED=1
 # Detect terminal
 # ----------------------------------------------------------
 
-if [[ -t 0 && -t 1 ]]; then
-    ACP_INTERACTIVE=1
-else
-    ACP_INTERACTIVE=0
+if [[ -z "${ACP_INTERACTIVE:-}" ]]; then
+    if [[ -t 0 && -t 1 ]]; then
+        ACP_INTERACTIVE=1
+    else
+        ACP_INTERACTIVE=0
+    fi
 fi
 
 # ----------------------------------------------------------
@@ -128,7 +130,7 @@ divider() {
 
 clear_screen() {
 
-    [[ $ACP_INTERACTIVE -eq 1 ]] && clear
+    [[ $ACP_INTERACTIVE -eq 1 ]] && clear || true
 
 }
 
