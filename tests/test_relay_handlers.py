@@ -12,33 +12,16 @@ def _reset_state():
     relay.state.store.is_deleted.return_value = False
     relay.state.store.register.return_value = None
     relay.state.app_clients = {}
-    relay.state.app_to_token = {}
-    relay.state.code_to_token = {}
-    relay.state.token_to_daemons = {}
-    relay.state.daemon_websocket = None
+    relay.state.daemons = {}
+    relay.state.app_to_daemon = {}
+    relay.state.code_to_daemon = {}
     yield
 
 
-class TestDaemonIsPaired:
-    def _import(self):
-        import relay.handlers.daemon as m
-        return m
-
-    def test_paired_when_relay_token_is_none(self):
-        mod = self._import()
-        with mock.patch.object(mod, "RELAY_TOKEN", None):
-            assert mod._is_paired("any-client") is True
-
-    def test_paired_when_client_in_app_to_token(self):
-        mod = self._import()
-        with mock.patch.object(mod, "RELAY_TOKEN", "secret"):
-            with mock.patch.object(mod.state, "app_to_token", {"client-1": "tok"}):
-                assert mod._is_paired("client-1") is True
-
-    def test_not_paired_when_client_not_in_app_to_token(self):
-        mod = self._import()
-        with mock.patch.object(mod, "RELAY_TOKEN", "secret"):
-            assert mod._is_paired("unknown") is False
+def _make_session(daemon_id="test-daemon"):
+    from relay.state import DaemonSession
+    ws = mock.AsyncMock(spec=WebSocket)
+    return DaemonSession(websocket=ws, daemon_id=daemon_id, token="test-token")
 
 
 class TestDaemonPairedClients:
@@ -46,32 +29,22 @@ class TestDaemonPairedClients:
         import relay.handlers.daemon as m
         return m
 
-    def test_yields_all_when_auth_disabled(self):
+    def test_yields_paired_clients(self):
         mod = self._import()
-        mod.state.app_clients = {"c1": mock.MagicMock(), "c2": mock.MagicMock()}
-        with mock.patch.object(mod, "RELAY_TOKEN", None):
-            clients = list(mod._paired_clients())
-            assert len(clients) == 2
-
-    def test_yields_only_authenticated(self):
-        mod = self._import()
-        ws1, ws2 = mock.MagicMock(), mock.MagicMock()
-        mod.state.app_clients = {"c1": ws1, "c2": ws2}
-        mod.state.app_to_token = {"c1": "tok1"}
-        with mock.patch.object(mod, "RELAY_TOKEN", "secret"):
-            clients = list(mod._paired_clients())
-            assert len(clients) == 1
-            assert clients[0][0] == "c1"
-            assert clients[0][1] is ws1
+        session = _make_session()
+        session.paired_apps = {"c1", "c2"}
+        mod.state.app_clients = {"c1": mock.MagicMock(), "c2": mock.MagicMock(), "c3": mock.MagicMock()}
+        clients = list(mod._paired_clients(session))
+        assert len(clients) == 2
 
     def test_skips_removed_clients(self):
         mod = self._import()
+        session = _make_session()
+        session.paired_apps = {"c1"}
         ws = mock.MagicMock()
         mod.state.app_clients = {"c1": ws}
-        mod.state.app_to_token = {"c1": "tok1"}
-        with mock.patch.object(mod, "RELAY_TOKEN", "secret"):
-            clients = list(mod._paired_clients())
-            assert len(clients) == 1
+        clients = list(mod._paired_clients(session))
+        assert len(clients) == 1
 
 
 class TestRegisterSession:
@@ -132,28 +105,6 @@ class TestRegisterSession:
         )
 
 
-class TestAppIsAuthenticated:
-    def _import(self):
-        import relay.handlers.app as m
-        return m
-
-    def test_authenticated_when_token_is_none(self):
-        mod = self._import()
-        with mock.patch.object(mod, "RELAY_TOKEN", None):
-            assert mod._is_authenticated("any-client") is True
-
-    def test_authenticated_when_client_in_app_to_token(self):
-        mod = self._import()
-        with mock.patch.object(mod, "RELAY_TOKEN", "secret"):
-            with mock.patch.object(mod.state, "app_to_token", {"client-1": "tok"}):
-                assert mod._is_authenticated("client-1") is True
-
-    def test_not_authenticated_when_not_paired(self):
-        mod = self._import()
-        with mock.patch.object(mod, "RELAY_TOKEN", "secret"):
-            assert mod._is_authenticated("unknown") is False
-
-
 class TestSendError:
     def _import(self):
         import relay.handlers.app as m
@@ -179,25 +130,19 @@ class TestSendError:
         ws.send_text.assert_awaited_once()
 
 
-class TestRequireAuth:
+class TestGetDaemonWs:
     def _import(self):
         import relay.handlers.app as m
         return m
 
-    @pytest.mark.asyncio
-    async def test_returns_true_when_authenticated(self):
+    def test_returns_none_when_no_session(self):
         mod = self._import()
-        ws = mock.AsyncMock(spec=WebSocket)
-        with mock.patch.object(mod, "_is_authenticated", return_value=True):
-            result = await mod._require_auth(ws, "client-1", 1)
-            assert result is True
-            ws.send_text.assert_not_called()
+        assert mod._get_daemon_ws("unknown") is None
 
-    @pytest.mark.asyncio
-    async def test_returns_false_and_sends_error_when_not_auth(self):
+    def test_returns_ws_when_paired(self):
         mod = self._import()
-        ws = mock.AsyncMock(spec=WebSocket)
-        with mock.patch.object(mod, "_is_authenticated", return_value=False):
-            result = await mod._require_auth(ws, "client-1", 1)
-            assert result is False
-            ws.send_text.assert_awaited_once()
+        session = _make_session()
+        mod.state.daemons[session.daemon_id] = session
+        mod.state.app_to_daemon["client-1"] = session.daemon_id
+        ws = mod._get_daemon_ws("client-1")
+        assert ws is session.websocket

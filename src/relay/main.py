@@ -52,7 +52,7 @@ app.add_middleware(
 async def health():
     return JSONResponse({
         "status": "ok",
-        "daemon_connected": state.daemon_websocket is not None,
+        "daemons_connected": len(state.daemons),
     })
 
 

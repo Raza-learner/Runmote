@@ -13,14 +13,10 @@ except ImportError:
 router = APIRouter()
 
 
-def _is_paired(client_id: str) -> bool:
-    return RELAY_TOKEN is None or client_id in state.app_to_token
-
-
-def _paired_clients():
-    """Yield (client_id, websocket) for authenticated clients (or all when auth is off)."""
+def _paired_clients(session: state.DaemonSession):
+    """Yield (client_id, websocket) for clients paired with this daemon."""
     for cid, ws in list(state.app_clients.items()):
-        if RELAY_TOKEN is None or cid in state.app_to_token:
+        if cid in session.paired_apps:
             yield cid, ws
 
 
@@ -29,8 +25,6 @@ def _register_session(session: dict) -> str:
     if not sid:
         return ""
 
-    # Skip sessions that were explicitly deleted by the user — agents like
-    # codex keep returning them in session/list after reconnect.
     if state.store.is_deleted(sid):
         return ""
 
@@ -54,8 +48,7 @@ def _register_session(session: dict) -> str:
 @router.websocket("/daemon")
 async def daemon_endpoint(websocket: WebSocket):
     await websocket.accept()
-    state.daemon_websocket = websocket
-    print("Daemon connected!")
+    session: state.DaemonSession | None = None
 
     try:
         async for message in websocket.iter_text():
@@ -71,29 +64,36 @@ async def daemon_endpoint(websocket: WebSocket):
                     token = params.get("token") or ""
 
                     if RELAY_TOKEN is not None and token != RELAY_TOKEN:
-                        print(f"  → daemon token rejected (got '{token}')")
+                        print(f"  → daemon {daemon_id} token rejected (got '{token}')")
                         if msg_id:
                             await websocket.send_text(json.dumps({
                                 "jsonrpc": "2.0",
                                 "id": msg_id,
                                 "error": {"code": -32001, "message": "invalid token"},
                             }))
-                        state.daemon_websocket = None
                         await websocket.close()
                         return
 
-                    # Remove old pairing code for this token (daemon reconnecting)
-                    old_codes = [c for c, t in state.code_to_token.items() if t == token]
-                    for old_code in old_codes:
-                        del state.code_to_token[old_code]
+                    # Remove previous session for same daemon_id (reconnect)
+                    old = state.daemons.pop(daemon_id, None)
+                    if old:
+                        print(f"  → daemon {daemon_id} reconnected, replacing old session")
 
-                    cleanup_expired_codes(set(state.code_to_token.keys()))
-                    pairing_code = generate_pairing_code(set(state.code_to_token.keys()))
-                    state.token_to_daemons[token] = daemon_id
-                    state.code_to_token[pairing_code] = token
-                    state.save_auth_state()
+                    # Generate pairing code unique across all daemons
+                    all_codes = set(state.code_to_daemon.keys())
+                    cleanup_expired_codes(all_codes)
+                    pairing_code = generate_pairing_code(all_codes)
+                    state.code_to_daemon[pairing_code] = daemon_id
+
+                    session = state.DaemonSession(
+                        websocket=websocket,
+                        daemon_id=daemon_id,
+                        token=token,
+                        public_url=PUBLIC_URL or "",
+                    )
+                    state.daemons[daemon_id] = session
                     state.store.set_daemon_id(daemon_id)
-                    print(f"  → daemon identified as {daemon_id}")
+                    print(f"  → daemon {daemon_id} identified")
                     print(f"  → pairing code: {pairing_code}")
 
                     if msg_id:
@@ -111,11 +111,19 @@ async def daemon_endpoint(websocket: WebSocket):
                         "method": "daemon/identified",
                         "params": {"daemonId": daemon_id},
                     }
-                    for cid, client in _paired_clients():
+                    for cid, client in _paired_clients(session):
                         try:
                             await client.send_text(json.dumps(forward))
                         except Exception:
                             state.app_clients.pop(cid, None)
+                            session.paired_apps.discard(cid)
+                    continue
+
+                if method == "pairing/complete":
+                    params = data.get("params") or {}
+                    client_id = params.get("clientId", "")
+                    if session and client_id:
+                        session.paired_apps.add(client_id)
                     continue
 
                 result = data.get("result")
@@ -139,9 +147,11 @@ async def daemon_endpoint(websocket: WebSocket):
             except Exception as e:
                 print(f"  → failed to process daemon message: {e}")
 
-            for cid, client in _paired_clients():
+            if session is None:
+                continue
+
+            for cid, client in _paired_clients(session):
                 try:
-                    # Filter deleted sessions from forwarded session/list
                     fwd = data
                     if fwd.get("result") and isinstance(fwd["result"], dict):
                         sess_list = fwd["result"].get("sessions")
@@ -151,23 +161,15 @@ async def daemon_endpoint(websocket: WebSocket):
                                 if not isinstance(s, dict) or
                                    not state.store.is_deleted(s.get("sessionId") or s.get("id") or "")
                             ]
-                            # Fill in sessions from the store that the agent
-                            # didn't return (lost e.g. after a daemon restart).
                             agent_sids = {
                                 s.get("sessionId") or s.get("id") or ""
                                 for s in filtered if isinstance(s, dict)
                             }
                             agent_id = fwd["result"].get("agentId", "")
-                            # Only merge cached sessions when we know which
-                            # agent the response belongs to. Without a valid
-                            # agent_id, merging would leak sessions from other
-                            # agents into this list.
                             if agent_id:
                                 for cs in state.store.list_sessions(agent_id=agent_id):
                                     if cs["sessionId"] not in agent_sids:
                                         filtered.append(cs)
-                            # Patch cwd from store for sessions that lack it
-                            # (some agents don't echo cwd in session/list).
                             for s in filtered:
                                 if isinstance(s, dict) and not s.get("cwd"):
                                     sid = s.get("sessionId") or s.get("id") or ""
@@ -178,18 +180,19 @@ async def daemon_endpoint(websocket: WebSocket):
                     await client.send_text(json.dumps(fwd))
                 except Exception:
                     state.app_clients.pop(cid, None)
+                    session.paired_apps.discard(cid)
 
     finally:
-        if state.daemon_websocket is websocket:
-            state.daemon_websocket = None
+        if session and session.daemon_id in state.daemons:
+            del state.daemons[session.daemon_id]
             state.store.clear_daemon_id()
-            print("Daemon disconnected!")
+            print(f"Daemon {session.daemon_id} disconnected!")
             forward = {
                 "jsonrpc": "2.0",
                 "method": "daemon/disconnected",
                 "params": {},
             }
-            for cid, client in _paired_clients():
+            for cid, client in _paired_clients(session):
                 try:
                     await client.send_text(json.dumps(forward))
                 except Exception:

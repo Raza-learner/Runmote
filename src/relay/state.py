@@ -1,5 +1,6 @@
 import json
 import os
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import WebSocket
@@ -12,9 +13,19 @@ except ImportError:
     from database import Database
     from session_store import SessionStore
 
+
+@dataclass
+class DaemonSession:
+    websocket: WebSocket
+    daemon_id: str
+    token: str
+    public_url: str = ""
+    paired_apps: set[str] = field(default_factory=set)
+
+
 db = Database()
 store = SessionStore(db)
-daemon_websocket: WebSocket | None = None
+daemons: dict[str, DaemonSession] = {}  # keyed by daemon_id
 app_clients: dict[str, WebSocket] = {}
 
 # Track deleted session IDs persistently so session/list from agents that keep
@@ -23,39 +34,20 @@ recently_deleted_sessions: set = store.deleted_sessions()
 
 # Auth state
 _AUTH_STATE_PATH = Path(os.environ.get("ACP_CONFIG_DIR", Path.home() / ".config" / "runmote")) / "relay_auth.json"
-token_to_daemons: dict[str, str] = {}
-code_to_token: dict[str, str] = {}
-app_to_token: dict[str, str] = {}
+code_to_daemon: dict[str, str] = {}  # pairing code -> daemon_id
+app_to_daemon: dict[str, str] = {}   # client_id -> daemon_id
 claimed_codes: set[str] = set()
 
 
-def _load_auth_state() -> None:
-    global token_to_daemons, code_to_token
-    if _AUTH_STATE_PATH.exists():
-        try:
-            with open(_AUTH_STATE_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            token_to_daemons.update(data.get("token_to_daemons", {}))
-            code_to_token.update(data.get("code_to_token", {}))
-            print(f"Loaded auth state from {_AUTH_STATE_PATH}")
-        except Exception as e:
-            print(f"Warning: could not load auth state: {e}")
+def get_daemon_by_code(code: str) -> DaemonSession | None:
+    did = code_to_daemon.get(code)
+    return daemons.get(did) if did else None
 
 
-def save_auth_state() -> None:
-    _AUTH_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        with open(_AUTH_STATE_PATH, "w", encoding="utf-8") as f:
-            json.dump({
-                "token_to_daemons": token_to_daemons,
-                "code_to_token": code_to_token,
-            }, f)
-    except Exception as e:
-        print(f"Warning: could not save auth state: {e}")
+def get_daemon_for_app(client_id: str) -> DaemonSession | None:
+    did = app_to_daemon.get(client_id)
+    return daemons.get(did) if did else None
 
 
-_load_auth_state()
 
-# Shared logger
-log = ACPLogger("Relay")
 
