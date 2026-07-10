@@ -26,16 +26,19 @@ def _detect_acp_agents() -> list[dict]:
     # opencode — native ACP mode
     if shutil.which("opencode"):
         agents.append({"id": "opencode", "name": "OpenCode", "command": ["opencode", "acp"]})
-    # codex — ACP adapter, check for the actual binary
-    if shutil.which("codex-acp"):
-        agents.append({"id": "codex", "name": "Codex", "command": ["codex-acp"]})
-    elif shutil.which("npx"):
-        agents.append({"id": "codex", "name": "Codex", "command": ["npx", "-y", "@agentclientprotocol/codex-acp"]})
-    # claude — ACP adapter, check for the actual binary
-    if shutil.which("claude-agent-acp"):
-        agents.append({"id": "claude", "name": "Claude Code", "command": ["claude-agent-acp"]})
-    elif shutil.which("npx"):
-        agents.append({"id": "claude", "name": "Claude Code", "command": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"]})
+    # codex — only if the codex CLI is installed (adapter bridges it to ACP)
+    if shutil.which("codex"):
+        if shutil.which("codex-acp"):
+            agents.append({"id": "codex", "name": "Codex", "command": ["codex-acp"]})
+        elif shutil.which("npx"):
+            agents.append({"id": "codex", "name": "Codex", "command": ["npx", "-y", "@agentclientprotocol/codex-acp"]})
+    # claude — only if the claude CLI is installed (adapter bridges it to ACP)
+    _has_claude = shutil.which("claude") or shutil.which("claude-code")
+    if _has_claude:
+        if shutil.which("claude-agent-acp"):
+            agents.append({"id": "claude", "name": "Claude Code", "command": ["claude-agent-acp"]})
+        elif shutil.which("npx"):
+            agents.append({"id": "claude", "name": "Claude Code", "command": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"]})
     # gemini — native ACP mode
     if shutil.which("gemini"):
         agents.append({"id": "gemini", "name": "Gemini", "command": ["gemini", "--acp"]})

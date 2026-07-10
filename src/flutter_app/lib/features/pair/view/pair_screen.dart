@@ -210,6 +210,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   }
 
   Widget _buildLogo(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
     return Column(
       children: [
         TweenAnimationBuilder<double>(
@@ -250,12 +251,12 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        const Text(
+        Text(
           'Runmote',
           style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.w800,
-            color: isDark ? Colors.white : Color(0xFF1E293B),
+            color: isDark ? Colors.white : const Color(0xFF1E293B),
             letterSpacing: -1,
           ),
         ),
@@ -265,7 +266,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w400,
-            color: isDark ? Colors.white.withOpacity(0.6) : Color(0xFF64748B),
+            color: isDark ? Colors.white.withOpacity(0.6) : const Color(0xFF64748B),
             letterSpacing: 0.2,
           ),
         ),
@@ -336,10 +337,10 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         const SizedBox(height: 20),
         _PulsingDots(),
         const SizedBox(height: 32),
-        const Text(
+        Text(
           'Scanning for Relay...',
           style: TextStyle(
-            color: isDark ? Colors.white : Color(0xFF1E293B),
+            color: isDark ? Colors.white : const Color(0xFF1E293B),
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -348,7 +349,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         Text(
           'Ensure the Runmote daemon is active on your local network',
           style: TextStyle(
-            color: isDark ? Colors.white.withOpacity(0.4) : Color(0xFF64748B),
+            color: isDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B),
             fontSize: 14,
           ),
           textAlign: TextAlign.center,
@@ -358,6 +359,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   }
 
   Widget _buildError(String error, bool isDark) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         Container(
@@ -378,7 +380,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
               Text(
                 error,
                 style: TextStyle(
-                  color: isDark ? Colors.white : Color(0xFF1E293B),
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                 ),
@@ -398,12 +400,12 @@ class _PairScreenState extends ConsumerState<PairScreen> {
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('Try Again'),
             style: OutlinedButton.styleFrom(
-            foregroundColor: isDark ? Colors.white : theme.colorScheme.primary,
-            side: BorderSide(color: isDark ? Colors.white.withOpacity(0.2) : theme.colorScheme.primary.withOpacity(0.2)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              foregroundColor: isDark ? Colors.white : theme.colorScheme.primary,
+              side: BorderSide(color: isDark ? Colors.white.withOpacity(0.2) : theme.colorScheme.primary.withOpacity(0.2)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
-          ),
           ),
         ),
       ],
@@ -411,6 +413,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   }
 
   Widget _buildQrScanner(bool isDark) {
+    final theme = Theme.of(context);
     return _GlassCard(
       isDark: isDark,
       child: Column(
@@ -472,6 +475,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   }
 
   Widget _buildCodeInput(bool isDark) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         _GlassCard(
