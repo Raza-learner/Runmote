@@ -156,33 +156,55 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     });
 
     final bgColors = isDark
-        ? [const Color(0xFF0D0D2B), const Color(0xFF1A1A4E)]
-        : [const Color(0xFF1A237E), const Color(0xFF283593)];
+        ? [const Color(0xFF0F172A), const Color(0xFF1E1B4B), const Color(0xFF312E81)]
+        : [const Color(0xFFF9F7F2), const Color(0xFFF2EFE9), const Color(0xFFEBE7DF)];
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: bgColors,
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildLogo(theme),
-                  const SizedBox(height: 48),
-                  _buildContent(theme, discovery, isDark),
-                ],
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: bgColors,
               ),
             ),
           ),
-        ),
+          if (isDark)
+            Positioned(
+              top: -100,
+              right: -50,
+              child: _BlurCircle(
+                color: const Color(0xFF6366F1).withOpacity(0.15),
+                size: 300,
+              ),
+            ),
+          if (isDark)
+            Positioned(
+              bottom: -50,
+              left: -50,
+              child: _BlurCircle(
+                color: const Color(0xFFA855F7).withOpacity(0.15),
+                size: 250,
+              ),
+            ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildLogo(theme),
+                    const SizedBox(height: 56),
+                    _buildContent(theme, discovery, isDark),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -190,35 +212,61 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   Widget _buildLogo(ThemeData theme) {
     return Column(
       children: [
-        Container(
-          width: 88,
-          height: 88,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: const Icon(
-            Icons.cast_connected,
-            size: 48,
-            color: Colors.white,
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: const Duration(seconds: 1),
+          builder: (context, value, child) {
+            return Transform.scale(
+              scale: 0.8 + (0.2 * value),
+              child: Opacity(
+                opacity: value,
+                child: child,
+              ),
+            );
+          },
+          child: Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6366F1), Color(0xFFA855F7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6366F1).withOpacity(0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              size: 56,
+              color: Colors.white,
+            ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         const Text(
-          'ACP Remote',
+          'Runmote',
           style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: -0.5,
+            fontSize: 32,
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : Color(0xFF1E293B),
+            letterSpacing: -1,
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Connect to your AI agents',
+          'Remote Access Redefined',
           style: TextStyle(
-            fontSize: 16,
-            color: Colors.white.withValues(alpha: 0.8),
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
+            color: isDark ? Colors.white.withOpacity(0.6) : Color(0xFF64748B),
+            letterSpacing: 0.2,
           ),
         ),
       ],
@@ -241,26 +289,18 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   Widget _buildOptions(bool isDark) {
     return Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.wifi, size: 20, color: Colors.white.withValues(alpha: 0.7)),
-            const SizedBox(width: 8),
-            Text(
-              'Relay found!',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
-                fontSize: 14,
-              ),
-            ),
-          ],
+        _StatusChip(
+          icon: Icons.wifi_rounded,
+          label: 'Relay found',
+          color: const Color(0xFF22C55E),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
         _OptionCard(
           icon: Icons.qr_code_scanner_rounded,
           title: 'Scan QR Code',
-          subtitle: 'Point camera at the QR\ncode in the daemon terminal',
+          subtitle: 'Use your camera to quickly link your device',
           isDark: isDark,
+          gradient: const [Color(0xFF6366F1), Color(0xFF4F46E5)],
           onTap: () => setState(() {
             _showScanner = true;
             _error = null;
@@ -269,81 +309,101 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         const SizedBox(height: 16),
         _OptionCard(
           icon: Icons.keyboard_rounded,
-          title: 'Enter Code',
-          subtitle: 'Type the 6-digit pairing\ncode shown in the terminal',
+          title: 'Enter Manual Code',
+          subtitle: 'Type the 8-character code from your terminal',
           isDark: isDark,
+          gradient: const [Color(0xFF94A3B8), Color(0xFF64748B)],
           onTap: () => setState(() {
             _showCodeEntry = true;
             _error = null;
           }),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
         TextButton(
           onPressed: _showHelp,
           style: TextButton.styleFrom(
-            foregroundColor: Colors.white.withValues(alpha: 0.7),
+            foregroundColor: isDark ? Colors.white.withOpacity(0.5) : theme.colorScheme.primary.withOpacity(0.7),
           ),
-          child: const Text('How to get your code?'),
+          child: const Text('Need help finding your code?'),
         ),
       ],
     );
   }
 
   Widget _buildSearching(bool isDark) {
-    return _GlassCard(
-      isDark: isDark,
-      child: Column(
-        children: [
-          _PulsingDots(),
-          const SizedBox(height: 20),
-          const Text(
-            'Searching for relay...',
-            style: TextStyle(color: Colors.white70, fontSize: 15),
+    return Column(
+      children: [
+        const SizedBox(height: 20),
+        _PulsingDots(),
+        const SizedBox(height: 32),
+        const Text(
+          'Scanning for Relay...',
+          style: TextStyle(
+            color: isDark ? Colors.white : Color(0xFF1E293B),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Make sure the relay is running on your network',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
-              fontSize: 13,
-            ),
-            textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Ensure the Runmote daemon is active on your local network',
+          style: TextStyle(
+            color: isDark ? Colors.white.withOpacity(0.4) : Color(0xFF64748B),
+            fontSize: 14,
           ),
-        ],
-      ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 
   Widget _buildError(String error, bool isDark) {
     return Column(
       children: [
-        _GlassCard(
-          isDark: isDark,
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEF4444).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.2)),
+          ),
           child: Column(
             children: [
-              Icon(
+              const Icon(
                 Icons.wifi_off_rounded,
                 size: 48,
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Color(0xFFEF4444),
               ),
               const SizedBox(height: 16),
               Text(
                 error,
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
+                style: TextStyle(
+                  color: isDark ? Colors.white : Color(0xFF1E293B),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 20),
-              OutlinedButton.icon(
-                onPressed: () {
-                  ref.read(relayDiscoveryProvider.notifier).startDiscovery();
-                },
-                icon: const Icon(Icons.refresh, color: Colors.white),
-                label: const Text('Retry', style: TextStyle(color: Colors.white)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.white38),
-                ),
-              ),
             ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              ref.read(relayDiscoveryProvider.notifier).startDiscovery();
+            },
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Try Again'),
+            style: OutlinedButton.styleFrom(
+            foregroundColor: isDark ? Colors.white : theme.colorScheme.primary,
+            side: BorderSide(color: isDark ? Colors.white.withOpacity(0.2) : theme.colorScheme.primary.withOpacity(0.2)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
           ),
         ),
       ],
@@ -358,7 +418,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           Row(
             children: [
               IconButton(
-                icon: Icon(Icons.arrow_back, color: Colors.white.withValues(alpha: 0.7)),
+                icon: Icon(Icons.arrow_back, color: isDark ? Colors.white.withValues(alpha: 0.7) : theme.colorScheme.onSurface),
                 onPressed: () => setState(() {
                   _showScanner = false;
                   _scannerController?.stop();
@@ -369,7 +429,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
               Text(
                 'Scan QR Code',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: isDark ? Colors.white.withValues(alpha: 0.7) : theme.colorScheme.onSurface,
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                 ),
@@ -380,7 +440,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           Text(
             'Point at the QR code in your daemon terminal',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: isDark ? Colors.white.withValues(alpha: 0.6) : theme.colorScheme.onSurfaceVariant,
               fontSize: 13,
             ),
           ),
@@ -421,7 +481,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
               Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.arrow_back, color: Colors.white.withValues(alpha: 0.7)),
+                    icon: Icon(Icons.arrow_back, color: isDark ? Colors.white.withValues(alpha: 0.7) : theme.colorScheme.onSurface),
                     onPressed: () => setState(() {
                       _showCodeEntry = false;
                       _error = null;
@@ -431,7 +491,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                   Text(
                     'Enter Code',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: isDark ? Colors.white.withValues(alpha: 0.7) : theme.colorScheme.onSurface,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
@@ -448,35 +508,35 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                       onSubmitted: (_) => _connect(),
                       textAlign: TextAlign.center,
                       autofocus: true,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                        color: isDark ? Colors.white : theme.colorScheme.onSurface,
                         letterSpacing: 4,
                       ),
                       decoration: InputDecoration(
                         hintText: 'XXXX-XXXX',
                         hintStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: isDark ? Colors.white.withValues(alpha: 0.3) : theme.colorScheme.onSurface.withOpacity(0.2),
                           fontSize: 28,
                           letterSpacing: 4,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: isDark ? Colors.white.withValues(alpha: 0.2) : theme.colorScheme.outline.withOpacity(0.2),
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: isDark ? Colors.white.withValues(alpha: 0.2) : theme.colorScheme.outline.withOpacity(0.2),
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: isDark ? Colors.white.withValues(alpha: 0.5) : theme.colorScheme.primary.withOpacity(0.5),
                           ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
@@ -484,7 +544,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                           vertical: 20,
                         ),
                         filled: true,
-                        fillColor: Colors.white.withValues(alpha: 0.08),
+                        fillColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withOpacity(0.03),
                       ),
                     ),
                   ),
@@ -504,9 +564,9 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                 child: FilledButton(
                   onPressed: _isConnecting ? null : _connect,
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: isDark ? Colors.black87 : Colors.indigo,
-                    disabledBackgroundColor: Colors.white.withValues(alpha: 0.2),
+                    backgroundColor: isDark ? Colors.white : theme.colorScheme.primary,
+                    foregroundColor: isDark ? Colors.black87 : Colors.white,
+                    disabledBackgroundColor: (isDark ? Colors.white : theme.colorScheme.primary).withValues(alpha: 0.2),
                   ),
                   child: _isConnecting
                       ? const SizedBox(
@@ -539,7 +599,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('1. Make sure the ACP daemon is running on your PC'),
+            Text('1. Make sure the Runmote daemon is running on your PC'),
             SizedBox(height: 8),
             Text('2. Look for the QR code in the terminal where the daemon is running'),
             SizedBox(height: 8),
@@ -557,10 +617,34 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   }
 }
 
+class _BlurCircle extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _BlurCircle({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+        child: Container(color: Colors.transparent),
+      ),
+    );
+  }
+}
+
 class _OptionCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final List<Color> gradient;
   final bool isDark;
   final VoidCallback onTap;
 
@@ -568,26 +652,44 @@ class _OptionCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.gradient,
     required this.isDark,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
-      child: _GlassCard(
-        isDark: isDark,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05)),
+        ),
+        padding: const EdgeInsets.all(20),
         child: Row(
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
+                gradient: LinearGradient(
+                  colors: gradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: gradient.first.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: Colors.white, size: 28),
+              child: Icon(icon, color: Colors.white, size: 26),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -596,26 +698,67 @@ class _OptionCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Color(0xFF1E293B),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: isDark ? Colors.white.withOpacity(0.5) : Color(0xFF64748B),
                       fontSize: 13,
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.4)),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isDark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.2),
+              size: 24,
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _StatusChip({required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -629,17 +772,21 @@ class _GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
           decoration: BoxDecoration(
-            color: (isDark ? Colors.white : Colors.black)
-                .withValues(alpha: 0.08),
+            color: isDark 
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withOpacity(0.02),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.12),
+              color: isDark 
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : Colors.black.withOpacity(0.05),
             ),
           ),
           padding: const EdgeInsets.all(AppSpacing.lg),
@@ -761,6 +908,8 @@ class _PulsingDotsState extends State<_PulsingDots>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -777,7 +926,7 @@ class _PulsingDotsState extends State<_PulsingDots>
                 width: 10 + 4 * (1 - dotT),
                 height: 10 + 4 * (1 - dotT),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3 + 0.7 * (1 - dotT)),
+                  color: (isDark ? Colors.white : theme.colorScheme.primary).withValues(alpha: 0.3 + 0.7 * (1 - dotT)),
                   shape: BoxShape.circle,
                 ),
               ),

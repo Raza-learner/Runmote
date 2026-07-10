@@ -168,7 +168,7 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Make sure an ACP agent is running on your PC.',
+                              'Make sure a Runmote agent is running on your PC.',
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -384,7 +384,7 @@ class _DaemonOfflineState extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: SelectableText(
-                    'acp-remote',
+                    'runmote',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontFamily: 'monospace',
                       fontSize: 14,

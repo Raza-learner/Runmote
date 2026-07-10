@@ -224,7 +224,7 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               children: [
                 Text(
-                  'ACP Remote v2.0.0',
+                  'Runmote v2.0.0',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                   ),

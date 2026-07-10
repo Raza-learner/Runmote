@@ -52,7 +52,7 @@ class DaemonOfflineBanner extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Run "acp-remote" on your device to reconnect.',
+                    'Run "runmote" on your device to reconnect.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.daemonOffline.withValues(alpha: 0.8),
                     ),

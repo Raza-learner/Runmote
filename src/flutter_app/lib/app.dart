@@ -51,7 +51,7 @@ class _AppState extends ConsumerState<App> {
     final themeMode = ref.watch(themeModeStateProvider);
     final scheme = ref.watch(flexSchemeProvider);
     return MaterialApp.router(
-      title: 'ACP Remote',
+      title: 'Runmote',
       routerConfig: goRouter,
       debugShowCheckedModeBanner: false,
       theme: buildFlexTheme(scheme: scheme, brightness: Brightness.light),

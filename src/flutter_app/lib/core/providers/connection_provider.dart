@@ -215,7 +215,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         'params': {},
       });
     } catch (e) {
-      debugPrint('[ACP] connect error: $e');
+      debugPrint('[RUNMOTE] connect error: $e');
       final msg = '$e';
       // Don't auto-reconnect on auth errors — the pairing code is stale.
       final isAuthError = msg.contains('Pairing') || msg.contains('code');
@@ -290,7 +290,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         return false;
       }
     } catch (e) {
-      debugPrint('[ACP] connectWithToken error: $e');
+      debugPrint('[RUNMOTE] connectWithToken error: $e');
       state = state.copyWith(
         state: AcpConnectionState.failed('$e'),
         error: '$e',
@@ -334,7 +334,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       }
 
       if (method == 'daemon/disconnected') {
-        debugPrint('[ACP] daemon/disconnected');
+        debugPrint('[RUNMOTE] daemon/disconnected');
         _daemonDisconnected = true;
         _reconnectTimer?.cancel();
         _agentCapabilities.clear();
@@ -373,7 +373,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       // Route other messages to chat/session providers
       _messageController.add(json);
     } catch (e) {
-      debugPrint('[ACP] _handleTokenAuth error: $e');
+      debugPrint('[RUNMOTE] _handleTokenAuth error: $e');
     }
   }
 
@@ -398,7 +398,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         }
         final error = json['error'] as Map<String, dynamic>?;
         final msg = error?['message'] as String? ?? 'Pairing rejected';
-        debugPrint('[ACP] auth/pair failed: $msg');
+        debugPrint('[RUNMOTE] auth/pair failed: $msg');
         pairCompleter.completeError(Exception(msg));
         return;
       }
@@ -417,7 +417,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
       // Handle daemon/disconnected
       if (method == 'daemon/disconnected') {
-        debugPrint('[ACP] daemon/disconnected');
+        debugPrint('[RUNMOTE] daemon/disconnected');
         _daemonDisconnected = true;
         _reconnectTimer?.cancel();
         _agentCapabilities.clear();
@@ -458,7 +458,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       // Route other messages to chat/session providers
       _messageController.add(json);
     } catch (e) {
-      debugPrint('[ACP] _handleMessage error: $e');
+      debugPrint('[RUNMOTE] _handleMessage error: $e');
     }
   }
 

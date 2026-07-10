@@ -9,12 +9,12 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   FlutterError.onError = (details) {
-    debugPrint('[ACP-ERROR] FlutterError: ${details.exception}');
-    debugPrint('[ACP-ERROR] Stack: ${details.stack}');
+    debugPrint('[RUNMOTE-ERROR] FlutterError: ${details.exception}');
+    debugPrint('[RUNMOTE-ERROR] Stack: ${details.stack}');
   };
   PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('[ACP-ERROR] PlatformDispatcher: $error');
-    debugPrint('[ACP-ERROR] Stack: $stack');
+    debugPrint('[RUNMOTE-ERROR] PlatformDispatcher: $error');
+    debugPrint('[RUNMOTE-ERROR] Stack: $stack');
     return true;
   };
 

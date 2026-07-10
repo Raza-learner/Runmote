@@ -27,6 +27,8 @@ ThemeData buildFlexTheme({
       subThemesData: sub,
       surfaceMode: FlexSurfaceMode.highBackgroundLowScaffold,
       blendLevel: 7,
+      scaffoldBackground: const Color(0xFFF9F7F2), // Soft Cream background
+      surface: const Color(0xFFFDFCFB),
     );
   }
   return FlexThemeData.dark(

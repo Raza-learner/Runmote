@@ -93,7 +93,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         });
       });
     } catch (e) {
-      debugPrint('[ACP] file pick error: $e');
+      debugPrint('[RUNMOTE] file pick error: $e');
     }
   }
 
