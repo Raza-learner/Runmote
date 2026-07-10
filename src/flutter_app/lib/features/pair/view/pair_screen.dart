@@ -284,10 +284,10 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     } else if (_showCodeEntry) {
       return _buildCodeInput(isDark);
     }
-    return _buildOptions(isDark);
+    return _buildOptions(theme, isDark);
   }
 
-  Widget _buildOptions(bool isDark) {
+  Widget _buildOptions(ThemeData theme, bool isDark) {
     return Column(
       children: [
         _StatusChip(
