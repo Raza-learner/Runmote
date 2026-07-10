@@ -697,26 +697,18 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   }
 
   void _scheduleReconnect() {
-    if (state.pairingCode == null) return;
-    // Stop after 5 failed attempts (~1+2+4+8+16=31s total) to avoid
-    // an indefinite reconnect storm. User can manually re-pair.
-    if (_reconnectAttempts >= 5) {
-      _reconnectAttempts = 0;
-      return;
-    }
+    final token = state.token;
+    final relayUrl = state.relayUrl;
+    if (token == null || relayUrl == null) return;
+
     _reconnectTimer?.cancel();
     final delay = Duration(
-      seconds: min(pow(2, _reconnectAttempts).toInt(), 30),
+      seconds: min(pow(2, _reconnectAttempts).toInt(), 60),
     );
     _reconnectAttempts++;
     _reconnectTimer = Timer(delay, () {
-      // Move to reconnecting only when the timer actually fires — avoids an
-      // immediate state transition storm after _onDisconnected already set
-      // the state to disconnected.
       state = state.copyWith(state: const AcpConnectionState.reconnecting());
-      final code = state.pairingCode;
-      final url = state.relayUrl;
-      if (code != null) connect(code, relayUrl: url);
+      connectWithToken(token, relayUrl);
     });
   }
 
