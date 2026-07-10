@@ -9,7 +9,7 @@ set -euo pipefail
 if [[ ! -f "$(dirname "$0")/lib/utils.sh" ]]; then
     echo "Downloading ACP installer..."
 
-    BRANCH="${ACP_BRANCH:-dev}"
+    BRANCH="${ACP_BRANCH:-main}"
     REPO="${ACP_REMOTE:-https://github.com/Raza-learner/Runmote.git}"
     TMP_DIR="$(mktemp -d)"
     SCRIPT_DIR="$TMP_DIR/runmote"
