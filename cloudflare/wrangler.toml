@@ -1,7 +1,0 @@
-name = "runmote-dev"
-main = "worker.js"
-compatibility_date = "2026-07-10"
-
-# Add the route after first deploy:
-# wrangler route list
-# wrangler route add "runmote.dev/*" runmote-dev
