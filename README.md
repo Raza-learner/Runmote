@@ -1,7 +1,15 @@
 # Runmote
 
-Remote AI agent daemon with cloud relay support.
+Control AI agents on your laptop from your mobile phone. Connect via cloud relay at `relay.runmote.dev`.
+
+## Install
 
 ```bash
-curl -sL https://raw.githubusercontent.com/Raza-learner/Runmote/dev/scripts/install.sh | bash
+curl -fsSL https://runmote.dev/install.sh | bash
+```
+
+Dev branch:
+
+```bash
+curl -fsSL https://runmote.dev/install.sh/dev | bash
 ```

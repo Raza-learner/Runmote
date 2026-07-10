@@ -4,11 +4,11 @@ import shutil
 import socket
 
 
-RELAY_HOST = os.environ.get("ACP_RELAY_HOST", "localhost")
-RELAY_PORT = os.environ.get("ACP_RELAY_PORT", "8000")
+RELAY_HOST = os.environ.get("ACP_RELAY_HOST", "relay.runmote.dev")
+RELAY_PORT = os.environ.get("ACP_RELAY_PORT", "443")
 _raw_relay_url = os.environ.get(
     "ACP_RELAY_URL",
-    f"ws://{RELAY_HOST}:{RELAY_PORT}/daemon",
+    f"wss://{RELAY_HOST}/daemon",
 )
 # Auto-convert http/https to ws/wss so users can pass an https URL
 if _raw_relay_url.startswith("https://"):
