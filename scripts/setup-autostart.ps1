@@ -55,7 +55,9 @@ function Install-AutoStart {
         $wrapperLines += "`$env:ACP_RELAY_URL = '$($env:ACP_RELAY_URL)'"
     }
 
-    $wrapperLines += "Start-Process -NoNewWindow -FilePath `"$python`" -ArgumentList `"-m`", `"src.daemon.main`" -WorkingDirectory `"$Dir`" -RedirectStandardOutput `$logFile -RedirectStandardError `$logFile"
+    $errFile = '$env:TEMP\runmote-daemon.err'
+    $wrapperLines += "`$errFile = `"$errFile`""
+    $wrapperLines += "Start-Process -NoNewWindow -FilePath `"$python`" -ArgumentList `"-m`", `"src.daemon.main`" -WorkingDirectory `"$Dir`" -RedirectStandardOutput `$logFile -RedirectStandardError `$errFile"
 
     Set-Content -Path $wrapperPath -Value ($wrapperLines -join "`r`n")
     Write-Host "  wrapper created: $wrapperPath"

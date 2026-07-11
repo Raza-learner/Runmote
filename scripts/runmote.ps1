@@ -47,9 +47,12 @@ function Stop-Daemon {
 }
 
 function Get-PairingCode {
-    if (Test-Path $logFile) {
-        $match = Select-String -Path $logFile -Pattern 'pairing code:\s+(\S+)' | Select-Object -Last 1
-        if ($match) { return $match.Matches.Groups[1].Value }
+    $errFile = "$env:TEMP\runmote-daemon.err"
+    foreach ($lf in @($logFile, $errFile)) {
+        if (Test-Path $lf) {
+            $match = Select-String -Path $lf -Pattern 'pairing code:\s+(\S+)' -ErrorAction SilentlyContinue | Select-Object -Last 1
+            if ($match) { return $match.Matches.Groups[1].Value }
+        }
     }
     return $null
 }

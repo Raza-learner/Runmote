@@ -199,12 +199,16 @@ if (Test-Path $wrapper) { & $wrapper }
 $pairingCode = $null
 for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Seconds 1
-    if (Test-Path $logFile) {
-        try {
-            $match = Select-String -Path $logFile -Pattern 'pairing code:\s+(\S+)' -ErrorAction SilentlyContinue | Select-Object -Last 1
-            if ($match) { $pairingCode = $match.Matches.Groups[1].Value; break }
-        } catch {}
+    $errFile = "$env:TEMP\runmote-daemon.err"
+    foreach ($lf in @($logFile, $errFile)) {
+        if (Test-Path $lf) {
+            try {
+                $match = Select-String -Path $lf -Pattern 'pairing code:\s+(\S+)' -ErrorAction SilentlyContinue | Select-Object -Last 1
+                if ($match) { $pairingCode = $match.Matches.Groups[1].Value; break }
+            } catch {}
+        }
     }
+    if ($pairingCode) { break }
 }
 if ($pairingCode) {
     $python = Join-Path (Join-Path (Join-Path $installDir ".venv") "Scripts") "python.exe"
