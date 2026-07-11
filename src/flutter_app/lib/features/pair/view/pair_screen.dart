@@ -24,6 +24,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   final _manualHostController = TextEditingController(text: '192.168.1.12');
   final _manualPortController = TextEditingController(text: '8000');
   bool _isConnecting = false;
+  bool _isAutoConnecting = true;
   bool _showScanner = false;
   bool _showCodeEntry = false;
   String? _error;
@@ -39,29 +40,33 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   }
 
   Future<void> _autoConnectWithToken() async {
-    final p = await ref.read(preferencesServiceProvider.future);
-    final token = p.getAuthToken();
-    final savedUrl = p.getRelayUrl();
-    debugPrint('[RUNMOTE] autoConnect: token=${token != null ? "present" : "null"}, savedUrl=$savedUrl');
-    if (token == null || savedUrl == null) return;
+    try {
+      final p = await ref.read(preferencesServiceProvider.future);
+      final token = p.getAuthToken();
+      final savedUrl = p.getRelayUrl();
+      debugPrint('[RUNMOTE] autoConnect: token=${token != null ? "present" : "null"}, savedUrl=$savedUrl');
+      if (token == null || savedUrl == null) return;
 
-    final urlsToTry = savedUrl == _defaultRelayUrl
-        ? [savedUrl]
-        : [savedUrl, _defaultRelayUrl];
+      final urlsToTry = savedUrl == _defaultRelayUrl
+          ? [savedUrl]
+          : [savedUrl, _defaultRelayUrl];
 
-    for (final url in urlsToTry) {
-      for (var attempt = 0; attempt < 2; attempt++) {
-        if (attempt > 0) await Future.delayed(const Duration(seconds: 3));
-        debugPrint('[RUNMOTE] autoConnect: trying url=$url attempt=${attempt + 1}');
-        final ok = await ref.read(connectionProvider.notifier).connectWithToken(token, url);
-        debugPrint('[RUNMOTE] autoConnect: url=$url attempt=${attempt + 1} result=$ok');
-        if (ok && mounted) {
-          context.go('/agents');
-          return;
+      for (final url in urlsToTry) {
+        for (var attempt = 0; attempt < 2; attempt++) {
+          if (attempt > 0) await Future.delayed(const Duration(seconds: 3));
+          debugPrint('[RUNMOTE] autoConnect: trying url=$url attempt=${attempt + 1}');
+          final ok = await ref.read(connectionProvider.notifier).connectWithToken(token, url);
+          debugPrint('[RUNMOTE] autoConnect: url=$url attempt=${attempt + 1} result=$ok');
+          if (ok && mounted) {
+            context.go('/agents');
+            return;
+          }
         }
       }
+      debugPrint('[RUNMOTE] autoConnect: all attempts failed, showing pairing screen');
+    } finally {
+      if (mounted) setState(() => _isAutoConnecting = false);
     }
-    debugPrint('[RUNMOTE] autoConnect: all attempts failed, showing pairing screen');
   }
 
   @override
@@ -279,12 +284,39 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   }
 
   Widget _buildContent(ThemeData theme, bool isDark) {
+    if (_isAutoConnecting) {
+      return _buildLoading(isDark);
+    }
     if (_showScanner) {
       return _buildQrScanner(isDark);
     } else if (_showCodeEntry) {
       return _buildCodeInput(isDark);
     }
     return _buildOptions(theme, isDark);
+  }
+
+  Widget _buildLoading(bool isDark) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 48,
+          height: 48,
+          child: CircularProgressIndicator(
+            strokeWidth: 3,
+            color: isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF6366F1),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Connecting...',
+          style: TextStyle(
+            color: isDark ? Colors.white.withOpacity(0.6) : const Color(0xFF64748B),
+            fontSize: 15,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildOptions(ThemeData theme, bool isDark) {
