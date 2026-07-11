@@ -220,7 +220,7 @@ Write-Host "  [DEBUG] python: $python" -ForegroundColor DarkYellow
 Write-Host "  [DEBUG] exists: $(Test-Path $python)" -ForegroundColor DarkYellow
 Write-Host "  [DEBUG] cwd: $installDir" -ForegroundColor DarkYellow
 Write-Host "  [DEBUG] relay: $env:ACP_RELAY_URL" -ForegroundColor DarkYellow
-Write-Host "  [DEBUG] token: $($env:ACP_DAEMON_TOKEN.Substring(0, [Math]::Min(4, $env:ACP_DAEMON_TOKEN.Length)))..." -ForegroundColor DarkYellow
+Write-Host "  [DEBUG] token: $(if ($env:ACP_DAEMON_TOKEN) { $env:ACP_DAEMON_TOKEN.Substring(0, [Math]::Min(4, $env:ACP_DAEMON_TOKEN.Length)) + '...' } else { 'null' })" -ForegroundColor DarkYellow
 if (Test-Path $python) {
     $env:ACP_DAEMON_ID = $daemonName
     Write-Host "  [DEBUG] starting..." -ForegroundColor DarkYellow
