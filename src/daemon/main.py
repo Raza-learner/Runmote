@@ -295,17 +295,17 @@ async def run_daemon():
                         if data.get("id") == identify_id:
                             result = data.get("result") or {}
                             pairing_code = result.get("pairingCode", "")
-                    if pairing_code:
-                        public_url = result.get("publicUrl", "")
-                        log(f"← pairing code: {pairing_code}")
-                        print(_pairing_banner(pairing_code, public_url), flush=True)
-                        # Write pairing code to temp file so installer can read it reliably
-                        try:
-                            with open(os.environ.get("TEMP", "/tmp") + "/runmote-pairing-code.txt", "w") as f:
-                                f.write(pairing_code)
-                        except Exception:
-                            pass
-                        # Persist public URL for runmote script
+                            if pairing_code:
+                                public_url = result.get("publicUrl", "")
+                                log(f"← pairing code: {pairing_code}")
+                                print(_pairing_banner(pairing_code, public_url), flush=True)
+                                # Write pairing code to temp file so installer can read it
+                                try:
+                                    with open(os.environ.get("TEMP", "/tmp") + "/runmote-pairing-code.txt", "w") as f:
+                                        f.write(pairing_code)
+                                except Exception:
+                                    pass
+                                # Persist public URL for runmote script
                                 if public_url:
                                     config_dir = Path.home() / ".config" / "runmote"
                                     config_dir.mkdir(parents=True, exist_ok=True)

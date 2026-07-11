@@ -222,6 +222,15 @@ Write-Host ""
 
 # Start daemon and show pairing code
 Write-Host "  Starting daemon..." -ForegroundColor Gray
+# Kill stale daemon processes from previous installs
+Get-Process -Name python* -ErrorAction SilentlyContinue | Where-Object {
+    try { $_.CommandLine -match 'src.daemon.main' } catch { $false }
+} | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 1
+# Clean up old temp files
+Remove-Item "$env:TEMP\runmote-daemon.log" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:TEMP\runmote-daemon.err" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:TEMP\runmote-pairing-code.txt" -Force -ErrorAction SilentlyContinue
 $python = Join-Path (Join-Path (Join-Path $installDir ".venv") "Scripts") "python.exe"
 $logFile = "$env:TEMP\runmote-daemon.log"
 $errFile = "$env:TEMP\runmote-daemon.err"
