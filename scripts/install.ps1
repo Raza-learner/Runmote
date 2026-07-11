@@ -191,11 +191,14 @@ Write-Host ""
 
 # Start daemon and show pairing code
 Write-Host "  Starting daemon..." -ForegroundColor Gray
+$python = Join-Path (Join-Path (Join-Path $installDir ".venv") "Scripts") "python.exe"
 $logFile = "$env:TEMP\runmote-daemon.log"
-$wrapper = "$installDir\scripts\run-daemon.ps1"
+$errFile = "$env:TEMP\runmote-daemon.err"
 try { Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null } catch {}
-Start-Sleep -Seconds 2
-if (Test-Path $wrapper) { & $wrapper }
+if (Test-Path $python) {
+    $env:ACP_DAEMON_ID = $daemonName
+    Start-Process -NoNewWindow -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile
+}
 $pairingCode = $null
 for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Seconds 1

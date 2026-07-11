@@ -673,17 +673,28 @@ async def main():
     loop = asyncio.get_running_loop()
     stop = asyncio.Event()
 
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, stop.set)
+    if sys.platform != "win32":
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, stop.set)
+            except NotImplementedError:
+                pass
 
     daemon_task = asyncio.create_task(run_daemon())
-    await stop.wait()
-    print("\nShutting down...")
-    daemon_task.cancel()
-    try:
-        await daemon_task
-    except asyncio.CancelledError:
-        pass
+
+    if sys.platform == "win32":
+        try:
+            await daemon_task
+        except asyncio.CancelledError:
+            pass
+    else:
+        await stop.wait()
+        print("\nShutting down...")
+        daemon_task.cancel()
+        try:
+            await daemon_task
+        except asyncio.CancelledError:
+            pass
 
 
 if __name__ == "__main__":
