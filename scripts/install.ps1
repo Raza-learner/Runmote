@@ -147,15 +147,15 @@ Write-Host "  Daemon: $daemonName  |  Install: $installDir" -ForegroundColor Dar
 Write-Host ""
 
 Write-Host "[1/3] Installing dependencies..."
-Push-Location $installDir -ErrorAction SilentlyContinue
 if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-    # Assume files were pre-copied (or run from repo)
-    if (Test-Path "$PSScriptRoot\..\pyproject.toml") {
-        $srcDir = Split-Path -Parent $PSScriptRoot
-        Copy-Item "$srcDir\*" $installDir -Recurse -Force -Exclude ".git",".venv","__pycache__",".pytest_cache","*.db","logs"
-    }
 }
+# Copy project files to install dir (bootstrap dir set by irm | iex flow)
+$srcDir = if ($env:ACP_BOOTSTRAP_DIR) { $env:ACP_BOOTSTRAP_DIR } elseif ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot } else { "" }
+if ($srcDir -and (Test-Path "$srcDir\pyproject.toml")) {
+    Copy-Item "$srcDir\*" $installDir -Recurse -Force -Exclude ".git",".venv","__pycache__",".pytest_cache","*.db","logs"
+}
+Push-Location $installDir -ErrorAction SilentlyContinue
 uv sync --frozen
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  frozen sync failed — running full sync..."
@@ -172,13 +172,13 @@ if ($skipAutostart) {
     Write-Host "  Auto-start skipped (use runmote start to start manually)" -ForegroundColor DarkGray
 } else {
     Write-Host "[3/3] Configuring auto-start..."
-    & (Join-Path $installDir "scripts" "setup-autostart.ps1") -Install
+    & "$installDir\scripts\setup-autostart.ps1" -Install
     Write-Host "  Done."
 }
 
 if ($env:ACP_ENABLE_AGENTS -ne "false") {
     Write-Host "[4/4] Installing agent adapters..."
-    & (Join-Path $installDir "scripts" "setup-agents.ps1") -Install
+    & "$installDir\scripts\setup-agents.ps1" -Install
     Write-Host "  Done."
 } else {
     Write-Host ""
