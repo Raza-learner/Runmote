@@ -232,13 +232,17 @@ for ($i = 0; $i -lt 20; $i++) {
     foreach ($lf in @($logFile, $errFile)) {
         if (Test-Path $lf) {
             try {
-                $match = Select-String -Path $lf -Pattern 'pairing code:\s+(\S+)' -ErrorAction SilentlyContinue | Select-Object -Last 1
-                if ($match) { $pairingCode = $match.Matches.Groups[1].Value; break }
+                $line = Get-Content $lf -Tail 50 | Where-Object { $_ -match 'pairing code:\s*(\S+)' } | Select-Object -Last 1
+                if ($line -match 'pairing code:\s*(\S+)') {
+                    $pairingCode = $Matches[1]
+                    break
+                }
             } catch {}
         }
     }
     if ($pairingCode) { break }
 }
+Write-Host "  [DEBUG] raw code: [$pairingCode]" -ForegroundColor DarkGray
 if ($pairingCode) {
     $formatted = $pairingCode.Substring(0, 4) + "-" + $pairingCode.Substring(4)
     Write-Host ""
