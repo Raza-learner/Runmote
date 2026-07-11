@@ -45,7 +45,7 @@ if (-not $hasLocalFiles) {
     }
 
     $script:ACP_BOOTSTRAPPED = $true
-    & "$extract\scripts\install.ps1" @args
+    & powershell -ExecutionPolicy Bypass -File "$extract\scripts\install.ps1" @args
     exit $LASTEXITCODE
 }
 
