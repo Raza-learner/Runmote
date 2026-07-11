@@ -1,13 +1,13 @@
-name = "runmote-dev"
+name = "runmote"
 main = "worker.js"
 compatibility_date = "2026-07-10"
 
-# Routes handled by this worker:
+# Routes
 #   runmote.dev/install.sh       -> main branch
 #   runmote.dev/install          -> main branch
 #   runmote.dev/install.sh/dev   -> dev branch
 #   runmote.dev/install/dev      -> dev branch
-#
-# Add the route after first deploy:
-# wrangler route list
-# wrangler route add "runmote.dev/*" runmote-dev
+
+# Keep Render free-tier relays awake (sleep after 15 min inactivity)
+[triggers]
+crons = ["*/10 * * * *"]
