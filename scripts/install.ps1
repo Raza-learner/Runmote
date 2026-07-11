@@ -1,10 +1,8 @@
 $ErrorActionPreference = "Continue"
 
-$script:ACP_BOOTSTRAPPED = $false
-
 # ── Bootstrap: if running via irm | iex, download the repo first ────
 $hasLocalFiles = [bool]$PSScriptRoot -and (Test-Path "$PSScriptRoot\..\pyproject.toml" -ErrorAction SilentlyContinue)
-if (-not $hasLocalFiles) {
+if (-not $hasLocalFiles -and -not $env:ACP_BOOTSTRAPPED) {
     $remote  = if ($env:ACP_REMOTE) { $env:ACP_REMOTE } else { "https://github.com/Raza-learner/Runmote.git" }
     $branch  = if ($env:ACP_BRANCH) { $env:ACP_BRANCH } else { "dev" }
     $tmpDir  = "$env:TEMP\runmote-install"
@@ -44,7 +42,7 @@ if (-not $hasLocalFiles) {
         exit 1
     }
 
-    $script:ACP_BOOTSTRAPPED = $true
+    $env:ACP_BOOTSTRAPPED = "1"
     Get-Content "$extract\scripts\install.ps1" -Raw -Encoding UTF8 | Invoke-Expression
     exit $LASTEXITCODE
 }
