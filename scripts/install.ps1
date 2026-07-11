@@ -282,6 +282,18 @@ print(_pairing_banner('$pairingCode'))
     }
 } else {
     Write-Host "  Run 'runmote code' after daemon connects to get pairing code."
+    # DEBUG: check what's happening
+    Write-Host "  [D] codeFile=$codeFile exists=$(Test-Path $codeFile)" -ForegroundColor DarkGray
+    Write-Host "  [D] logFile=$logFile size=$((Get-Item $logFile -ErrorAction SilentlyContinue).Length) bytes" -ForegroundColor DarkGray
+    Write-Host "  [D] errFile=$errFile size=$((Get-Item $errFile -ErrorAction SilentlyContinue).Length) bytes" -ForegroundColor DarkGray
+    if (Test-Path $logFile) {
+        Write-Host "  [D] log tail:" -ForegroundColor DarkGray
+        Get-Content $logFile -Tail 10 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    }
+    if (Test-Path $errFile) {
+        Write-Host "  [D] err tail:" -ForegroundColor DarkGray
+        Get-Content $errFile -Tail 5 | ForEach-Object { Write-Host "    ERR $_" -ForegroundColor DarkGray }
+    }
 }
 
 Write-Host ""
