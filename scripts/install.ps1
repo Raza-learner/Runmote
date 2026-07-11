@@ -43,6 +43,7 @@ if (-not $hasLocalFiles -and -not $env:ACP_BOOTSTRAPPED) {
     }
 
     $env:ACP_BOOTSTRAPPED = "1"
+    $env:ACP_BOOTSTRAP_DIR = "$extract"
     Get-Content "$extract\scripts\install.ps1" -Raw -Encoding UTF8 | Invoke-Expression
     exit $LASTEXITCODE
 }
