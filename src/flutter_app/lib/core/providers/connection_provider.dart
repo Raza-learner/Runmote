@@ -54,6 +54,7 @@ class AcpConnection {
   final String? token;
   final String? relayUrl;
   final String? daemonId;
+  final String? daemonName;
   final List<AcpAgent> agents;
   final String? selectedAgentId;
   final AgentInfo? agentInfo;
@@ -69,6 +70,7 @@ class AcpConnection {
     this.token,
     this.relayUrl,
     this.daemonId,
+    this.daemonName,
     this.agents = const [],
     this.selectedAgentId,
     this.agentInfo,
@@ -92,6 +94,7 @@ class AcpConnection {
     String? token,
     String? relayUrl,
     String? daemonId,
+    String? daemonName,
     List<AcpAgent>? agents,
     String? selectedAgentId,
     AgentInfo? agentInfo,
@@ -112,6 +115,7 @@ class AcpConnection {
       token: token ?? this.token,
       relayUrl: relayUrl ?? this.relayUrl,
       daemonId: daemonId ?? this.daemonId,
+      daemonName: daemonName ?? this.daemonName,
       agents: agents ?? this.agents,
       selectedAgentId: clearSelectedAgent
           ? null
@@ -330,10 +334,12 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         final result = json['result'] as Map<String, dynamic>?;
         if (result != null && result['authenticated'] == true) {
           final daemonId = result['daemonId'] as String?;
+          final daemonName = result['daemonName'] as String?;
           final daemonConnected = result['daemonConnected'] as bool? ?? daemonId != null;
-          debugPrint('[RUNMOTE] auth/token success: daemonId=$daemonId, daemonConnected=$daemonConnected');
+          debugPrint('[RUNMOTE] auth/token success: daemonId=$daemonId, name=$daemonName, daemonConnected=$daemonConnected');
           state = state.copyWith(
             daemonId: daemonId,
+            daemonName: daemonName,
             daemonConnected: daemonConnected,
           );
           completer.complete(true);
@@ -348,8 +354,13 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       if (method == 'daemon/identified') {
         final params = json['params'] as Map<String, dynamic>?;
         final di = params?['daemonId'] as String?;
+        final dn = params?['name'] as String?;
         if (di != null) {
-          state = state.copyWith(daemonId: di, daemonConnected: true);
+          state = state.copyWith(
+            daemonId: di,
+            daemonName: dn,
+            daemonConnected: true,
+          );
         } else {
           state = state.copyWith(daemonConnected: true);
         }
@@ -410,9 +421,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         final result = json['result'] as Map<String, dynamic>?;
         if (result != null && result['paired'] == true) {
           final daemonId = result['daemonId'] as String?;
+          final daemonName = result['daemonName'] as String?;
           final token = result['token'] as String?;
           state = state.copyWith(
             daemonId: daemonId,
+            daemonName: daemonName,
             token: token,
             daemonConnected: daemonId != null,
           );
@@ -430,8 +443,13 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       if (method == 'daemon/identified') {
         final params = json['params'] as Map<String, dynamic>?;
         final di = params?['daemonId'] as String?;
+        final dn = params?['name'] as String?;
         if (di != null) {
-          state = state.copyWith(daemonId: di, daemonConnected: true);
+          state = state.copyWith(
+            daemonId: di,
+            daemonName: dn,
+            daemonConnected: true,
+          );
         } else {
           state = state.copyWith(daemonConnected: true);
         }

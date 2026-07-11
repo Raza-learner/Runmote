@@ -1,11 +1,60 @@
 $ErrorActionPreference = "Continue"
 
+$script:ACP_BOOTSTRAPPED = $false
+
+# ── Bootstrap: if running via irm | iex, download the repo first ────
+$hasLocalFiles = [bool]$PSScriptRoot -and (Test-Path "$PSScriptRoot\..\pyproject.toml" -ErrorAction SilentlyContinue)
+if (-not $hasLocalFiles) {
+    $remote  = if ($env:ACP_REMOTE) { $env:ACP_REMOTE } else { "https://github.com/Raza-learner/Runmote.git" }
+    $branch  = if ($env:ACP_BRANCH) { $env:ACP_BRANCH } else { "dev" }
+    $tmpDir  = "$env:TEMP\runmote-install"
+    $extract = "$tmpDir\repo"
+
+    Write-Host "Downloading Runmote installer ($branch branch)..." -ForegroundColor Cyan
+
+    Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue | Out-Null
+    New-Item -ItemType Directory -Force -Path $extract | Out-Null
+
+    # Try archive download (fast)
+    try {
+        $zipUrl = "https://github.com/Raza-learner/Runmote/archive/refs/heads/$branch.zip"
+        $zipFile = "$tmpDir\repo.zip"
+        Invoke-WebRequest -UseBasicParsing -Uri $zipUrl -OutFile $zipFile -ErrorAction Stop
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile, $tmpDir)
+        # GitHub archives extract to "Runmote-$branch" folder
+        $extracted = Get-ChildItem "$tmpDir\Runmote-*" -Directory | Select-Object -First 1
+        if ($extracted) {
+            Move-Item "$($extracted.FullName)\*" $extract -Force -ErrorAction SilentlyContinue
+        }
+    } catch {
+        # Fallback: shallow git clone
+        if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+            Write-Host "Error: git or internet connection required." -ForegroundColor Red
+            exit 1
+        }
+        git clone --depth 1 --branch "$branch" "$remote" $extract 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            git clone --depth 1 --branch "$branch" "git@github.com:Raza-learner/Runmote.git" $extract 2>$null
+        }
+    }
+
+    if (-not (Test-Path "$extract\scripts\install.ps1")) {
+        Write-Host "Error: failed to download installer." -ForegroundColor Red
+        exit 1
+    }
+
+    $script:ACP_BOOTSTRAPPED = $true
+    & "$extract\scripts\install.ps1" @args
+    exit $LASTEXITCODE
+}
+
 # ── Color setup ──────────────────────────────────────────────────────
 $interactive = [Environment]::UserInteractive -and -not $PSCommandPath.StartsWith("-")
 
 # Defaults
 $remote     = if ($env:ACP_REMOTE)    { $env:ACP_REMOTE }    else { "https://github.com/Raza-learner/Runmote.git" }
-$branch     = if ($env:ACP_BRANCH)    { $env:ACP_BRANCH }    else { "main" }
+$branch     = if ($env:ACP_BRANCH)    { $env:ACP_BRANCH }    else { "dev" }
 $installDir = if ($env:ACP_DIR)       { $env:ACP_DIR }       else { "$env:USERPROFILE\.local\share\runmote" }
 $mode       = "install"
 $skipAutostart = $false
@@ -21,14 +70,14 @@ for ($i = 0; $i -lt $args.Count; $i++) {
 Install Runmote daemon and configure auto-start.
 
 Usage:
-  iwr -useb https://raw.githubusercontent.com/Raza-learner/Runmote/$branch/scripts/install.ps1 | iex
-  `$env:ACP_RELAY_URL='ws://host:8000/daemon'; iwr -useb https://raw.githubusercontent.com/Raza-learner/Runmote/$branch/scripts/install.ps1 | iex
+  powershell -c "irm https://raw.githubusercontent.com/Raza-learner/Runmote/dev/scripts/install.ps1 | iex"
+  `$env:ACP_RELAY_URL='ws://host:8000/daemon'; powershell -c "irm https://raw.githubusercontent.com/Raza-learner/Runmote/dev/scripts/install.ps1 | iex"
 
 Environment variables:
   ACP_RELAY_URL      WebSocket URL of the relay server
   ACP_DAEMON_TOKEN   Auth token for daemon-relay authentication
   ACP_DAEMON_ID      Daemon identifier (default: hostname)
-  ACP_BRANCH         Git branch (default: main)
+  ACP_BRANCH         Git branch (default: dev)
   ACP_DIR            Install directory
   ACP_REMOTE         Git remote URL
 "@

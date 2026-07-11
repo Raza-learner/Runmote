@@ -33,8 +33,12 @@ def _pairing_banner(code: str, public_url: str = "") -> str:
     else:
         formatted = f"{code[:4]}-{code[4:]}"
 
-    qr_data = code
-    title = "Scan QR Code"
+    if public_url:
+        qr_data = f"acp://{public_url}/connect?code={code}"
+        title = "Scan to connect from anywhere"
+    else:
+        qr_data = code
+        title = "Scan QR Code"
 
     qr = qrcode.QRCode(border=2, box_size=1)
     qr.add_data(qr_data)
@@ -63,6 +67,8 @@ def _pairing_banner(code: str, public_url: str = "") -> str:
     lines.append(f"║  {' ' * pad3}{code_line}{' ' * (inner_width - pad3 - len(code_line))}  ║")
     lines.append(f"║{' ' * (inner_width + 2)}║")
     lines.append(f"╚{'═' * (inner_width + 2)}╝")
+    if public_url:
+        lines.append(f"  Relay: {public_url}")
     return "\n" + "\n".join(lines) + "\n"
 
 # Tracks request info (cwd, method) keyed by message id, so

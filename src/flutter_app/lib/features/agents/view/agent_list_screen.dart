@@ -48,6 +48,7 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
     final connectionState = ref.watch(connectionProvider.select((c) => c.state));
     final agents = ref.watch(connectionProvider.select((c) => c.agents));
     final daemonConnected = ref.watch(connectionProvider.select((c) => c.daemonConnected));
+    final daemonName = ref.watch(connectionProvider.select((c) => c.daemonName));
     final pairingCode = ref.watch(connectionProvider.select((c) => c.pairingCode));
     final relayUrl = ref.watch(connectionProvider.select((c) => c.relayUrl));
     final selectedAgentId = ref.watch(connectionProvider.select((c) => c.selectedAgentId));
@@ -72,9 +73,9 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
-          pairingCode != null
+          daemonName ?? (pairingCode != null
               ? '${pairingCode.substring(0, 3)}-${pairingCode.substring(3)}'
-              : 'Agents',
+              : 'Agents'),
           style: theme.textTheme.titleMedium,
         ),
         actions: [
