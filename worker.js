@@ -17,8 +17,8 @@ export default {
       const resp = await fetch(gh, { headers: { 'Accept': 'application/vnd.github.raw', 'User-Agent': 'runmote-worker' } })
       let text = await resp.text()
       // Inject relay config from Worker secrets (no hardcoded tokens in source code)
-      text = text.replace('__ACP_RELAY_URL__', relayUrl)
-      text = text.replace('__ACP_DAEMON_TOKEN__', token)
+      text = text.replaceAll('__ACP_RELAY_URL__', relayUrl)
+      text = text.replaceAll('__ACP_DAEMON_TOKEN__', token)
       return new Response(text, {
         headers: {
           'content-type': ext === 'ps1' ? 'text/powershell' : 'text/x-shellscript',
