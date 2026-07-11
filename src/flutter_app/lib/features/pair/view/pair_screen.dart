@@ -7,9 +7,10 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/models/connection_state.dart';
 import '../../../core/providers/connection_provider.dart';
-import '../../../core/providers/discovery_provider.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/theme/app_spacing.dart';
+
+const _defaultRelayUrl = 'wss://runmote-relay-u2zi.onrender.com';
 
 class PairScreen extends ConsumerStatefulWidget {
   const PairScreen({super.key});
@@ -22,7 +23,6 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   final _codeController = TextEditingController();
   final _manualHostController = TextEditingController(text: '192.168.1.12');
   final _manualPortController = TextEditingController(text: '8000');
-  bool _discoveryStarted = false;
   bool _isConnecting = false;
   bool _showScanner = false;
   bool _showCodeEntry = false;
@@ -41,17 +41,27 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   Future<void> _autoConnectWithToken() async {
     final p = await ref.read(preferencesServiceProvider.future);
     final token = p.getAuthToken();
-    final relayUrl = p.getRelayUrl();
-    if (token == null || relayUrl == null) return;
+    final savedUrl = p.getRelayUrl();
+    debugPrint('[RUNMOTE] autoConnect: token=${token != null ? "present" : "null"}, savedUrl=$savedUrl');
+    if (token == null || savedUrl == null) return;
 
-    for (var attempt = 0; attempt < 2; attempt++) {
-      if (attempt > 0) await Future.delayed(const Duration(seconds: 3));
-      final ok = await ref.read(connectionProvider.notifier).connectWithToken(token, relayUrl);
-      if (ok && mounted) {
-        context.go('/agents');
-        return;
+    final urlsToTry = savedUrl == _defaultRelayUrl
+        ? [savedUrl]
+        : [savedUrl, _defaultRelayUrl];
+
+    for (final url in urlsToTry) {
+      for (var attempt = 0; attempt < 2; attempt++) {
+        if (attempt > 0) await Future.delayed(const Duration(seconds: 3));
+        debugPrint('[RUNMOTE] autoConnect: trying url=$url attempt=${attempt + 1}');
+        final ok = await ref.read(connectionProvider.notifier).connectWithToken(token, url);
+        debugPrint('[RUNMOTE] autoConnect: url=$url attempt=${attempt + 1} result=$ok');
+        if (ok && mounted) {
+          context.go('/agents');
+          return;
+        }
       }
     }
+    debugPrint('[RUNMOTE] autoConnect: all attempts failed, showing pairing screen');
   }
 
   @override
@@ -103,9 +113,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
       _isConnecting = true;
       _error = null;
     });
-    final discovery = ref.read(relayDiscoveryProvider);
-    final url = discovery.url;
-    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: url);
+    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: _defaultRelayUrl);
   }
 
   bool _isValidCode(String raw) {
@@ -132,15 +140,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final discovery = ref.watch(relayDiscoveryProvider);
     final isDark = theme.brightness == Brightness.dark;
-
-    if (!_discoveryStarted && !discovery.searching) {
-      _discoveryStarted = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(relayDiscoveryProvider.notifier).startDiscovery();
-      });
-    }
 
     ref.listen<AcpConnection>(connectionProvider, (prev, next) {
       if (next.paired && next.state is Connected) {
@@ -202,7 +202,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                   children: [
                     _buildLogo(theme),
                     const SizedBox(height: 56),
-                    _buildContent(theme, discovery, isDark),
+                    _buildContent(theme, isDark),
                   ],
                 ),
               ),
@@ -278,12 +278,8 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     );
   }
 
-  Widget _buildContent(ThemeData theme, RelayDiscoveryState discovery, bool isDark) {
-    if (discovery.searching) {
-      return _buildSearching(isDark);
-    } else if (discovery.error != null) {
-      return _buildError(discovery.error!, isDark);
-    } else if (_showScanner) {
+  Widget _buildContent(ThemeData theme, bool isDark) {
+    if (_showScanner) {
       return _buildQrScanner(isDark);
     } else if (_showCodeEntry) {
       return _buildCodeInput(isDark);
@@ -294,12 +290,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   Widget _buildOptions(ThemeData theme, bool isDark) {
     return Column(
       children: [
-        _StatusChip(
-          icon: Icons.wifi_rounded,
-          label: 'Relay found',
-          color: const Color(0xFF22C55E),
-        ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 8),
         _OptionCard(
           icon: Icons.qr_code_scanner_rounded,
           title: 'Scan QR Code',
@@ -330,87 +321,6 @@ class _PairScreenState extends ConsumerState<PairScreen> {
             foregroundColor: isDark ? Colors.white.withOpacity(0.5) : theme.colorScheme.primary.withOpacity(0.7),
           ),
           child: const Text('Need help finding your code?'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSearching(bool isDark) {
-    return Column(
-      children: [
-        const SizedBox(height: 20),
-        _PulsingDots(),
-        const SizedBox(height: 32),
-        Text(
-          'Scanning for Relay...',
-          style: TextStyle(
-            color: isDark ? Colors.white : const Color(0xFF1E293B),
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Ensure the Runmote daemon is active on your local network',
-          style: TextStyle(
-            color: isDark ? Colors.white.withOpacity(0.4) : const Color(0xFF64748B),
-            fontSize: 14,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildError(String error, bool isDark) {
-    final theme = Theme.of(context);
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEF4444).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.2)),
-          ),
-          child: Column(
-            children: [
-              const Icon(
-                Icons.wifi_off_rounded,
-                size: 48,
-                color: Color(0xFFEF4444),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                error,
-                style: TextStyle(
-                  color: isDark ? Colors.white : const Color(0xFF1E293B),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: OutlinedButton.icon(
-            onPressed: () {
-              ref.read(relayDiscoveryProvider.notifier).startDiscovery();
-            },
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Try Again'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: isDark ? Colors.white : theme.colorScheme.primary,
-              side: BorderSide(color: isDark ? Colors.white.withOpacity(0.2) : theme.colorScheme.primary.withOpacity(0.2)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
         ),
       ],
     );
@@ -736,42 +646,6 @@ class _OptionCard extends StatelessWidget {
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _StatusChip({required this.icon, required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _GlassCard extends StatelessWidget {
   final bool isDark;
   final Widget child;
@@ -888,60 +762,4 @@ class _CornerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CornerPainter oldDelegate) => false;
-}
-
-class _PulsingDots extends StatefulWidget {
-  @override
-  State<_PulsingDots> createState() => _PulsingDotsState();
-}
-
-class _PulsingDotsState extends State<_PulsingDots>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final theme = Theme.of(context);
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final t = _controller.value;
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(3, (i) {
-              final phase = i / 3.0;
-              final raw = (t * 3 - phase) % 1.0;
-              final dotT = raw < 0 ? raw + 1 : raw;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Container(
-                width: 10 + 4 * (1 - dotT),
-                height: 10 + 4 * (1 - dotT),
-                decoration: BoxDecoration(
-                  color: (isDark ? Colors.white : theme.colorScheme.primary).withValues(alpha: 0.3 + 0.7 * (1 - dotT)),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
 }

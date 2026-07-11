@@ -92,6 +92,8 @@ async def daemon_endpoint(websocket: WebSocket):
                         public_url=PUBLIC_URL or "",
                     )
                     state.daemons[daemon_id] = session
+                    if token:
+                        state.known_tokens[token] = daemon_id
                     state.store.set_daemon_id(daemon_id)
                     print(f"  → daemon {daemon_id} identified")
                     print(f"  → pairing code: {pairing_code}")

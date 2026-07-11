@@ -6,11 +6,21 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../models/connection_state.dart';
-import '../models/agent_info.dart';
 import '../models/agent_capabilities.dart';
+import '../models/agent_info.dart';
+import '../models/connection_state.dart';
 import 'database_provider.dart';
 import 'session_list_provider.dart';
+
+const _defaultRelayUrl = 'wss://runmote-relay-u2zi.onrender.com';
+
+String _sanitizeRelayUrl(String url) {
+  var u = url.trim();
+  while (u.endsWith('/')) u = u.substring(0, u.length - 1);
+  if (u.startsWith('https://')) u = 'wss://${u.substring(8)}';
+  if (u.startsWith('http://')) u = 'ws://${u.substring(7)}';
+  return u;
+}
 
 class AcpAgent {
   final String id;
@@ -150,7 +160,8 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       return;
     }
 
-    final url = relayUrl ?? state.relayUrl ?? 'ws://localhost:8000';
+    final url = _sanitizeRelayUrl(relayUrl ?? state.relayUrl ?? _defaultRelayUrl);
+    debugPrint('[RUNMOTE] connect: url=$url');
 
     state = state.copyWith(
       state: const AcpConnectionState.connecting(),
@@ -162,6 +173,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
     try {
       final uri = Uri.parse('$url/app');
+      debugPrint('[RUNMOTE] connect: ws uri=$uri');
       final channel = WebSocketChannel.connect(uri);
 
       await channel.ready;
@@ -234,14 +246,17 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       return true;
     }
 
+    final url = _sanitizeRelayUrl(relayUrl);
+    debugPrint('[RUNMOTE] connectWithToken: url=$url');
     state = state.copyWith(
       state: const AcpConnectionState.connecting(),
-      relayUrl: relayUrl,
+      relayUrl: url,
       error: null,
     );
 
     try {
-      final uri = Uri.parse('$relayUrl/app');
+      final uri = Uri.parse('$url/app');
+      debugPrint('[RUNMOTE] connectWithToken: ws uri=$uri');
       final channel = WebSocketChannel.connect(uri);
       await channel.ready;
 
@@ -275,6 +290,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
           state: const AcpConnectionState.connected(),
           paired: true,
         );
+        final p = await _ref.read(preferencesServiceProvider.future);
+        if (state.token != null) {
+          await p.setAuthToken(state.token!);
+          await p.setRelayUrl(url);
+        }
         sendRaw({
           'jsonrpc': '2.0',
           'id': _nextId,
@@ -310,13 +330,16 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         final result = json['result'] as Map<String, dynamic>?;
         if (result != null && result['authenticated'] == true) {
           final daemonId = result['daemonId'] as String?;
+          final daemonConnected = result['daemonConnected'] as bool? ?? daemonId != null;
+          debugPrint('[RUNMOTE] auth/token success: daemonId=$daemonId, daemonConnected=$daemonConnected');
           state = state.copyWith(
             daemonId: daemonId,
-            daemonConnected: daemonId != null,
+            daemonConnected: daemonConnected,
           );
           completer.complete(true);
           return;
         }
+        debugPrint('[RUNMOTE] auth/token rejected');
         completer.complete(false);
         return;
       }

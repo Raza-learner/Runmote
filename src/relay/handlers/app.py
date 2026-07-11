@@ -105,20 +105,19 @@ async def app_endpoint(websocket: WebSocket):
                 if method == "auth/token":
                     params = data.get("params") or {}
                     token = params.get("token", "").strip()
-                    found = None
-                    for did, s in state.daemons.items():
-                        if s.token == token:
-                            found = s
-                            break
-                    if found:
-                        state.app_to_daemon[client_id] = found.daemon_id
-                        found.paired_apps.add(client_id)
+                    daemon_id = state.get_daemon_id_by_token(token)
+                    if daemon_id is not None:
+                        state.app_to_daemon[client_id] = daemon_id
+                        active = state.daemons.get(daemon_id)
+                        if active:
+                            active.paired_apps.add(client_id)
                         await websocket.send_text(json.dumps({
                             "jsonrpc": "2.0",
                             "id": msg_id,
                             "result": {
                                 "authenticated": True,
-                                "daemonId": found.daemon_id,
+                                "daemonId": daemon_id,
+                                "daemonConnected": active is not None,
                             },
                         }))
                     else:

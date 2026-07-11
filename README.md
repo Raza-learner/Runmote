@@ -1,6 +1,6 @@
 # Runmote
 
-Control AI agents on your laptop from your mobile phone. Connect via cloud relay at `relay.runmote.dev`.
+Control AI agents on your laptop from your mobile phone. Connect via cloud relay at `runmote-relay-u2zi.onrender.com`.
 
 ## Install
 
