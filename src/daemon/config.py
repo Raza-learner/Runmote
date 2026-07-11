@@ -6,10 +6,7 @@ import socket
 
 RELAY_HOST = os.environ.get("ACP_RELAY_HOST", "relay.runmote.dev")
 RELAY_PORT = os.environ.get("ACP_RELAY_PORT", "443")
-_raw_relay_url = os.environ.get(
-    "ACP_RELAY_URL",
-    f"wss://{RELAY_HOST}/daemon",
-)
+_raw_relay_url = os.environ.get("ACP_RELAY_URL", "") or f"wss://{RELAY_HOST}/daemon"
 # Auto-convert http/https to ws/wss so users can pass an https URL
 if _raw_relay_url.startswith("https://"):
     RELAY_URL = _raw_relay_url.replace("https://", "wss://", 1)

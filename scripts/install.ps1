@@ -144,9 +144,11 @@ if ($interactive) {
 if (-not $env:ACP_RELAY_URL -or -not $env:ACP_DAEMON_TOKEN) {
     $configUrl = if ($branch -eq "dev") { "https://runmote.dev/config/dev" } else { "https://runmote.dev/config" }
     try {
-        $config = Invoke-RestMethod -UseBasicParsing -Uri $configUrl -ErrorAction Stop
-        if (-not $env:ACP_RELAY_URL)    { $env:ACP_RELAY_URL = $config.relayUrl }
-        if (-not $env:ACP_DAEMON_TOKEN) { $env:ACP_DAEMON_TOKEN = $config.token }
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $resp = Invoke-WebRequest -UseBasicParsing -Uri $configUrl -ErrorAction Stop
+        $config = $resp.Content | ConvertFrom-Json
+        if (-not $env:ACP_RELAY_URL    -and $config.relayUrl) { $env:ACP_RELAY_URL = $config.relayUrl }
+        if (-not $env:ACP_DAEMON_TOKEN -and $config.token)    { $env:ACP_DAEMON_TOKEN = $config.token }
     } catch {
         Write-Host "  Warning: could not fetch relay config ($configUrl)" -ForegroundColor DarkGray
     }
