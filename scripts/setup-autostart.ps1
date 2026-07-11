@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$Install,
     [switch]$Remove,
     [switch]$Status,
