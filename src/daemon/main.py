@@ -63,8 +63,6 @@ def _pairing_banner(code: str, public_url: str = "") -> str:
     lines.append(f"║  {' ' * pad3}{code_line}{' ' * (inner_width - pad3 - len(code_line))}  ║")
     lines.append(f"║{' ' * (inner_width + 2)}║")
     lines.append(f"╚{'═' * (inner_width + 2)}╝")
-    if public_url:
-        lines.append(f"  Relay: {public_url}")
     return "\n" + "\n".join(lines) + "\n"
 
 # Tracks request info (cwd, method) keyed by message id, so
