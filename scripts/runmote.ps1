@@ -14,7 +14,7 @@ $logFile = "$env:TEMP\runmote-daemon.log"
 
 $scriptDir = Split-Path -Parent $PSCommandPath
 $installDir = Split-Path -Parent $scriptDir
-$python = Join-Path $installDir ".venv" "Scripts" "python.exe"
+$python = Join-Path (Join-Path (Join-Path $installDir ".venv") "Scripts") "python.exe"
 
 function Get-DaemonName {
     if ($env:ACP_DAEMON_ID) { return $env:ACP_DAEMON_ID }

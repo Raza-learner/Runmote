@@ -186,16 +186,48 @@ if ($env:ACP_ENABLE_AGENTS -ne "false") {
     Write-Host "  Agent adapters skipped (ACP_ENABLE_AGENTS=false)" -ForegroundColor DarkGray
 }
 
-Write-Host ""
 Write-Host "  Installation Complete" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Control the daemon:"
+
+# Start daemon and show pairing code
+Write-Host "  Starting daemon..." -ForegroundColor Gray
+try {
+    Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null
+} catch {}
+$logFile = "$env:TEMP\runmote-daemon.log"
+$pairingCode = $null
+for ($i = 0; $i -lt 12; $i++) {
+    Start-Sleep -Seconds 1
+    if (Test-Path $logFile) {
+        $match = Select-String -Path $logFile -Pattern 'pairing code:\s+(\S+)' | Select-Object -Last 1
+        if ($match) { $pairingCode = $match.Matches.Groups[1].Value; break }
+    }
+}
+if ($pairingCode) {
+    $python = Join-Path (Join-Path (Join-Path $installDir ".venv") "Scripts") "python.exe"
+    if (Test-Path $python) {
+        & $python -c @"
+import sys; sys.path.insert(0, r'$installDir\src')
+from daemon.main import _pairing_banner
+print(_pairing_banner('$pairingCode'))
+"@ 2>$null
+    } else {
+        $formatted = $pairingCode.Substring(0, 4) + "-" + $pairingCode.Substring(4)
+        Write-Host ""
+        Write-Host "  +-----------------------------+"
+        Write-Host ("  |  Pairing Code: {0,-12}  |" -f $formatted)
+        Write-Host "  |                             |"
+        Write-Host "  |  Enter this in the app      |"
+        Write-Host "  +-----------------------------+"
+        Write-Host ""
+    }
+} else {
+    Write-Host "  Run 'runmote code' after daemon connects to get pairing code."
+}
+
+Write-Host ""
+Write-Host "  Control the daemon:" -ForegroundColor White
 Write-Host "    runmote             interactive menu" -ForegroundColor Cyan
 Write-Host "    runmote start       start daemon" -ForegroundColor Cyan
 Write-Host "    runmote code        show pairing QR" -ForegroundColor Cyan
 Write-Host "    runmote stop        stop daemon" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "  Pair with the Runmote app:" -ForegroundColor White
-Write-Host "  Start the daemon, then scan the QR code or type the"
-Write-Host "  code shown in the terminal into the mobile app."
-Write-Host ""
