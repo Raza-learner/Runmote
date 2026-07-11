@@ -704,14 +704,19 @@ async def main():
             except NotImplementedError:
                 pass
 
-    daemon_task = asyncio.create_task(run_daemon())
-
     if sys.platform == "win32":
-        try:
-            await daemon_task
-        except asyncio.CancelledError:
-            pass
+        while True:
+            try:
+                daemon_task = asyncio.create_task(run_daemon())
+                await daemon_task
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                import traceback
+                print(f"Daemon crashed: {traceback.format_exc()}", file=sys.stderr, flush=True)
+                await asyncio.sleep(5)
     else:
+        daemon_task = asyncio.create_task(run_daemon())
         await stop.wait()
         print("\nShutting down...")
         daemon_task.cancel()
