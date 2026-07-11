@@ -16,7 +16,7 @@ $python = ""
 $envVars = @{}
 
 # Try .venv first, then fallback to python in PATH
-$venvPython = Join-Path $Dir ".venv" "Scripts" "python.exe"
+$venvPython = Join-Path (Join-Path (Join-Path $Dir ".venv") "Scripts") "python.exe"
 if (Test-Path $venvPython) {
     $python = $venvPython
 } else {
@@ -78,7 +78,7 @@ function Remove-AutoStart {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
     Write-Host "  scheduled task removed: $taskName"
 
-    $wrapperPath = Join-Path $Dir "scripts" "run-daemon.ps1"
+    $wrapperPath = Join-Path (Join-Path $Dir "scripts") "run-daemon.ps1"
     if (Test-Path $wrapperPath) {
         Remove-Item $wrapperPath -Force
         Write-Host "  wrapper removed"
@@ -99,11 +99,11 @@ function Get-AutoStartStatus {
 }
 
 function Install-RunmoteCmd {
-    $binDir = Join-Path $env:USERPROFILE ".local" "bin"
+    $binDir = Join-Path (Join-Path $env:USERPROFILE ".local") "bin"
     New-Item -ItemType Directory -Force -Path $binDir | Out-Null
     $cmdPath = Join-Path $binDir "runmote.cmd"
 
-    $psScriptPath = Join-Path $Dir "scripts" "runmote.ps1"
+    $psScriptPath = Join-Path (Join-Path $Dir "scripts") "runmote.ps1"
     $cmdLines = @(
         "@echo off",
         "powershell -NoProfile -ExecutionPolicy Bypass -File `"$psScriptPath`" %*"
@@ -114,7 +114,7 @@ function Install-RunmoteCmd {
 }
 
 function Remove-RunmoteCmd {
-    $cmdPath = Join-Path $env:USERPROFILE ".local" "bin" "runmote.cmd"
+    $cmdPath = Join-Path (Join-Path (Join-Path $env:USERPROFILE ".local") "bin") "runmote.cmd"
     if (Test-Path $cmdPath) {
         Remove-Item $cmdPath -Force
         Write-Host "  runmote command removed"

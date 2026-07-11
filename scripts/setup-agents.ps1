@@ -11,7 +11,7 @@ if (-not $Dir) {
     $Dir = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 }
 
-$binDir = Join-Path $env:USERPROFILE ".local" "bin"
+$binDir = Join-Path (Join-Path $env:USERPROFILE ".local") "bin"
 
 function Test-NpmInstalled {
     return (Get-Command npm -ErrorAction SilentlyContinue) -ne $null
@@ -51,8 +51,8 @@ function Install-IfCliFound($cli, $package) {
 
 function Install-CmdWrapper($name) {
     New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-    $cmdPath = Join-Path $binDir "$name.cmd"
-    $npmPath = Join-Path $env:APPDATA "npm" "$name.cmd"
+    $cmdPath = Join-Path $binDir "${name}.cmd"
+    $npmPath = Join-Path (Join-Path $env:APPDATA "npm") "${name}.cmd"
     if (Test-Path $npmPath) {
         $cmdLines = @(
             "@echo off",
@@ -73,7 +73,7 @@ function Install-AgentWrappers {
 }
 
 function Remove-CmdWrapper($name) {
-    $cmdPath = Join-Path $binDir "$name.cmd"
+    $cmdPath = Join-Path $binDir "${name}.cmd"
     if (Test-Path $cmdPath) {
         Remove-Item $cmdPath -Force
         Write-Host "  $name.cmd removed from $binDir"
@@ -138,9 +138,9 @@ function Get-AllCliStatus {
         $cli = $_
         $found = Get-Command $cli -ErrorAction SilentlyContinue
         if ($found) {
-            Write-Host "  $cli: found ($($found.Source))"
+            Write-Host "  ${cli}: found ($($found.Source))"
         } else {
-            Write-Host "  $cli: not found"
+            Write-Host "  ${cli}: not found"
         }
     }
 }
@@ -153,9 +153,9 @@ function Get-AllPackageStatus {
         if ($LASTEXITCODE -eq 0 -and $lines) {
             $match = [regex]::Match($lines, "@(\d+\.\d+\.\d+)")
             $ver = if ($match.Success) { $match.Groups[1].Value } else { "?" }
-            Write-Host "  $pkg: installed (v$ver)"
+            Write-Host "  ${pkg}: installed (v${ver})"
         } else {
-            Write-Host "  $pkg: not installed"
+            Write-Host "  ${pkg}: not installed"
         }
     }
 }
@@ -164,15 +164,15 @@ function Get-AllWrapperStatus {
     Write-Host ""
     @("codex-acp", "claude-agent-acp") | ForEach-Object {
         $bin = $_
-        $cmdPath = Join-Path $binDir "$bin.cmd"
+        $cmdPath = Join-Path $binDir "${bin}.cmd"
         if (Test-Path $cmdPath) {
-            Write-Host "  $binDir\$bin.cmd: linked"
+            Write-Host "  ${binDir}\${bin}.cmd: linked"
         } else {
             $global = Get-Command $bin -ErrorAction SilentlyContinue
             if ($global) {
                 Write-Host "  $($global.Source): in PATH"
             } else {
-                Write-Host "  $bin: not in PATH"
+                Write-Host "  ${bin}: not in PATH"
             }
         }
     }
