@@ -37,12 +37,12 @@ function Get-PackageVersion($package) {
 
 function Install-IfCliFound($cli, $package) {
     if (-not (Test-CliFound $cli)) {
-        Write-Host "  '$cli' not found — skipping $package"
+        Write-Host "  '$cli' not found -- skipping $package"
         return
     }
     if (Test-PackageInstalled $package) {
         $ver = Get-PackageVersion $package
-        Write-Host "  $package v$ver already installed — skipping"
+        Write-Host "  $package v$ver already installed -- skipping"
     } else {
         Write-Host "  Installing $package (for $cli)..."
         npm install -g $package
@@ -109,7 +109,7 @@ function Remove-Agents {
     Write-Host ""
 
     if (-not (Test-NpmInstalled)) {
-        Write-Host "  npm not found — skipping"
+        Write-Host "  npm not found -- skipping"
         exit 0
     }
 
@@ -117,14 +117,14 @@ function Remove-Agents {
         Write-Host "  Removing @agentclientprotocol/codex-acp..."
         npm uninstall -g "@agentclientprotocol/codex-acp"
     } else {
-        Write-Host "  @agentclientprotocol/codex-acp not installed — skipping"
+        Write-Host "  @agentclientprotocol/codex-acp not installed -- skipping"
     }
 
     if (Test-PackageInstalled "@agentclientprotocol/claude-agent-acp") {
         Write-Host "  Removing @agentclientprotocol/claude-agent-acp..."
         npm uninstall -g "@agentclientprotocol/claude-agent-acp"
     } else {
-        Write-Host "  @agentclientprotocol/claude-agent-acp not installed — skipping"
+        Write-Host "  @agentclientprotocol/claude-agent-acp not installed -- skipping"
     }
 
     Remove-AgentWrappers
