@@ -10,4 +10,4 @@ compatibility_date = "2026-07-10"
 
 # Keep Render free-tier relays awake (sleep after 15 min inactivity)
 [triggers]
-crons = ["*/10 * * * *"]
+crons = ["*/13 * * * *"]
