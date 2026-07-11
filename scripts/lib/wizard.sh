@@ -368,12 +368,12 @@ wizard_autostart_summary() {
 
 wizard_cloud_relay() {
 
-    # Non-interactive — default to cloud mode with public relay.
-    # The public relay token is embedded so `curl | bash` works anywhere.
+    # Non-interactive — cloud mode uses env vars set by install.sh bootstrap.
+    # Values are injected by the Worker at serve time via __PLACEHOLDERS__.
     if [[ $ACP_INTERACTIVE -eq 0 ]]; then
         ACP_CLOUD_MODE=true
-        ACP_RELAY_URL="${ACP_RELAY_URL:-wss://runmote-relay.onrender.com/daemon}"
-        ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-00a89de233437a8f8482c4aab2af80a9}"
+        ACP_RELAY_URL="${ACP_RELAY_URL:-}"
+        ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-}"
         if [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]]; then
             ACP_RELAY_PUBLIC_URL="$ACP_RELAY_PUBLIC_URL"
         else

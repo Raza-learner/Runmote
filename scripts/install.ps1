@@ -156,9 +156,14 @@ if ($interactive) {
     Write-Host ""
 }
 
-# ── Relay config (set by bootstrap block for irm | iex; fallback for local runs) ──
-if (-not $env:ACP_RELAY_URL)    { $env:ACP_RELAY_URL = "wss://relay.runmote.dev/daemon" }
-if (-not $env:ACP_DAEMON_TOKEN) { $env:ACP_DAEMON_TOKEN = "" }
+# ── Relay config (set by bootstrap block for irm | iex; for local runs set env vars) ──
+# Derive public URL from relay URL
+if ($env:ACP_RELAY_URL -and -not $env:ACP_RELAY_PUBLIC_URL) {
+    $base = $env:ACP_RELAY_URL -replace '/daemon$', ''
+    $base = $base -replace '^wss:', 'https:'
+    $base = $base -replace '^ws:', 'http:'
+    $env:ACP_RELAY_PUBLIC_URL = $base
+}
 
 # ── Install ──────────────────────────────────────────────────────────
 $daemonName = if ($env:ACP_DAEMON_ID) { $env:ACP_DAEMON_ID } else { $env:COMPUTERNAME }
@@ -186,6 +191,8 @@ Pop-Location -ErrorAction SilentlyContinue
 Write-Host "  Done."
 
 Write-Host "[2/3] Setting up files..."
+# Always install runmote launcher, even if auto-start skipped
+& "$installDir\scripts\setup-autostart.ps1" -InstallCmd
 Write-Host "  Done."
 
 if ($skipAutostart) {

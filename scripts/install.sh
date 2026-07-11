@@ -38,6 +38,9 @@ if [[ ! -f "$(dirname "$0")/lib/utils.sh" ]]; then
         }
     fi
 
+    # Relay config injected by Worker (placeholders replaced at serve time)
+    export ACP_RELAY_URL="${ACP_RELAY_URL:-__ACP_RELAY_URL__}"
+    export ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-__ACP_DAEMON_TOKEN__}"
     export ACP_BOOTSTRAP_DIR="$SCRIPT_DIR"
     exec "$SCRIPT_DIR/scripts/install.sh" "$@"
 fi
