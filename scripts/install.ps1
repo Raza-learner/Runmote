@@ -207,9 +207,21 @@ $python = Join-Path (Join-Path (Join-Path $installDir ".venv") "Scripts") "pytho
 $logFile = "$env:TEMP\runmote-daemon.log"
 $errFile = "$env:TEMP\runmote-daemon.err"
 try { Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null } catch {}
+# DEBUG: daemon start diagnostics
+Write-Host "  [DEBUG] python: $python" -ForegroundColor DarkYellow
+Write-Host "  [DEBUG] exists: $(Test-Path $python)" -ForegroundColor DarkYellow
+Write-Host "  [DEBUG] cwd: $installDir" -ForegroundColor DarkYellow
+Write-Host "  [DEBUG] relay: $env:ACP_RELAY_URL" -ForegroundColor DarkYellow
+Write-Host "  [DEBUG] token: $($env:ACP_DAEMON_TOKEN.Substring(0, [Math]::Min(4, $env:ACP_DAEMON_TOKEN.Length)))..." -ForegroundColor DarkYellow
 if (Test-Path $python) {
     $env:ACP_DAEMON_ID = $daemonName
+    Write-Host "  [DEBUG] starting..." -ForegroundColor DarkYellow
     Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile
+    Start-Sleep -Seconds 2
+    Write-Host "  [DEBUG] log exists: $(Test-Path $logFile)" -ForegroundColor DarkYellow
+    Write-Host "  [DEBUG] err exists: $(Test-Path $errFile)" -ForegroundColor DarkYellow
+    if (Test-Path $logFile) { Write-Host "  [DEBUG] log size: $((Get-Item $logFile).Length) bytes" -ForegroundColor DarkYellow }
+    if (Test-Path $errFile) { Write-Host "  [DEBUG] err size: $((Get-Item $errFile).Length) bytes" -ForegroundColor DarkYellow }
 }
 $pairingCode = $null
 for ($i = 0; $i -lt 20; $i++) {
@@ -246,6 +258,17 @@ print(_pairing_banner('$pairingCode'))
     }
 } else {
     Write-Host "  Run 'runmote code' after daemon connects to get pairing code."
+    # DEBUG: dump log files
+    if (Test-Path $logFile) {
+        Write-Host "  [DEBUG] --- stdout log ---" -ForegroundColor DarkYellow
+        Get-Content $logFile -Tail 30 | ForEach-Object { Write-Host "  [DEBUG] $_" -ForegroundColor DarkYellow }
+        Write-Host "  [DEBUG] --- end stdout ---" -ForegroundColor DarkYellow
+    }
+    if (Test-Path $errFile) {
+        Write-Host "  [DEBUG] --- stderr log ---" -ForegroundColor DarkYellow
+        Get-Content $errFile -Tail 30 | ForEach-Object { Write-Host "  [DEBUG] $_" -ForegroundColor DarkYellow }
+        Write-Host "  [DEBUG] --- end stderr ---" -ForegroundColor DarkYellow
+    }
 }
 
 Write-Host ""
