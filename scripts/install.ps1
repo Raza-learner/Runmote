@@ -186,12 +186,9 @@ if ($srcDir -and (Test-Path "$srcDir\pyproject.toml")) {
     Copy-Item "$srcDir\*" $installDir -Recurse -Force -Exclude ".git",".venv","__pycache__",".pytest_cache","*.db","logs"
 }
 Push-Location $installDir -ErrorAction SilentlyContinue
-uv sync --frozen
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "  frozen sync failed — running full sync..."
-    uv sync
-}
-Pop-Location -ErrorAction SilentlyContinue
+# Recreate venv to avoid stale/corrupted packages from previous installs
+Remove-Item ".venv" -Recurse -Force -ErrorAction SilentlyContinue
+uv sync
 Write-Host "  Done."
 
 Write-Host "[2/3] Setting up files..."

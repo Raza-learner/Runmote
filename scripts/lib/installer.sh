@@ -263,19 +263,10 @@ install_dependencies() {
         return 1
     fi
 
-    if uv sync --frozen; then
-
-        success "Dependencies installed"
-
-    else
-
-        warn "Frozen sync failed."
-
-        info "Running full sync..."
-
-        uv sync || return 1
-
-        success "Dependencies installed"
+    # Recreate venv to avoid stale packages from previous installs
+    rm -rf .venv
+    uv sync || return 1
+    success "Dependencies installed"
 
     fi
 
