@@ -12,7 +12,7 @@ import '../models/connection_state.dart';
 import 'database_provider.dart';
 import 'session_list_provider.dart';
 
-const _defaultRelayUrl = 'wss://runmote-relay-u2zi.onrender.com';
+const _defaultRelayUrl = 'wss://runmote-relay.onrender.com';
 
 String _sanitizeRelayUrl(String url) {
   var u = url.trim();

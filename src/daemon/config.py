@@ -4,7 +4,7 @@ import shutil
 import socket
 
 
-RELAY_HOST = os.environ.get("ACP_RELAY_HOST", "runmote-relay-u2zi.onrender.com")
+RELAY_HOST = os.environ.get("ACP_RELAY_HOST", "runmote-relay.onrender.com")
 RELAY_PORT = os.environ.get("ACP_RELAY_PORT", "443")
 _raw_relay_url = os.environ.get(
     "ACP_RELAY_URL",

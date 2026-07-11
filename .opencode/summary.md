@@ -2,42 +2,44 @@
 
 ## Work State
 
-**Phase**: Auto-reconnect & cloud-relay default — code complete, pending rebuild/deploy.
+**Phase**: Dev branch installer + relay defaults fixed; daemon manually running; pending push/merge and app rebuild.
 
 ### Completed
 
-1. **Relay: token persistence across daemon disconnects** (`src/relay/state.py`)
-   - `known_tokens: dict[str, str]` maps token → daemon_id, survives disconnects.
-   - `get_daemon_id_by_token()` checks both active (`daemons`) and offline (`known_tokens`) daemons.
+1. **Root cause identified**: installed daemon was from `main` even when running `/install.sh/dev`, because `scripts/install.sh` defaulted to `BRANCH="${ACP_RELAY_BRANCH:-main}"`. This installed old code still using the broken `relay.runmote.dev` URL.
 
-2. **Relay: save token on daemon identify** (`src/relay/handlers/daemon.py`)
-   - On daemon identify, token is saved to `known_tokens`.
+2. **Fixed running daemon manually**:
+   - Updated `/home/raza/.local/share/runmote/src/daemon/config.py` to use relay host `runmote-relay-u2zi.onrender.com`.
+   - Added `ACP_DAEMON_TOKEN=67bcb1b81fd2ae0e6c3b93ddf6a5e445` to `/home/raza/.config/systemd/user/runmote.service`.
+   - Restarted daemon; it connected and shows pairing code `TRV5-TRBU`.
+   - Relay health shows `{"status":"ok","daemons_connected":1}`.
 
-3. **Relay: graceful offline-daemon response** (`src/relay/handlers/app.py`)
-   - `auth/token` uses `get_daemon_id_by_token()`.
-   - Token valid but daemon offline → `{authenticated: true, daemonConnected: false}` instead of "invalid token".
+3. **Fixed dev branch installer**:
+   - `scripts/install.sh`: default branch changed from `main` to `dev` so `/install.sh/dev` installs dev code.
+   - `scripts/lib/wizard.sh`: `wizard_cloud_relay()` now requires `ACP_RELAY_TOKEN` in non-interactive mode and defaults to cloud relay.
 
-4. **App: no mDNS blocking, cloud-relay default** (`src/flutter_app/lib/features/pair/view/pair_screen.dart`)
-   - Pairing options (QR + manual) shown immediately — no wait for mDNS.
-   - Default relay URL: `wss://relay.runmote.dev`.
-   - Auto-connect falls back to `_defaultRelayUrl` if saved URL fails.
-   - Removed dead code (`_buildSearching`, `_buildError`, `_StatusChip`, `_PulsingDots`).
-   - Debug logging (`[RUNMOTE]` prefix) added to `_autoConnectWithToken`.
+4. **Updated dev branch defaults to dev relay**:
+   - `src/daemon/config.py`: default host `runmote-relay.onrender.com`.
+   - `src/flutter_app/lib/core/providers/connection_provider.dart`: default URL `wss://runmote-relay.onrender.com`.
+   - `src/flutter_app/lib/features/pair/view/pair_screen.dart`: default URL `wss://runmote-relay.onrender.com`.
+   - `worker.js`: info text updated.
+   - `README.md`: updated.
 
-5. **App: URL sanitization & diagnostics** (`src/flutter_app/lib/core/providers/connection_provider.dart`)
-   - `_sanitizeRelayUrl()` strips trailing slashes, converts `http://`→`ws://`, `https://`→`wss://`.
-   - Default URL: `wss://relay.runmote.dev`.
-   - On successful `connectWithToken`, sanitized URL saved back to SharedPreferences.
-   - Debug logging (`[RUNMOTE]`) before connecting — shows resolved WS URI.
+5. **Tokens identified**:
+   - Main relay (`runmote-relay-u2zi.onrender.com`): `67bcb1b81fd2ae0e6c3b93ddf6a5e445`.
+   - Dev relay (`runmote-relay.onrender.com`): `00a89de233437a8f8482c4aab2af80a9`.
 
 ### Active
 
-- Rebuild Flutter app (`flutter build`) and reinstall on device to get new code + clear old SharedPreferences.
-- Verify `relay.runmote.dev` CNAME is set to DNS-only (grey cloud) in Cloudflare.
+- Push dev branch so the Worker serves the updated `install.sh/dev`.
+- Update main branch so `curl https://runmote.dev/install.sh | bash` works (currently main still has `relay.runmote.dev` default). Requires merging dev into main or manually updating main branch files.
 
 ### Next Move
 
-1. Rebuild and deploy the Flutter app.
-2. Verify `relay.runmote.dev` CNAME is grey-cloud (DNS only) in Cloudflare.
-3. Verify cron trigger `*/13 * * * *` is added in Cloudflare Worker Triggers.
-4. Test end-to-end: pair, disconnect daemon, reconnect app, verify auto-reconnect works.
+1. Push the dev branch to deploy the updated `install.sh/dev`.
+2. Merge dev into main (or manually update main branch files) so the production installer points to the working relay.
+3. Rebuild and deploy the Flutter app; test end-to-end pair/connect flow.
+4. For new dev installs, use:
+   ```bash
+   curl -fsSL https://runmote.dev/install.sh/dev | ACP_RELAY_TOKEN=00a89de233437a8f8482c4aab2af80a9 bash
+   ```

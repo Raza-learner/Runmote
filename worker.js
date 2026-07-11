@@ -13,7 +13,7 @@ export default {
 <p>Install: <code>curl -fsSL https://runmote.dev/install.sh | bash</code></p>
 <p>Dev: <code>curl -fsSL https://runmote.dev/install.sh/dev | bash</code></p>
 <hr>
-<p>Daemon connects to your relay at <code>runmote-relay-u2zi.onrender.com</code></p>`
+<p>Daemon connects to your relay at <code>runmote-relay.onrender.com</code></p>`
     return new Response(html, { headers: { 'content-type': 'text/html;charset=utf-8' } })
   },
 

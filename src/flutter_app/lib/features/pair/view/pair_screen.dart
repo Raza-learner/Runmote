@@ -10,7 +10,7 @@ import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/theme/app_spacing.dart';
 
-const _defaultRelayUrl = 'wss://runmote-relay-u2zi.onrender.com';
+const _defaultRelayUrl = 'wss://runmote-relay.onrender.com';
 
 class PairScreen extends ConsumerStatefulWidget {
   const PairScreen({super.key});
