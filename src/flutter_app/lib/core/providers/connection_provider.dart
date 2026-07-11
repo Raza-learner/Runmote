@@ -266,7 +266,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       );
 
       final ok = await authCompleter.future.timeout(
-        const Duration(seconds: 5),
+        const Duration(seconds: 10),
         onTimeout: () => false,
       );
 

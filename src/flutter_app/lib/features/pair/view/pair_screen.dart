@@ -42,10 +42,14 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     final p = await ref.read(preferencesServiceProvider.future);
     final token = p.getAuthToken();
     final relayUrl = p.getRelayUrl();
-    if (token != null && relayUrl != null) {
+    if (token == null || relayUrl == null) return;
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await Future.delayed(const Duration(seconds: 3));
       final ok = await ref.read(connectionProvider.notifier).connectWithToken(token, relayUrl);
       if (ok && mounted) {
         context.go('/agents');
+        return;
       }
     }
   }
