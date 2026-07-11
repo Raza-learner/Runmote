@@ -222,6 +222,9 @@ Write-Host ""
 
 # Start daemon and show pairing code
 Write-Host "  Starting daemon..." -ForegroundColor Gray
+$python = Join-Path (Join-Path (Join-Path $installDir ".venv") "Scripts") "python.exe"
+$logFile = "$env:TEMP\runmote-daemon.log"
+$errFile = "$env:TEMP\runmote-daemon.err"
 # Kill stale daemon processes from previous installs
 cmd /c "wmic process where ""commandline like '%%src.daemon.main%%' and name like '%%python%%'"" delete 2>nul" | Out-Null
 Start-Sleep -Seconds 1
