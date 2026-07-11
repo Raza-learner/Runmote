@@ -81,10 +81,10 @@ show_code_fallback() {
 }
 
 regenerate_code() {
-    echo "  ${DIM}Restarting daemon to generate a new pairing code...${RESET}"
-    stop_daemon
+    echo "  ${DIM}Restarting daemon to generate a new pairing code...${RESET}" >&2
+    stop_daemon >&2
     sleep 1
-    start_daemon
+    start_daemon >&2
     local code=""
     for i in $(seq 1 15); do
         sleep 1; code=$(get_pairing_code)
