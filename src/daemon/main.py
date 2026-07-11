@@ -19,7 +19,14 @@ from websockets.asyncio.client import connect
 
 
 def log(msg: str):
-    print(msg, flush=True)
+    try:
+        print(msg, flush=True)
+    except Exception:
+        # Windows console can't handle some Unicode — fall back to stderr
+        try:
+            print(msg, file=sys.stderr, flush=True)
+        except Exception:
+            pass
 
 
 def _pairing_banner(code: str, public_url: str = "") -> str:
@@ -298,7 +305,10 @@ async def run_daemon():
                             if pairing_code:
                                 public_url = result.get("publicUrl", "")
                                 log(f"pairing code: {pairing_code}")
-                                print(_pairing_banner(pairing_code, public_url), flush=True)
+                                try:
+                                    print(_pairing_banner(pairing_code, public_url), flush=True)
+                                except Exception:
+                                    pass
                                 # Write pairing code to temp file so installer can read it
                                 try:
                                     with open(os.environ.get("TEMP", "/tmp") + "/runmote-pairing-code.txt", "w") as f:
@@ -667,11 +677,17 @@ async def run_daemon():
             raise
         except Exception as e:
             log(f"Connection error: {e}")
-            import traceback
-            log(traceback.format_exc())
+            try:
+                import traceback
+                log(traceback.format_exc())
+            except Exception:
+                pass
 
         for agent in agents.values():
-            await agent.stop()
+            try:
+                await agent.stop()
+            except Exception:
+                pass
 
         log(f"Reconnecting in {RECONNECT_DELAY}s...")
         await asyncio.sleep(RECONNECT_DELAY)
