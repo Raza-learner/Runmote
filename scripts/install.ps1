@@ -49,14 +49,14 @@ if (-not $hasLocalFiles -and -not $env:ACP_BOOTSTRAPPED) {
     # These values persist as env vars for the re-invoked script
     if (-not $env:ACP_RELAY_URL)    { $env:ACP_RELAY_URL = "__ACP_RELAY_URL__" }
     if (-not $env:ACP_DAEMON_TOKEN) { $env:ACP_DAEMON_TOKEN = "__ACP_DAEMON_TOKEN__" }
-    if ($env:ACP_RELAY_URL -eq "__ACP_RELAY_URL__" -or $env:ACP_DAEMON_TOKEN -eq "__ACP_DAEMON_TOKEN__") {
+    if ($env:ACP_RELAY_URL.StartsWith("__ACP_RELAY_URL__") -or $env:ACP_DAEMON_TOKEN.StartsWith("__ACP_DAEMON_TOKEN__")) {
         try {
             $cu = if ($branch -eq "dev") { "https://runmote.dev/config/dev" } else { "https://runmote.dev/config" }
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             $r = Invoke-WebRequest -UseBasicParsing -Uri $cu -ErrorAction Stop
             $c = $r.Content | ConvertFrom-Json
-            if ($env:ACP_RELAY_URL -eq "__ACP_RELAY_URL__")       { $env:ACP_RELAY_URL = $c.relayUrl }
-            if ($env:ACP_DAEMON_TOKEN -eq "__ACP_DAEMON_TOKEN__")  { $env:ACP_DAEMON_TOKEN = $c.token }
+            if ($env:ACP_RELAY_URL.StartsWith("__ACP_RELAY_URL__"))    { $env:ACP_RELAY_URL = $c.relayUrl }
+            if ($env:ACP_DAEMON_TOKEN.StartsWith("__ACP_DAEMON_TOKEN__"))  { $env:ACP_DAEMON_TOKEN = $c.token }
         } catch { Write-Host "  Warning: could not fetch relay config" -ForegroundColor DarkGray }
     }
 
