@@ -45,7 +45,7 @@ if (-not $hasLocalFiles) {
     }
 
     $script:ACP_BOOTSTRAPPED = $true
-    Get-Content "$extract\scripts\install.ps1" -Raw | Invoke-Expression
+    Get-Content "$extract\scripts\install.ps1" -Raw -Encoding UTF8 | Invoke-Expression
     exit $LASTEXITCODE
 }
 
