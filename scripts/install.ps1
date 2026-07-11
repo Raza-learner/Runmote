@@ -236,7 +236,8 @@ try { Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContin
 if (Test-Path $python) {
     $env:ACP_DAEMON_ID = $daemonName
     $env:PYTHONIOENCODING = "utf-8"
-    Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile
+    $proc = Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile -PassThru
+    if ($proc) { $proc.Id | Out-File "$env:TEMP\runmote-daemon.pid" -Force }
 }
 # Wait for pairing code (daemon writes it to temp file)
 $codeFile = "$env:TEMP\runmote-pairing-code.txt"

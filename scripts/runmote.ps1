@@ -13,6 +13,7 @@ $taskName = "Runmote Daemon"
 $logFile = "$env:TEMP\runmote-daemon.log"
 $errFile = "$env:TEMP\runmote-daemon.err"
 $codeFile = "$env:TEMP\runmote-pairing-code.txt"
+$pidFile = "$env:TEMP\runmote-daemon.pid"
 
 $scriptDir = Split-Path -Parent $PSCommandPath
 $installDir = Split-Path -Parent $scriptDir
@@ -24,33 +25,41 @@ function Get-DaemonName {
 }
 
 function Get-DaemonPID {
-    try {
-        $proc = Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -ErrorAction SilentlyContinue |
-                Where-Object { $_.CommandLine -match 'src.daemon.main' } |
-                Select-Object -First 1
-        if ($proc) { return $proc.ProcessId }
-    } catch {}
+    if (Test-Path $pidFile) {
+        try { return [int](Get-Content $pidFile -Raw).Trim() } catch {}
+    }
     return $null
 }
 
 function Test-IsRunning {
-    # Primary: check if Python daemon process exists
     $daemonPid = Get-DaemonPID
-    if ($daemonPid) { return $true }
-    # Fallback: check if the new log file exists (daemon writes to it)
-    if (Test-Path $logFile) { return $true }
+    if ($daemonPid) {
+        try { Get-Process -Id $daemonPid -ErrorAction Stop | Out-Null; return $true } catch {}
+    }
+    # Fallback: check if the daemon wrote a log recently
+    if (Test-Path $logFile) {
+        $lastWrite = (Get-Item $logFile).LastWriteTime
+        if ($lastWrite -gt (Get-Date).AddMinutes(-2)) { return $true }
+    }
     return $false
 }
 
 function Start-Daemon {
     try {
+        # Kill any stale daemon first
+        $oldPid = Get-DaemonPID
+        if ($oldPid) { Stop-Process -Id $oldPid -Force -ErrorAction SilentlyContinue }
+        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+
         # Try scheduled task first
         try { Start-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null } catch {}
-        # Also start directly (fallback if task doesn't exist)
+        # Start directly (primary method)
         if (Test-Path $python) {
             $env:ACP_DAEMON_ID = Get-DaemonName
             $env:PYTHONIOENCODING = "utf-8"
-            Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile
+            $proc = Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile -PassThru
+            if ($proc) { $proc.Id | Out-File $pidFile -Force }
+            Start-Sleep -Seconds 1
         }
         Write-Host "  Daemon started." -ForegroundColor Green
     } catch {
@@ -62,9 +71,12 @@ function Stop-Daemon {
     try {
         # Try scheduled task first
         try { Stop-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null } catch {}
-        # Kill Python processes directly
+        # Kill by PID
         $daemonPid = Get-DaemonPID
         if ($daemonPid) { Stop-Process -Id $daemonPid -Force -ErrorAction SilentlyContinue }
+        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        # Fallback: kill any python process running daemon
+        cmd /c "wmic process where ""commandline like '%%src.daemon.main%%'"" delete 2>nul" | Out-Null
         # Clean up temp files
         Remove-Item $logFile -Force -ErrorAction SilentlyContinue
         Remove-Item $errFile -Force -ErrorAction SilentlyContinue
@@ -243,9 +255,10 @@ function Show-Menu {
     if ($Host.UI.SupportsVirtualTerminal) {
         [Console]::CursorVisible = $false
         $sel = 1
-        Draw-Menu $sel
 
         while ($true) {
+            Draw-Menu $sel
+
             $key = [Console]::ReadKey($true)
             switch ($key.Key) {
                 UpArrow { if ($sel -gt 1) { $sel-- } }
@@ -256,22 +269,13 @@ function Show-Menu {
                     [Console]::CursorVisible = $true
                     [Console]::ResetColor()
                     Write-Host ""
-                    Write-Host ""
                     $shouldExit = Exec-Action $sel
                     if ($shouldExit) { return }
                     [Console]::CursorVisible = $false
                 }
             }
-
-            # Move up 17 lines and redraw
-            [Console]::SetCursorPosition(0, [Math]::Max(0, [Console]::CursorTop - 17))
-            for ($i = 0; $i -lt 17; $i++) {
-                Write-Host (" " * 80)
-            }
-            [Console]::SetCursorPosition(0, [Math]::Max(0, [Console]::CursorTop - 17))
-            Draw-Menu $sel
+            Clear-Host
         }
-        [Console]::CursorVisible = $true
     } else {
         # Non-TTY fallback
         while ($true) {
