@@ -642,33 +642,37 @@ async def run_daemon():
                             "sender": asyncio.create_task(agent_sender(agent, send_q)),
                         }
 
-                while agent_tasks:
-                    # Wait for any agent to fail
-                    all_tasks = [relay_task] + [
-                        t for at in agent_tasks.values() for t in at.values() if isinstance(t, asyncio.Task)
-                    ]
-                    done, pending = await asyncio.wait(
-                        [t for t in all_tasks if not t.done()],
-                        return_when=asyncio.FIRST_COMPLETED,
-                    )
+                if agent_tasks:
+                    while agent_tasks:
+                        # Wait for any agent to fail
+                        all_tasks = [relay_task] + [
+                            t for at in agent_tasks.values() for t in at.values() if isinstance(t, asyncio.Task)
+                        ]
+                        done, pending = await asyncio.wait(
+                            [t for t in all_tasks if not t.done()],
+                            return_when=asyncio.FIRST_COMPLETED,
+                        )
 
-                    # Check which agent's watch task completed
-                    for aid, at in list(agent_tasks.items()):
-                        if at["watch"].done():
-                            log(f"Agent {aid} stopped, continuing others...")
-                            for t in [at["relay"], at["stderr"], at.get("sender")]:
-                                if t and not t.done():
-                                    t.cancel()
-                            send_queues.pop(aid, None)
-                            del agent_tasks[aid]
+                        # Check which agent's watch task completed
+                        for aid, at in list(agent_tasks.items()):
+                            if at["watch"].done():
+                                log(f"Agent {aid} stopped, continuing others...")
+                                for t in [at["relay"], at["stderr"], at.get("sender")]:
+                                    if t and not t.done():
+                                        t.cancel()
+                                send_queues.pop(aid, None)
+                                del agent_tasks[aid]
 
-                    # If relay task stopped or no agents left, stop everything
-                    if relay_task.done() or not agent_tasks:
-                        if relay_task.done():
-                            exc = relay_task.exception()
-                            if exc:
-                                log(f"Relay task exception: {exc}")
-                        break
+                        # If relay task stopped or no agents left, stop everything
+                        if relay_task.done() or not agent_tasks:
+                            if relay_task.done():
+                                exc = relay_task.exception()
+                                if exc:
+                                    log(f"Relay task exception: {exc}")
+                            break
+                else:
+                    # No agents — stay connected so pairing/mobile app works
+                    await relay_task
 
                 for t in pending:
                     t.cancel()
