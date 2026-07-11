@@ -5,13 +5,13 @@ export default {
 
     const ext = url.pathname.startsWith('/install.ps1') ? 'ps1' : 'sh'
     if (url.pathname.startsWith('/install.' + ext) || (ext === 'sh' && (url.pathname === '/install' || url.pathname === '/install/'))) {
-      const gh = `https://raw.githubusercontent.com/Raza-learner/Runmote/${branch}/scripts/install.${ext}?_=${Date.now()}`
-      const resp = await fetch(gh)
+      const gh = `https://api.github.com/repos/Raza-learner/Runmote/contents/scripts/install.${ext}?ref=${branch}`
+      const resp = await fetch(gh, { headers: { 'Accept': 'application/vnd.github.raw', 'User-Agent': 'runmote-worker' } })
       const text = await resp.text()
       return new Response(text, {
         headers: {
           'content-type': ext === 'ps1' ? 'text/powershell' : 'text/x-shellscript',
-          'cache-control': 'no-cache, no-store, must-revalidate'
+          'cache-control': 'public, max-age=60'
         }
       })
     }
