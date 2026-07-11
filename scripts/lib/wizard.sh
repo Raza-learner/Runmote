@@ -368,27 +368,24 @@ wizard_autostart_summary() {
 
 wizard_cloud_relay() {
 
-    # Non-interactive — default to cloud mode (daemon default is cloud relay).
-    # A relay auth token is mandatory because the public relay requires one.
+    # Non-interactive — default to local-only mode (mDNS) when no token provided.
     if [[ $ACP_INTERACTIVE -eq 0 ]]; then
-        ACP_CLOUD_MODE=true
         if [[ -z "${ACP_RELAY_TOKEN:-}" ]]; then
-            error "ACP_RELAY_TOKEN is required for non-interactive cloud relay installation."
-            echo
-            echo "Run the installer with your relay token:"
-            echo "  curl -fsSL https://runmote.dev/install.sh    | ACP_RELAY_TOKEN=<token> bash"
-            echo "  curl -fsSL https://runmote.dev/install.sh/dev | ACP_RELAY_TOKEN=<token> bash"
-            echo
-            exit 1
-        fi
-        ACP_RELAY_URL="${ACP_RELAY_URL:-wss://runmote-relay.onrender.com/daemon}"
-        if [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]]; then
-            ACP_RELAY_PUBLIC_URL="$ACP_RELAY_PUBLIC_URL"
+            ACP_CLOUD_MODE=false
+            ACP_RELAY_URL=""
+            ACP_RELAY_TOKEN=""
+            ACP_RELAY_PUBLIC_URL=""
         else
-            base="${ACP_RELAY_URL%/daemon}"
-            base="${base/#wss:/https:}"
-            base="${base/#ws:/http:}"
-            ACP_RELAY_PUBLIC_URL="$base"
+            ACP_CLOUD_MODE=true
+            ACP_RELAY_URL="${ACP_RELAY_URL:-wss://runmote-relay.onrender.com/daemon}"
+            if [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]]; then
+                ACP_RELAY_PUBLIC_URL="$ACP_RELAY_PUBLIC_URL"
+            else
+                base="${ACP_RELAY_URL%/daemon}"
+                base="${base/#wss:/https:}"
+                base="${base/#ws:/http:}"
+                ACP_RELAY_PUBLIC_URL="$base"
+            fi
         fi
         return 0
     fi
