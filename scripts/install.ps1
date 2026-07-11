@@ -140,6 +140,10 @@ if ($interactive) {
     Write-Host ""
 }
 
+# ── Default relay (dev) — overridable via env vars ────────────────────
+if (-not $env:ACP_RELAY_URL)    { $env:ACP_RELAY_URL = "wss://runmote-relay.onrender.com/daemon" }
+if (-not $env:ACP_DAEMON_TOKEN) { $env:ACP_DAEMON_TOKEN = "00a89de233437a8f8482c4aab2af80a9" }
+
 # ── Install ──────────────────────────────────────────────────────────
 $daemonName = if ($env:ACP_DAEMON_ID) { $env:ACP_DAEMON_ID } else { $env:COMPUTERNAME }
 
@@ -197,7 +201,7 @@ $errFile = "$env:TEMP\runmote-daemon.err"
 try { Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null } catch {}
 if (Test-Path $python) {
     $env:ACP_DAEMON_ID = $daemonName
-    Start-Process -NoNewWindow -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile
+    Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile
 }
 $pairingCode = $null
 for ($i = 0; $i -lt 20; $i++) {
