@@ -47,6 +47,9 @@ if (-not $hasLocalFiles -and -not $env:ACP_BOOTSTRAPPED) {
     exit $LASTEXITCODE
 }
 
+# ── Bypass execution policy for this process (uv installer needs it) ─
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
+
 # ── Color setup ──────────────────────────────────────────────────────
 $interactive = [Environment]::UserInteractive -and -not $PSCommandPath.StartsWith("-")
 
