@@ -143,11 +143,12 @@ function Show-QR {
     }
     Write-Host ""
     $publicUrl = ""
-    $pubFile = "$env:USERPROFILE\.config\acp\public_url"
+    $pubFile = "$env:USERPROFILE\.config\runmote\public_url"
     if (Test-Path $pubFile) {
         $publicUrl = Get-Content $pubFile -Raw | ForEach-Object { $_.Trim() }
     }
     if ((Test-Path $python) -and (Test-Path "$installDir\src")) {
+        $env:PYTHONIOENCODING = "utf-8"
         & $python -c @"
 import sys; sys.path.insert(0, r'$installDir\src')
 from daemon.main import _pairing_banner

@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import socket
+import sys
 
 
 RELAY_HOST = os.environ.get("ACP_RELAY_HOST", "relay.runmote.dev")
@@ -20,8 +21,19 @@ AGENT_COMMAND = json.loads(_raw_agent_command)
 
 def _detect_acp_agents() -> list[dict]:
     agents = []
-    # opencode — native ACP mode
-    if shutil.which("opencode"):
+    # opencode — native ACP mode (check PATH + common Windows locations)
+    _has_opencode = bool(shutil.which("opencode"))
+    if not _has_opencode and sys.platform == "win32":
+        for base in [os.environ.get("LOCALAPPDATA", ""), os.environ.get("PROGRAMFILES", ""), os.environ.get("USERPROFILE", "")]:
+            if not base:
+                continue
+            for rel in [r"Programs\opencode\opencode.exe", r"OpenCode\opencode.exe", r".opencode\bin\opencode.exe", r"AppData\Local\opencode\opencode.exe"]:
+                if os.path.isfile(os.path.join(base, rel)):
+                    _has_opencode = True
+                    break
+            if _has_opencode:
+                break
+    if _has_opencode:
         agents.append({"id": "opencode", "name": "OpenCode", "command": ["opencode", "acp"]})
     # codex — only if the codex CLI is installed (adapter bridges it to ACP)
     if shutil.which("codex"):
