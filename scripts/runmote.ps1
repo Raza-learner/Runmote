@@ -35,8 +35,8 @@ function Get-DaemonPID {
 
 function Test-IsRunning {
     # Primary: check if Python daemon process exists
-    $pid = Get-DaemonPID
-    if ($pid) { return $true }
+    $daemonPid = Get-DaemonPID
+    if ($daemonPid) { return $true }
     # Fallback: check if the new log file exists (daemon writes to it)
     if (Test-Path $logFile) { return $true }
     return $false
@@ -63,8 +63,8 @@ function Stop-Daemon {
         # Try scheduled task first
         try { Stop-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null } catch {}
         # Kill Python processes directly
-        $pid = Get-DaemonPID
-        if ($pid) { Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue }
+        $daemonPid = Get-DaemonPID
+        if ($daemonPid) { Stop-Process -Id $daemonPid -Force -ErrorAction SilentlyContinue }
         # Clean up temp files
         Remove-Item $logFile -Force -ErrorAction SilentlyContinue
         Remove-Item $errFile -Force -ErrorAction SilentlyContinue
