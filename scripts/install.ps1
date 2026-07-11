@@ -225,22 +225,34 @@ Write-Host "  Starting daemon..." -ForegroundColor Gray
 $python = Join-Path (Join-Path (Join-Path $installDir ".venv") "Scripts") "python.exe"
 $logFile = "$env:TEMP\runmote-daemon.log"
 $errFile = "$env:TEMP\runmote-daemon.err"
+Write-Host "  [D] relay=$env:ACP_RELAY_URL" -ForegroundColor DarkGray
+Write-Host "  [D] token=$(if ($env:ACP_DAEMON_TOKEN) { $env:ACP_DAEMON_TOKEN.Substring(0,4) + '...' } else { 'EMPTY' })" -ForegroundColor DarkGray
+Write-Host "  [D] python=$python  exists=$(Test-Path $python)" -ForegroundColor DarkGray
+Write-Host "  [D] cwd=$installDir" -ForegroundColor DarkGray
 try { Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null } catch {}
 if (Test-Path $python) {
     $env:ACP_DAEMON_ID = $daemonName
     Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile
+    Write-Host "  [D] daemon launched" -ForegroundColor DarkGray
 }
 # Wait for pairing code (daemon writes it to temp file)
 $codeFile = "$env:TEMP\runmote-pairing-code.txt"
 $pairingCode = $null
-for ($i = 0; $i -lt 20; $i++) {
+for ($i = 1; $i -le 20; $i++) {
     Start-Sleep -Seconds 1
+    Write-Host "  [D] wait ${i}s  log=$((Get-Item $logFile -ErrorAction SilentlyContinue).Length) bytes  codeFile=$(Test-Path $codeFile)" -ForegroundColor DarkGray
     if (Test-Path $codeFile) {
         try {
             $pairingCode = (Get-Content $codeFile -Raw).Trim()
+            Write-Host "  [D] codeFile found: [$pairingCode]" -ForegroundColor DarkGray
             if ($pairingCode) { break }
         } catch {}
     }
+}
+if (-not $pairingCode) {
+    Write-Host "  [D] no pairing code — dumping log:" -ForegroundColor DarkGray
+    if (Test-Path $logFile) { Get-Content $logFile -Tail 20 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray } }
+    if (Test-Path $errFile) { Get-Content $errFile -Tail 10 | ForEach-Object { Write-Host "    [ERR] $_" -ForegroundColor DarkGray } }
 }
 if ($pairingCode) {
     $formatted = $pairingCode.Substring(0, 4) + "-" + $pairingCode.Substring(4)

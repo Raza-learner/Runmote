@@ -2,6 +2,7 @@
     [switch]$Install,
     [switch]$Remove,
     [switch]$Status,
+    [switch]$InstallCmd,
     [string]$Dir = ""
 )
 
@@ -53,6 +54,9 @@ function Install-AutoStart {
     }
     if ($env:ACP_RELAY_URL) {
         $wrapperLines += "`$env:ACP_RELAY_URL = '$($env:ACP_RELAY_URL)'"
+    }
+    if ($env:ACP_RELAY_PUBLIC_URL) {
+        $wrapperLines += "`$env:ACP_RELAY_PUBLIC_URL = '$($env:ACP_RELAY_PUBLIC_URL)'"
     }
 
     $errFile = '$env:TEMP\runmote-daemon.err'
@@ -130,6 +134,8 @@ if ($Install) {
     Remove-AutoStart
 } elseif ($Status) {
     Get-AutoStartStatus
+} elseif ($InstallCmd) {
+    Install-RunmoteCmd
 } else {
-    Write-Host "Usage: .\setup-autostart.ps1 -Install | -Remove | -Status"
+    Write-Host "Usage: .\setup-autostart.ps1 -Install | -Remove | -Status | -InstallCmd"
 }
