@@ -58,6 +58,7 @@ function Install-AutoStart {
     if ($env:ACP_RELAY_PUBLIC_URL) {
         $wrapperLines += "`$env:ACP_RELAY_PUBLIC_URL = '$($env:ACP_RELAY_PUBLIC_URL)'"
     }
+    $wrapperLines += "`$env:PYTHONIOENCODING = 'utf-8'"
 
     $errFile = '$env:TEMP\runmote-daemon.err'
     $wrapperLines += "`$errFile = `"$errFile`""

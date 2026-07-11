@@ -297,7 +297,7 @@ async def run_daemon():
                             pairing_code = result.get("pairingCode", "")
                             if pairing_code:
                                 public_url = result.get("publicUrl", "")
-                                log(f"← pairing code: {pairing_code}")
+                                log(f"pairing code: {pairing_code}")
                                 print(_pairing_banner(pairing_code, public_url), flush=True)
                                 # Write pairing code to temp file so installer can read it
                                 try:

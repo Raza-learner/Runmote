@@ -239,6 +239,7 @@ Write-Host "  [D] cwd=$installDir" -ForegroundColor DarkGray
 try { Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null } catch {}
 if (Test-Path $python) {
     $env:ACP_DAEMON_ID = $daemonName
+    $env:PYTHONIOENCODING = "utf-8"
     Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile
     Write-Host "  [D] daemon launched" -ForegroundColor DarkGray
 }
