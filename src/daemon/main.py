@@ -33,12 +33,8 @@ def _pairing_banner(code: str, public_url: str = "") -> str:
     else:
         formatted = f"{code[:4]}-{code[4:]}"
 
-    if public_url:
-        qr_data = f"acp://{public_url}/connect?code={code}"
-        title = "Scan to connect from anywhere"
-    else:
-        qr_data = code
-        title = "Scan QR Code"
+    qr_data = code
+    title = "Scan QR Code"
 
     qr = qrcode.QRCode(border=2, box_size=1)
     qr.add_data(qr_data)

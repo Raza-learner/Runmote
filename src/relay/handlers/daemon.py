@@ -185,7 +185,7 @@ async def daemon_endpoint(websocket: WebSocket):
                     session.paired_apps.discard(cid)
 
     finally:
-        if session and session.daemon_id in state.daemons:
+        if session and state.daemons.get(session.daemon_id) is session:
             del state.daemons[session.daemon_id]
             state.store.clear_daemon_id()
             print(f"Daemon {session.daemon_id} disconnected!")

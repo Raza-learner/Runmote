@@ -80,35 +80,36 @@ show_code_fallback() {
     echo ""
 }
 
-show_code_only() {
-    if ! is_running; then
-        echo "  ${YELLOW}Daemon is not running. Start it first.${RESET}"
-        return 1
-    fi
-    echo "  ${DIM}Fetching pairing code...${RESET}"
+regenerate_code() {
+    echo "  ${DIM}Restarting daemon to generate a new pairing code...${RESET}"
+    stop_daemon
+    sleep 1
+    start_daemon
     local code=""
-    for i in $(seq 1 5); do
+    for i in $(seq 1 15); do
         sleep 1; code=$(get_pairing_code)
         [[ -n "$code" ]] && break
     done
     if [[ -z "$code" ]]; then
-        echo "  ${RED}Could not retrieve pairing code.${RESET}"
+        echo "  ${RED}Could not retrieve new pairing code.${RESET}" >&2
+        return 1
+    fi
+    echo "$code"
+}
+
+show_code_only() {
+    local code=$(regenerate_code)
+    if [[ -z "$code" ]]; then
         return 1
     fi
     show_code_fallback
 }
 
 show_qr() {
-    if ! is_running; then
-        echo "  ${YELLOW}Daemon is not running. Start it first.${RESET}"
+    local code=$(regenerate_code)
+    if [[ -z "$code" ]]; then
         return 1
     fi
-    echo "  ${DIM}Fetching pairing code...${RESET}"
-    local code=""
-    for i in $(seq 1 10); do
-        sleep 1; code=$(get_pairing_code)
-        [[ -n "$code" ]] && break
-    done
     if [[ -z "$code" ]]; then
         echo "  ${RED}Could not retrieve pairing code. Is the daemon connected?${RESET}"
         return 1
