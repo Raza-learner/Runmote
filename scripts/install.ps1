@@ -215,26 +215,13 @@ $python = Join-Path (Join-Path (Join-Path $installDir ".venv") "Scripts") "pytho
 $logFile = "$env:TEMP\runmote-daemon.log"
 $errFile = "$env:TEMP\runmote-daemon.err"
 try { Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null } catch {}
-# DEBUG: daemon start diagnostics
-Write-Host "  [DEBUG] python: $python" -ForegroundColor DarkYellow
-Write-Host "  [DEBUG] exists: $(Test-Path $python)" -ForegroundColor DarkYellow
-Write-Host "  [DEBUG] cwd: $installDir" -ForegroundColor DarkYellow
-Write-Host "  [DEBUG] relay: $env:ACP_RELAY_URL" -ForegroundColor DarkYellow
-Write-Host "  [DEBUG] token: $(if ($env:ACP_DAEMON_TOKEN) { $env:ACP_DAEMON_TOKEN.Substring(0, [Math]::Min(4, $env:ACP_DAEMON_TOKEN.Length)) + '...' } else { 'null' })" -ForegroundColor DarkYellow
 if (Test-Path $python) {
     $env:ACP_DAEMON_ID = $daemonName
-    Write-Host "  [DEBUG] starting..." -ForegroundColor DarkYellow
     Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile
-    Start-Sleep -Seconds 2
-    Write-Host "  [DEBUG] log exists: $(Test-Path $logFile)" -ForegroundColor DarkYellow
-    Write-Host "  [DEBUG] err exists: $(Test-Path $errFile)" -ForegroundColor DarkYellow
-    if (Test-Path $logFile) { Write-Host "  [DEBUG] log size: $((Get-Item $logFile).Length) bytes" -ForegroundColor DarkYellow }
-    if (Test-Path $errFile) { Write-Host "  [DEBUG] err size: $((Get-Item $errFile).Length) bytes" -ForegroundColor DarkYellow }
 }
 $pairingCode = $null
 for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Seconds 1
-    $errFile = "$env:TEMP\runmote-daemon.err"
     foreach ($lf in @($logFile, $errFile)) {
         if (Test-Path $lf) {
             try {
@@ -246,37 +233,16 @@ for ($i = 0; $i -lt 20; $i++) {
     if ($pairingCode) { break }
 }
 if ($pairingCode) {
-    $python = Join-Path (Join-Path (Join-Path $installDir ".venv") "Scripts") "python.exe"
-    if (Test-Path $python) {
-        & $python -c @"
-import sys; sys.path.insert(0, r'$installDir\src')
-from daemon.main import _pairing_banner
-print(_pairing_banner('$pairingCode'))
-"@ 2>$null
-    }
-    if (-not $?) {
-        $formatted = $pairingCode.Substring(0, 4) + "-" + $pairingCode.Substring(4)
-        Write-Host ""
-        Write-Host "  +-----------------------------+"
-        Write-Host ("  |  Pairing Code: {0,-12}  |" -f $formatted)
-        Write-Host "  |                             |"
-        Write-Host "  |  Enter this in the app      |"
-        Write-Host "  +-----------------------------+"
-        Write-Host ""
-    }
+    $formatted = $pairingCode.Substring(0, 4) + "-" + $pairingCode.Substring(4)
+    Write-Host ""
+    Write-Host "  +-----------------------------+"
+    Write-Host ("  |  Pairing Code: {0,-12}  |" -f $formatted)
+    Write-Host "  |                             |"
+    Write-Host "  |  Enter this in the app      |"
+    Write-Host "  +-----------------------------+"
+    Write-Host ""
 } else {
     Write-Host "  Run 'runmote code' after daemon connects to get pairing code."
-    # DEBUG: dump log files
-    if (Test-Path $logFile) {
-        Write-Host "  [DEBUG] --- stdout log ---" -ForegroundColor DarkYellow
-        Get-Content $logFile -Tail 30 | ForEach-Object { Write-Host "  [DEBUG] $_" -ForegroundColor DarkYellow }
-        Write-Host "  [DEBUG] --- end stdout ---" -ForegroundColor DarkYellow
-    }
-    if (Test-Path $errFile) {
-        Write-Host "  [DEBUG] --- stderr log ---" -ForegroundColor DarkYellow
-        Get-Content $errFile -Tail 30 | ForEach-Object { Write-Host "  [DEBUG] $_" -ForegroundColor DarkYellow }
-        Write-Host "  [DEBUG] --- end stderr ---" -ForegroundColor DarkYellow
-    }
 }
 
 Write-Host ""
