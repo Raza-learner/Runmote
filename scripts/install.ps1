@@ -49,14 +49,18 @@ if (-not $hasLocalFiles -and -not $env:ACP_BOOTSTRAPPED) {
     # These values persist as env vars for the re-invoked script
     if (-not $env:ACP_RELAY_URL)    { $env:ACP_RELAY_URL = "__ACP_RELAY_URL__" }
     if (-not $env:ACP_DAEMON_TOKEN) { $env:ACP_DAEMON_TOKEN = "__ACP_DAEMON_TOKEN__" }
-    if ($env:ACP_RELAY_URL.StartsWith("__ACP_RELAY_URL__") -or $env:ACP_DAEMON_TOKEN.StartsWith("__ACP_DAEMON_TOKEN__")) {
+    # Check if placeholders weren't replaced (local run / git fallback) — use
+    # concatenation so Worker replaceAll doesn't also change the check string.
+    $phr = "__ACP_RELAY" + "_URL__"
+    $pht = "__ACP_DAEMON" + "_TOKEN__"
+    if ($env:ACP_RELAY_URL -eq $phr -or $env:ACP_DAEMON_TOKEN -eq $pht) {
         try {
             $cu = if ($branch -eq "dev") { "https://runmote.dev/config/dev" } else { "https://runmote.dev/config" }
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             $r = Invoke-WebRequest -UseBasicParsing -Uri $cu -ErrorAction Stop
             $c = $r.Content | ConvertFrom-Json
-            if ($env:ACP_RELAY_URL.StartsWith("__ACP_RELAY_URL__"))    { $env:ACP_RELAY_URL = $c.relayUrl }
-            if ($env:ACP_DAEMON_TOKEN.StartsWith("__ACP_DAEMON_TOKEN__"))  { $env:ACP_DAEMON_TOKEN = $c.token }
+            if ($env:ACP_RELAY_URL -eq $phr)    { $env:ACP_RELAY_URL = $c.relayUrl }
+            if ($env:ACP_DAEMON_TOKEN -eq $pht)  { $env:ACP_DAEMON_TOKEN = $c.token }
         } catch { Write-Host "  Warning: could not fetch relay config" -ForegroundColor DarkGray }
     }
 
@@ -226,23 +230,18 @@ if (Test-Path $python) {
     $env:ACP_DAEMON_ID = $daemonName
     Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile
 }
+# Wait for pairing code (daemon writes it to temp file)
+$codeFile = "$env:TEMP\runmote-pairing-code.txt"
 $pairingCode = $null
 for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Seconds 1
-    foreach ($lf in @($logFile, $errFile)) {
-        if (Test-Path $lf) {
-            try {
-                $line = Get-Content $lf -Tail 50 | Where-Object { $_ -match 'pairing code:\s*(\S+)' } | Select-Object -Last 1
-                if ($line -match 'pairing code:\s*(\S+)') {
-                    $pairingCode = $Matches[1]
-                    break
-                }
-            } catch {}
-        }
+    if (Test-Path $codeFile) {
+        try {
+            $pairingCode = (Get-Content $codeFile -Raw).Trim()
+            if ($pairingCode) { break }
+        } catch {}
     }
-    if ($pairingCode) { break }
 }
-Write-Host "  [DEBUG] raw code: [$pairingCode]" -ForegroundColor DarkGray
 if ($pairingCode) {
     $formatted = $pairingCode.Substring(0, 4) + "-" + $pairingCode.Substring(4)
     Write-Host ""
