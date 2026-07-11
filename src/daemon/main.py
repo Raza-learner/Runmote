@@ -277,7 +277,7 @@ async def run_daemon():
 
     while True:
         try:
-            async with connect(RELAY_URL) as websocket:
+            async with connect(RELAY_URL, additional_headers={"Origin": "https://runmote.dev"}) as websocket:
                 log("Connected to relay!")
 
                 identify_id = "daemon_ident"
@@ -661,6 +661,8 @@ async def run_daemon():
             raise
         except Exception as e:
             log(f"Connection error: {e}")
+            import traceback
+            log(traceback.format_exc())
 
         for agent in agents.values():
             await agent.stop()
