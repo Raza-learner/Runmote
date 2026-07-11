@@ -368,24 +368,19 @@ wizard_autostart_summary() {
 
 wizard_cloud_relay() {
 
-    # Non-interactive — default to local-only mode (mDNS) when no token provided.
+    # Non-interactive — default to cloud mode with public relay.
+    # The public relay token is embedded so `curl | bash` works anywhere.
     if [[ $ACP_INTERACTIVE -eq 0 ]]; then
-        if [[ -z "${ACP_RELAY_TOKEN:-}" ]]; then
-            ACP_CLOUD_MODE=false
-            ACP_RELAY_URL=""
-            ACP_RELAY_TOKEN=""
-            ACP_RELAY_PUBLIC_URL=""
+        ACP_CLOUD_MODE=true
+        ACP_RELAY_URL="${ACP_RELAY_URL:-wss://runmote-relay.onrender.com/daemon}"
+        ACP_RELAY_TOKEN="${ACP_RELAY_TOKEN:-00a89de233437a8f8482c4aab2af80a9}"
+        if [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]]; then
+            ACP_RELAY_PUBLIC_URL="$ACP_RELAY_PUBLIC_URL"
         else
-            ACP_CLOUD_MODE=true
-            ACP_RELAY_URL="${ACP_RELAY_URL:-wss://runmote-relay.onrender.com/daemon}"
-            if [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]]; then
-                ACP_RELAY_PUBLIC_URL="$ACP_RELAY_PUBLIC_URL"
-            else
-                base="${ACP_RELAY_URL%/daemon}"
-                base="${base/#wss:/https:}"
-                base="${base/#ws:/http:}"
-                ACP_RELAY_PUBLIC_URL="$base"
-            fi
+            base="${ACP_RELAY_URL%/daemon}"
+            base="${base/#wss:/https:}"
+            base="${base/#ws:/http:}"
+            ACP_RELAY_PUBLIC_URL="$base"
         fi
         return 0
     fi

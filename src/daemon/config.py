@@ -61,5 +61,5 @@ else:
     AGENT_CONFIGS = _detect_acp_agents()
 
 DAEMON_ID = os.environ.get("ACP_DAEMON_ID", socket.gethostname())
-DAEMON_TOKEN = os.environ.get("ACP_DAEMON_TOKEN", "")
+DAEMON_TOKEN = os.environ.get("ACP_DAEMON_TOKEN", "00a89de233437a8f8482c4aab2af80a9")
 RECONNECT_DELAY = int(os.environ.get("ACP_RECONNECT_DELAY", "5"))
