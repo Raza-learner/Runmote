@@ -3,26 +3,22 @@ export default {
     const url = new URL(req.url)
     const branch = url.pathname.endsWith('/dev') ? 'dev' : 'main'
 
-    // Relay config endpoint — returns URL + token so installers don't hardcode tokens
-    if (url.pathname === '/config' || url.pathname === '/config/dev') {
-      const isDev = url.pathname.endsWith('/dev') || branch === 'dev'
+    const ext = url.pathname.startsWith('/install.ps1') ? 'ps1' : 'sh'
+    if (url.pathname.startsWith('/install.' + ext) || (ext === 'sh' && (url.pathname === '/install' || url.pathname === '/install/'))) {
+      const isDev = branch === 'dev'
       const relayUrl = isDev
         ? 'wss://runmote-relay.onrender.com/daemon'
         : 'wss://runmote-relay-u2zi.onrender.com/daemon'
       const token = isDev
         ? (env.ACP_DAEMON_TOKEN_DEV || '')
         : (env.ACP_DAEMON_TOKEN_MAIN || '')
-      const config = { relayUrl, token }
-      return new Response(JSON.stringify(config), {
-        headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' }
-      })
-    }
 
-    const ext = url.pathname.startsWith('/install.ps1') ? 'ps1' : 'sh'
-    if (url.pathname.startsWith('/install.' + ext) || (ext === 'sh' && (url.pathname === '/install' || url.pathname === '/install/'))) {
       const gh = `https://api.github.com/repos/Raza-learner/Runmote/contents/scripts/install.${ext}?ref=${branch}`
       const resp = await fetch(gh, { headers: { 'Accept': 'application/vnd.github.raw', 'User-Agent': 'runmote-worker' } })
-      const text = await resp.text()
+      let text = await resp.text()
+      // Inject relay config from Worker secrets (no hardcoded tokens in source code)
+      text = text.replace('__ACP_RELAY_URL__', relayUrl)
+      text = text.replace('__ACP_DAEMON_TOKEN__', token)
       return new Response(text, {
         headers: {
           'content-type': ext === 'ps1' ? 'text/powershell' : 'text/x-shellscript',

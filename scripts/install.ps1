@@ -140,17 +140,22 @@ if ($interactive) {
     Write-Host ""
 }
 
-# ── Fetch relay config from worker (no hardcoded tokens) ─────────────
-if (-not $env:ACP_RELAY_URL -or -not $env:ACP_DAEMON_TOKEN) {
+# ── Relay config injected by worker at serve time (no hardcoded tokens in source) ──
+if (-not $env:ACP_RELAY_URL)    { $env:ACP_RELAY_URL = "__ACP_RELAY_URL__" }
+if (-not $env:ACP_DAEMON_TOKEN) { $env:ACP_DAEMON_TOKEN = "__ACP_DAEMON_TOKEN__" }
+# Fallback for local runs / bootstrap re-invoke: fetch from worker
+if ($env:ACP_RELAY_URL -eq "__ACP_RELAY_URL__" -or $env:ACP_DAEMON_TOKEN -eq "__ACP_DAEMON_TOKEN__") {
     $configUrl = if ($branch -eq "dev") { "https://runmote.dev/config/dev" } else { "https://runmote.dev/config" }
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         $resp = Invoke-WebRequest -UseBasicParsing -Uri $configUrl -ErrorAction Stop
-        $config = $resp.Content | ConvertFrom-Json
-        if (-not $env:ACP_RELAY_URL    -and $config.relayUrl) { $env:ACP_RELAY_URL = $config.relayUrl }
-        if (-not $env:ACP_DAEMON_TOKEN -and $config.token)    { $env:ACP_DAEMON_TOKEN = $config.token }
+        $cfg = $resp.Content | ConvertFrom-Json
+        if ($env:ACP_RELAY_URL -eq "__ACP_RELAY_URL__")       { $env:ACP_RELAY_URL = $cfg.relayUrl }
+        if ($env:ACP_DAEMON_TOKEN -eq "__ACP_DAEMON_TOKEN__")  { $env:ACP_DAEMON_TOKEN = $cfg.token }
     } catch {
-        Write-Host "  Warning: could not fetch relay config ($configUrl)" -ForegroundColor DarkGray
+        Write-Host "  Warning: could not fetch relay config, using defaults" -ForegroundColor DarkGray
+        if ($env:ACP_RELAY_URL -eq "__ACP_RELAY_URL__")       { $env:ACP_RELAY_URL = "wss://relay.runmote.dev/daemon" }
+        if ($env:ACP_DAEMON_TOKEN -eq "__ACP_DAEMON_TOKEN__") { $env:ACP_DAEMON_TOKEN = "" }
     }
 }
 
