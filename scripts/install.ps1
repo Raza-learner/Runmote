@@ -191,16 +191,21 @@ Write-Host ""
 
 # Start daemon and show pairing code
 Write-Host "  Starting daemon..." -ForegroundColor Gray
+$wrapper = "$installDir\scripts\run-daemon.ps1"
 try {
     Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null
-} catch {}
+} catch {
+    if (Test-Path $wrapper) { & $wrapper }
+}
 $logFile = "$env:TEMP\runmote-daemon.log"
 $pairingCode = $null
-for ($i = 0; $i -lt 12; $i++) {
+for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Seconds 1
     if (Test-Path $logFile) {
-        $match = Select-String -Path $logFile -Pattern 'pairing code:\s+(\S+)' | Select-Object -Last 1
-        if ($match) { $pairingCode = $match.Matches.Groups[1].Value; break }
+        try {
+            $match = Select-String -Path $logFile -Pattern 'pairing code:\s+(\S+)' -ErrorAction SilentlyContinue | Select-Object -Last 1
+            if ($match) { $pairingCode = $match.Matches.Groups[1].Value; break }
+        } catch {}
     }
 }
 if ($pairingCode) {
@@ -211,7 +216,8 @@ import sys; sys.path.insert(0, r'$installDir\src')
 from daemon.main import _pairing_banner
 print(_pairing_banner('$pairingCode'))
 "@ 2>$null
-    } else {
+    }
+    if (-not $?) {
         $formatted = $pairingCode.Substring(0, 4) + "-" + $pairingCode.Substring(4)
         Write-Host ""
         Write-Host "  +-----------------------------+"

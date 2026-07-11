@@ -210,6 +210,7 @@ function Exec-Action($sel) {
 }
 
 function Show-Menu {
+    Clear-Host
     if ($Host.UI.SupportsVirtualTerminal) {
         [Console]::CursorVisible = $false
         $sel = 1
