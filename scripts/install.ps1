@@ -191,13 +191,11 @@ Write-Host ""
 
 # Start daemon and show pairing code
 Write-Host "  Starting daemon..." -ForegroundColor Gray
-$wrapper = "$installDir\scripts\run-daemon.ps1"
-try {
-    Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null
-} catch {
-    if (Test-Path $wrapper) { & $wrapper }
-}
 $logFile = "$env:TEMP\runmote-daemon.log"
+$wrapper = "$installDir\scripts\run-daemon.ps1"
+try { Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null } catch {}
+Start-Sleep -Seconds 2
+if (Test-Path $wrapper) { & $wrapper }
 $pairingCode = $null
 for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Seconds 1
