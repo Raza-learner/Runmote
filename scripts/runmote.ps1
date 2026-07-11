@@ -11,6 +11,8 @@ $ErrorActionPreference = "Continue"
 
 $taskName = "Runmote Daemon"
 $logFile = "$env:TEMP\runmote-daemon.log"
+$errFile = "$env:TEMP\runmote-daemon.err"
+$codeFile = "$env:TEMP\runmote-pairing-code.txt"
 
 $scriptDir = Split-Path -Parent $PSCommandPath
 $installDir = Split-Path -Parent $scriptDir
@@ -21,38 +23,62 @@ function Get-DaemonName {
     return $env:COMPUTERNAME
 }
 
-function Test-IsRunning {
+function Get-DaemonPID {
     try {
-        $task = Get-ScheduledTask -TaskName $taskName -ErrorAction Stop
-        return $task.State -eq "Running"
-    } catch { return $false }
+        $proc = Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -ErrorAction SilentlyContinue |
+                Where-Object { $_.CommandLine -match 'src.daemon.main' } |
+                Select-Object -First 1
+        if ($proc) { return $proc.ProcessId }
+    } catch {}
+    return $null
+}
+
+function Test-IsRunning {
+    # Primary: check if Python daemon process exists
+    $pid = Get-DaemonPID
+    if ($pid) { return $true }
+    # Fallback: check if the new log file exists (daemon writes to it)
+    if (Test-Path $logFile) { return $true }
+    return $false
 }
 
 function Start-Daemon {
     try {
-        Start-ScheduledTask -TaskName $taskName | Out-Null
+        # Try scheduled task first
+        try { Start-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null } catch {}
+        # Also start directly (fallback if task doesn't exist)
+        if (Test-Path $python) {
+            $env:ACP_DAEMON_ID = Get-DaemonName
+            $env:PYTHONIOENCODING = "utf-8"
+            Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile
+        }
         Write-Host "  Daemon started." -ForegroundColor Green
     } catch {
-        Write-Host "  Error: could not start '$taskName'." -ForegroundColor Red
+        Write-Host "  Error: could not start daemon." -ForegroundColor Red
     }
 }
 
 function Stop-Daemon {
     try {
-        Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Out-Null
+        # Try scheduled task first
+        try { Stop-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null } catch {}
+        # Kill Python processes directly
+        $pid = Get-DaemonPID
+        if ($pid) { Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue }
+        # Clean up temp files
+        Remove-Item $logFile -Force -ErrorAction SilentlyContinue
+        Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+        Remove-Item $codeFile -Force -ErrorAction SilentlyContinue
         Write-Host "  Daemon stopped." -ForegroundColor Yellow
     } catch {
-        Write-Host "  Error: could not stop '$taskName'." -ForegroundColor Red
+        Write-Host "  Error: could not stop daemon." -ForegroundColor Red
     }
 }
 
 function Get-PairingCode {
-    $errFile = "$env:TEMP\runmote-daemon.err"
-    foreach ($lf in @($logFile, $errFile)) {
-        if (Test-Path $lf) {
-            $match = Select-String -Path $lf -Pattern 'pairing code:\s+(\S+)' -ErrorAction SilentlyContinue | Select-Object -Last 1
-            if ($match) { return $match.Matches.Groups[1].Value }
-        }
+    # Read from temp file (daemon writes code here on connection)
+    if (Test-Path $codeFile) {
+        return (Get-Content $codeFile -Raw).Trim()
     }
     return $null
 }
