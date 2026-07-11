@@ -263,14 +263,25 @@ if (-not $pairingCode) {
     if (Test-Path $errFile) { Get-Content $errFile -Tail 10 | ForEach-Object { Write-Host "    [ERR] $_" -ForegroundColor DarkGray } }
 }
 if ($pairingCode) {
-    $formatted = $pairingCode.Substring(0, 4) + "-" + $pairingCode.Substring(4)
-    Write-Host ""
-    Write-Host "  +-----------------------------+"
-    Write-Host ("  |  Pairing Code: {0,-12}  |" -f $formatted)
-    Write-Host "  |                             |"
-    Write-Host "  |  Enter this in the app      |"
-    Write-Host "  +-----------------------------+"
-    Write-Host ""
+    # Try QR banner first (removed from daemon output since redirect goes to log file)
+    if (Test-Path $python) {
+        & $python -c @"
+import sys
+sys.path.insert(0, r'$installDir\src')
+from daemon.main import _pairing_banner
+print(_pairing_banner('$pairingCode'))
+"@ 2>$null
+    }
+    if (-not $?) {
+        $formatted = $pairingCode.Substring(0, 4) + "-" + $pairingCode.Substring(4)
+        Write-Host ""
+        Write-Host "  +-----------------------------+"
+        Write-Host ("  |  Pairing Code: {0,-12}  |" -f $formatted)
+        Write-Host "  |                             |"
+        Write-Host "  |  Enter this in the app      |"
+        Write-Host "  +-----------------------------+"
+        Write-Host ""
+    }
 } else {
     Write-Host "  Run 'runmote code' after daemon connects to get pairing code."
 }
