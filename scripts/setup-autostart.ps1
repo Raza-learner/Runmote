@@ -59,6 +59,11 @@ function Install-AutoStart {
         $wrapperLines += "`$env:ACP_RELAY_PUBLIC_URL = '$($env:ACP_RELAY_PUBLIC_URL)'"
     }
     $wrapperLines += "`$env:PYTHONIOENCODING = 'utf-8'"
+    # Extended PATH for agent detection (matching Linux systemd service)
+    $userHome = '$env:USERPROFILE'
+    $wrapperLines += "# Extended PATH for agent detection`n" +
+        "`$agentPaths = @(`"$userHome\.local\bin`", `"$userHome\AppData\Roaming\npm`", `"$userHome\.opencode\bin`", `"$userHome\.cargo\bin`", `"$userHome\.bun\bin`")`n" +
+        "`$env:Path = (`$agentPaths + `$env:Path.Split(';') | Where-Object { `$_ -and (Test-Path `$_ -ErrorAction SilentlyContinue) }) -join ';'"
 
     $errFile = '$env:TEMP\runmote-daemon.err'
     $wrapperLines += "`$errFile = `"$errFile`""

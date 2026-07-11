@@ -236,6 +236,15 @@ try { Start-ScheduledTask -TaskName "Runmote Daemon" -ErrorAction SilentlyContin
 if (Test-Path $python) {
     $env:ACP_DAEMON_ID = $daemonName
     $env:PYTHONIOENCODING = "utf-8"
+    # Extended PATH for agent detection (matching Linux systemd service)
+    $agentPaths = @(
+        "$env:USERPROFILE\.local\bin",
+        "$env:USERPROFILE\AppData\Roaming\npm",
+        "$env:USERPROFILE\.opencode\bin",
+        "$env:USERPROFILE\.cargo\bin",
+        "$env:USERPROFILE\.bun\bin"
+    )
+    $env:Path = ($agentPaths + $env:Path.Split(';') | Where-Object { $_ -and (Test-Path $_ -ErrorAction SilentlyContinue) }) -join ';'
     $proc = Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $installDir -RedirectStandardOutput $logFile -RedirectStandardError $errFile -PassThru
     if ($proc) { $proc.Id | Out-File "$env:TEMP\runmote-daemon.pid" -Force }
 }

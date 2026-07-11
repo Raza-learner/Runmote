@@ -60,3 +60,10 @@ else:
 DAEMON_ID = os.environ.get("ACP_DAEMON_ID", socket.gethostname())
 DAEMON_TOKEN = os.environ.get("ACP_DAEMON_TOKEN", "")
 RECONNECT_DELAY = int(os.environ.get("ACP_RECONNECT_DELAY", "5"))
+
+# Log detected agents for debugging
+_detected_ids = [a["id"] for a in AGENT_CONFIGS]
+if _detected_ids:
+    print(f"agents detected: {', '.join(_detected_ids)}", flush=True)
+else:
+    print("no ACP agents detected — install opencode, codex, or claude", flush=True)
