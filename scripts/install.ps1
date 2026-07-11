@@ -223,11 +223,9 @@ Write-Host ""
 # Start daemon and show pairing code
 Write-Host "  Starting daemon..." -ForegroundColor Gray
 # Kill stale daemon processes from previous installs
-Get-Process -Name python* -ErrorAction SilentlyContinue | Where-Object {
-    try { $_.CommandLine -match 'src.daemon.main' } catch { $false }
-} | Stop-Process -Force -ErrorAction SilentlyContinue
+cmd /c "wmic process where ""commandline like '%%src.daemon.main%%' and name like '%%python%%'"" delete 2>nul" | Out-Null
 Start-Sleep -Seconds 1
-# Clean up old temp files
+# Clean up old temp files (ignore errors if file is locked)
 Remove-Item "$env:TEMP\runmote-daemon.log" -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:TEMP\runmote-daemon.err" -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:TEMP\runmote-pairing-code.txt" -Force -ErrorAction SilentlyContinue
