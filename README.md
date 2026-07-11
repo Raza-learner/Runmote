@@ -16,5 +16,10 @@ curl -fsSL https://runmote.dev/install.sh/dev | bash
 
 ### Windows
 ```powershell
-powershell -c "irm https://raw.githubusercontent.com/Raza-learner/Runmote/dev/scripts/install.ps1 | iex"
+powershell -c "irm https://runmote.dev/install.ps1 | iex"
+```
+
+Dev branch:
+```powershell
+powershell -c "irm https://runmote.dev/install.ps1/dev | iex"
 ```

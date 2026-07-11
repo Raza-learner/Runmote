@@ -70,8 +70,8 @@ for ($i = 0; $i -lt $args.Count; $i++) {
 Install Runmote daemon and configure auto-start.
 
 Usage:
-  powershell -c "irm https://raw.githubusercontent.com/Raza-learner/Runmote/dev/scripts/install.ps1 | iex"
-  `$env:ACP_RELAY_URL='ws://host:8000/daemon'; powershell -c "irm https://raw.githubusercontent.com/Raza-learner/Runmote/dev/scripts/install.ps1 | iex"
+  powershell -c "irm https://runmote.dev/install.ps1 | iex"
+  `$env:ACP_RELAY_URL='ws://host:8000/daemon'; powershell -c "irm https://runmote.dev/install.ps1 | iex"
 
 Environment variables:
   ACP_RELAY_URL      WebSocket URL of the relay server
