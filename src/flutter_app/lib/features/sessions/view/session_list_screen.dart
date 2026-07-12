@@ -164,9 +164,9 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     if (connection.selectedAgentId != _lastAgentId) {
       _lastAgentId = connection.selectedAgentId;
       if (connection.selectedAgentId != null) {
-        final notifier = ref.read(sessionListProvider.notifier);
-        notifier.clearForAgent(connection.selectedAgentId);
-        Future.microtask(() => notifier.loadSessions());
+        Future.microtask(() {
+          ref.read(sessionListProvider.notifier).loadSessions();
+        });
       }
     }
 
