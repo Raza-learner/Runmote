@@ -119,6 +119,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
   Timer? _debounceTimer;
   bool _wasConnected = false;
   bool _isLoading = false;
+  String? _loadedAgentId;
   int _requestSeq = 0;
   int get _nextRequestId => ++_requestSeq;
 
@@ -185,6 +186,16 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
   }
 
   Future<void> loadSessions() async {
+    final connection = _ref.read(connectionProvider);
+    final currentAgentId = connection.selectedAgentId;
+
+    // If the selected agent changed, cancel any in-flight load so the
+    // new agent's sessions are fetched immediately.
+    if (currentAgentId != _loadedAgentId) {
+      _loadedAgentId = currentAgentId;
+      _isLoading = false;
+    }
+
     if (_isLoading) {
       return;
     }
@@ -194,7 +205,6 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       state = const AsyncValue.loading();
     }
     try {
-      final connection = _ref.read(connectionProvider);
       if (connection.channel == null) {
         state = const AsyncValue.data([]);
         return;
