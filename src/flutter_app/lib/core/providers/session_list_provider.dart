@@ -160,6 +160,20 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       connectionProvider,
       (previous, next) {
         final isConnected = next.state is Connected;
+
+        // If the selected agent changed, cancel any in-flight load and
+        // immediately clear state so the widget renders empty / cached
+        // instead of the previous agent's sessions.  This runs in a
+        // Riverpod listen callback (outside build phase), so mutating
+        // state here is safe.
+        if (next.selectedAgentId != _loadedAgentId) {
+          _loadedAgentId = next.selectedAgentId;
+          _isLoading = false;
+          state = const AsyncValue.data([]);
+          Future.microtask(() => loadSessions());
+          return;
+        }
+
         if (isConnected && !_wasConnected) {
           _debouncedRefresh();
         }

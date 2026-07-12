@@ -26,8 +26,6 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
   final _searchController = TextEditingController();
   bool _showSearch = false;
   String _searchQuery = '';
-  String? _lastAgentId;
-
   @override
   void initState() {
     super.initState();
@@ -160,15 +158,6 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     final theme = Theme.of(context);
     final connection = ref.watch(connectionProvider);
     final sessionsAsync = ref.watch(sessionListProvider);
-
-    if (connection.selectedAgentId != _lastAgentId) {
-      _lastAgentId = connection.selectedAgentId;
-      if (connection.selectedAgentId != null) {
-        Future.microtask(() {
-          ref.read(sessionListProvider.notifier).loadSessions();
-        });
-      }
-    }
 
     final activeIds = ref.watch(activeSessionsProvider);
 
