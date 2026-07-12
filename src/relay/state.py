@@ -45,6 +45,11 @@ claimed_codes: set[str] = set()
 # negligible).
 known_tokens: dict[str, str] = {}
 
+# Tracks daemons that have ever received a pairing (via pairing/complete).
+# Survives daemon disconnects so the relay can tell a reconnecting daemon
+# that it was previously paired but now has no active mobile apps.
+daemon_ever_paired: set[str] = set()
+
 
 def get_daemon_by_code(code: str) -> DaemonSession | None:
     did = code_to_daemon.get(code)

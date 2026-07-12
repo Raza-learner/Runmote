@@ -79,29 +79,42 @@ async def daemon_endpoint(websocket: WebSocket):
                     if old:
                         print(f"  → daemon {daemon_id} reconnected, replacing old session")
 
+                    ever_paired = daemon_id in state.daemon_ever_paired
+
                     # Generate pairing code unique across all daemons
                     all_codes = set(state.code_to_daemon.keys())
                     cleanup_expired_codes(all_codes)
                     pairing_code = generate_pairing_code(all_codes)
                     state.code_to_daemon[pairing_code] = daemon_id
 
+                    # Derive paired apps from persistent app_to_daemon mapping
+                    # (survives daemon disconnects — only cleared when the app
+                    # explicitly disconnects).
+                    paired_apps = {
+                        cid for cid, did in state.app_to_daemon.items()
+                        if did == daemon_id
+                    }
+
                     session = state.DaemonSession(
                         websocket=websocket,
                         daemon_id=daemon_id,
                         token=token,
                         public_url=PUBLIC_URL or "",
+                        paired_apps=paired_apps,
                     )
                     state.daemons[daemon_id] = session
                     if token:
                         state.known_tokens[token] = daemon_id
                     state.store.set_daemon_id(daemon_id)
-                    print(f"  → daemon {daemon_id} identified")
+                    print(f"  → daemon {daemon_id} identified (paired_apps={len(session.paired_apps)}, ever_paired={ever_paired})")
                     print(f"  → pairing code: {pairing_code}")
 
                     if msg_id:
                         result = {"pairingCode": pairing_code}
                         if PUBLIC_URL:
                             result["publicUrl"] = PUBLIC_URL
+                        result["pairedAppCount"] = len(session.paired_apps)
+                        result["everPaired"] = ever_paired
                         await websocket.send_text(json.dumps({
                             "jsonrpc": "2.0",
                             "id": msg_id,
@@ -126,6 +139,7 @@ async def daemon_endpoint(websocket: WebSocket):
                     client_id = params.get("clientId", "")
                     if session and client_id:
                         session.paired_apps.add(client_id)
+                        state.daemon_ever_paired.add(session.daemon_id)
                     continue
 
                 result = data.get("result")

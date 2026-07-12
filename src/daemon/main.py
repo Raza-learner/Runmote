@@ -18,6 +18,11 @@ from config import AGENT_CONFIGS, DAEMON_ID, DAEMON_TOKEN, RECONNECT_DELAY, RELA
 from websockets.asyncio.client import connect
 
 
+class DaemonUnpaired(Exception):
+    """Raised when the daemon reconnects but has no paired mobile apps
+    after having been paired previously — indicates the mobile app unpaired."""
+
+
 def log(msg: str):
     try:
         print(msg, flush=True)
@@ -302,6 +307,8 @@ async def run_daemon():
                         if data.get("id") == identify_id:
                             result = data.get("result") or {}
                             pairing_code = result.get("pairingCode", "")
+                            paired_count = result.get("pairedAppCount", 0)
+                            ever_paired = result.get("everPaired", False)
                             if pairing_code:
                                 public_url = result.get("publicUrl", "")
                                 log(f"pairing code: {pairing_code}")
@@ -320,6 +327,11 @@ async def run_daemon():
                                     config_dir = Path.home() / ".config" / "runmote"
                                     config_dir.mkdir(parents=True, exist_ok=True)
                                     (config_dir / "public_url").write_text(public_url)
+                            # If daemon was previously paired (ever_paired) but has
+                            # no paired apps now, the mobile app unpaired — stop.
+                            if paired_count == 0 and ever_paired:
+                                log("No paired mobile apps — daemon was unpaired, shutting down")
+                                raise DaemonUnpaired()
                             break
                     except json.JSONDecodeError:
                         log(f"Invalid JSON from relay during identify: {msg[:200]}")
@@ -679,6 +691,8 @@ async def run_daemon():
 
         except asyncio.CancelledError:
             raise
+        except DaemonUnpaired:
+            raise
         except Exception as e:
             log(f"Connection error: {e}")
             try:
@@ -708,26 +722,47 @@ async def main():
             except NotImplementedError:
                 pass
 
-    if sys.platform == "win32":
+    async def _run_or_stop():
+        """Run the daemon — stop on unpaired, signal, or crash."""
+        nonlocal stop
         while True:
             try:
                 daemon_task = asyncio.create_task(run_daemon())
-                await daemon_task
-            except asyncio.CancelledError:
-                break
-            except Exception:
-                import traceback
-                print(f"Daemon crashed: {traceback.format_exc()}", file=sys.stderr, flush=True)
-                await asyncio.sleep(5)
-    else:
-        daemon_task = asyncio.create_task(run_daemon())
-        await stop.wait()
-        print("\nShutting down...")
-        daemon_task.cancel()
-        try:
-            await daemon_task
-        except asyncio.CancelledError:
-            pass
+                # Wait for either daemon exit or stop signal
+                done, _ = await asyncio.wait(
+                    [daemon_task, asyncio.create_task(stop.wait())],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if daemon_task in done:
+                    exc = daemon_task.exception()
+                    if isinstance(exc, DaemonUnpaired):
+                        print("Daemon unpaired — shutting down", flush=True)
+                        return
+                    if isinstance(exc, asyncio.CancelledError):
+                        return
+                    if exc:
+                        raise exc
+                    # Daemon exited normally
+                    if sys.platform == "win32":
+                        log("Daemon exited, restarting...")
+                        await asyncio.sleep(5)
+                        continue
+                    else:
+                        return
+                else:
+                    # stop was set (SIGINT/SIGTERM)
+                    daemon_task.cancel()
+                    try:
+                        await daemon_task
+                    except (asyncio.CancelledError, DaemonUnpaired):
+                        pass
+                    return
+            except DaemonUnpaired:
+                print("Daemon unpaired — shutting down", flush=True)
+                return
+
+    await _run_or_stop()
+    print("\nShutting down...")
 
 
 if __name__ == "__main__":

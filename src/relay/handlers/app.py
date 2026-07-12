@@ -100,6 +100,7 @@ async def app_endpoint(websocket: WebSocket):
                             "method": "pairing/complete",
                             "params": {"clientId": client_id},
                         }))
+                        state.daemon_ever_paired.add(daemon_session.daemon_id)
                     continue
 
                 if method == "auth/token":
