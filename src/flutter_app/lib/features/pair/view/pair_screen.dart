@@ -107,7 +107,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     setState(() {});
   }
 
-  Future<void> _connect({String? code}) async {
+  Future<void> _connect({String? code, String? relayUrl}) async {
     final pairingCode = (code ?? _codeController.text)
         .replaceAll(RegExp(r'[^A-Za-z0-9]'), '')
         .toUpperCase();
@@ -119,7 +119,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
       _isConnecting = true;
       _error = null;
     });
-    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: _defaultRelayUrl);
+    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: relayUrl ?? _defaultRelayUrl);
   }
 
   bool _isValidCode(String raw) {
@@ -137,15 +137,23 @@ class _PairScreenState extends ConsumerState<PairScreen> {
 
     // The QR may be a plain code ("GGTTFGV5") or a relay URL with
     // a code query parameter ("https://relay/connect?code=GGTTFGV5").
+    // When it's a URL, extract both the relay host and the code so
+    // we connect to the same relay that generated the code.
+    String code;
+    String? relayUrl;
     final uri = Uri.tryParse(raw);
-    final code = (uri != null && uri.queryParameters.containsKey('code'))
-        ? uri.queryParameters['code']!
-        : raw;
+    if (uri != null && uri.queryParameters.containsKey('code')) {
+      code = uri.queryParameters['code']!;
+      // Use the scanned relay's scheme + host + port (without path).
+      relayUrl = '${uri.scheme}://${uri.host}${uri.port != 80 && uri.port != 443 ? ':${uri.port}' : ''}';
+    } else {
+      code = raw;
+    }
 
     if (_isValidCode(code)) {
       _qrScanned = true;
       _scannerController?.stop();
-      _connect(code: code);
+      _connect(code: code, relayUrl: relayUrl);
     }
   }
 
