@@ -190,8 +190,6 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
     }
     _isLoading = true;
 
-    // Preserve existing data while refreshing so the list doesn't flash.
-    final currentSessions = state.valueOrNull ?? [];
     if (!state.hasValue) {
       state = const AsyncValue.loading();
     }
@@ -208,13 +206,23 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       final capabilities = connection.capabilities;
       final supportsList = capabilities?.supportsSessionList ?? true;
 
+      // Preserve existing data while refreshing so the list doesn't flash,
+      // but filter by the current agent to avoid showing another agent's
+      // sessions while the session/list request is in flight.
+      var currentSessions = state.valueOrNull ?? [];
+      if (selectedAgentId != null) {
+        currentSessions = currentSessions.where((s) => s.agentId == selectedAgentId).toList();
+      }
+
       final pairingCode = _cacheDeviceCode(
         connection.pairingCode ?? '',
         selectedAgentId,
       );
 
-      // Always show cached sessions first so the list is never empty
-      // while waiting for the agent response.
+      // Always show cached sessions for the current agent first so the
+      // list is never empty while waiting for the remote response and
+      // so switching agents immediately clears stale sessions from the
+      // previous agent.
       final cachedRows = await db.getCachedSessions(pairingCode);
       final cachedSessions = cachedRows
           .map((s) => AcpSession(
@@ -226,9 +234,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
           .where((s) => !_deletedIds.contains(s.id))
           .toList();
 
-      if (!state.hasValue) {
-        state = AsyncValue.data(cachedSessions);
-      }
+      state = AsyncValue.data(cachedSessions);
 
       if (!supportsList) {
         final merged = <String, AcpSession>{};
