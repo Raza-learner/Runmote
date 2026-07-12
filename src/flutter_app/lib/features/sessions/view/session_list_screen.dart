@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import '../../../core/providers/database_provider.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/ongoing_session_banner.dart';
 import '../../../shared/widgets/daemon_offline_banner.dart';
+import '../../../shared/widgets/animated_background.dart';
 import 'widgets/session_card.dart';
 import 'widgets/directory_picker_sheet.dart';
 
@@ -162,16 +164,25 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     if (connection.selectedAgentId != _lastAgentId) {
       _lastAgentId = connection.selectedAgentId;
       if (connection.selectedAgentId != null) {
-        Future.microtask(() {
-          ref.read(sessionListProvider.notifier).loadSessions();
-        });
+        final notifier = ref.read(sessionListProvider.notifier);
+        notifier.clearForAgent(connection.selectedAgentId);
+        Future.microtask(() => notifier.loadSessions());
       }
     }
 
     final activeIds = ref.watch(activeSessionsProvider);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.4),
+        elevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
         title: _showSearch
             ? TextField(
                 controller: _searchController,
@@ -213,42 +224,51 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
           ),
         ],
       ),
-      body: sessionsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (sessions) {
-          final supportsSessionList =
-              connection.capabilities?.supportsSessionList ?? true;
-          final filtered = _searchQuery.isEmpty
-              ? sessions
-              : sessions
-                  .where((s) =>
-                      (s.title ?? '')
-                          .toLowerCase()
-                          .contains(_searchQuery.toLowerCase()) ||
-                      s.cwd.toLowerCase().contains(_searchQuery.toLowerCase()))
-                  .toList();
+      body: AnimatedBackground(
+        child: Column(
+          children: [
+            SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
+            Expanded(
+              child: sessionsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Error: $e')),
+                data: (sessions) {
+                  final supportsSessionList =
+                      connection.capabilities?.supportsSessionList ?? true;
+                  final filtered = _searchQuery.isEmpty
+                      ? sessions
+                      : sessions
+                          .where((s) =>
+                              (s.title ?? '')
+                                  .toLowerCase()
+                                  .contains(_searchQuery.toLowerCase()) ||
+                              s.cwd.toLowerCase().contains(_searchQuery.toLowerCase()))
+                          .toList();
 
-          return Column(
-            children: [
-              const OngoingSessionBanner(),
-              if (connection.paired && !connection.daemonConnected)
-                const DaemonOfflineBanner(),
-              if (!supportsSessionList && sessions.isNotEmpty)
-                _LocalOnlyBanner(),
-              Expanded(
-                child: _buildSessionList(
-                  theme,
-                  filtered,
-                  sessions,
-                  _searchQuery,
-                  activeIds,
-                  !connection.daemonConnected,
-                ),
+                  return Column(
+                    children: [
+                      const OngoingSessionBanner(),
+                      if (connection.paired && !connection.daemonConnected)
+                        const DaemonOfflineBanner(),
+                      if (!supportsSessionList && sessions.isNotEmpty)
+                        _LocalOnlyBanner(),
+                      Expanded(
+                        child: _buildSessionList(
+                          theme,
+                          filtered,
+                          sessions,
+                          _searchQuery,
+                          activeIds,
+                          !connection.daemonConnected,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _createSession,

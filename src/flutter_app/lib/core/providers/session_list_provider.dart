@@ -177,6 +177,17 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
     });
   }
 
+  /// Synchronously clear state when the selected agent changes, so the
+  /// widget rebuilds with the cleared state before [loadSessions] starts
+  /// its async work (which runs via Future.microtask).
+  void clearForAgent(String? agentId) {
+    if (agentId != _loadedAgentId) {
+      _loadedAgentId = agentId;
+      _isLoading = false;
+      state = const AsyncValue.data([]);
+    }
+  }
+
   @override
   void dispose() {
     _messageSub?.cancel();
