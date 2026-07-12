@@ -268,8 +268,6 @@ install_dependencies() {
     uv sync || return 1
     success "Dependencies installed"
 
-    fi
-
     return 0
 
 }
