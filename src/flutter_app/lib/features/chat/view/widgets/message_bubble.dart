@@ -40,13 +40,18 @@ class MessageBubble extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isUser
                         ? theme.colorScheme.primary
-                        : theme.colorScheme.surfaceContainerHigh,
+                        : theme.brightness == Brightness.dark
+                            ? Colors.white.withValues(alpha: 0.05)
+                            : theme.colorScheme.surfaceContainerHigh,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(20),
                       topRight: const Radius.circular(20),
                       bottomLeft: Radius.circular(isUser ? 20 : 4),
                       bottomRight: Radius.circular(isUser ? 4 : 20),
                     ),
+                    border: !isUser && theme.brightness == Brightness.dark
+                        ? Border.all(color: Colors.white.withValues(alpha: 0.08))
+                        : null,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.05),
@@ -291,6 +296,7 @@ class _ToolCallGroupState extends State<ToolCallGroup>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final counts = _counts;
     final anyRunning = widget.isStreaming && !_allCompleted;
 
@@ -298,10 +304,14 @@ class _ToolCallGroupState extends State<ToolCallGroup>
       width: double.infinity,
       margin: const EdgeInsets.only(top: 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.5),
+        color: isDark 
+            ? Colors.white.withValues(alpha: 0.02)
+            : theme.colorScheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+          color: isDark 
+              ? Colors.white.withValues(alpha: 0.05)
+              : theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -317,13 +327,15 @@ class _ToolCallGroupState extends State<ToolCallGroup>
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                      color: isDark 
+                          ? Colors.blue.withValues(alpha: 0.1)
+                          : theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.settings_input_component,
                       size: 14,
-                      color: theme.colorScheme.primary,
+                      color: isDark ? Colors.blue.shade300 : theme.colorScheme.primary,
                     ),
                   ),
                   const SizedBox(width: 12),

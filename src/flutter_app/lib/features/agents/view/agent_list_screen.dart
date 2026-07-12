@@ -13,6 +13,7 @@ import 'widgets/agent_card.dart';
 import 'widgets/agent_logo.dart';
 import '../../../../shared/widgets/error_banner.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../../shared/widgets/animated_background.dart';
 
 class AgentListScreen extends ConsumerStatefulWidget {
   const AgentListScreen({super.key});
@@ -84,7 +85,7 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
             child: StatusLabel(status: status),
           ),
         ],
-        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.1),
         elevation: 0,
         flexibleSpace: ClipRect(
           child: BackdropFilter(
@@ -93,11 +94,12 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          // Adjust for transparent app bar
-          SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
-          if (!isConnected && pairingCode != null)
+      body: AnimatedBackground(
+        child: Column(
+          children: [
+            // Adjust for transparent app bar
+            SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
+            if (!isConnected && pairingCode != null)
             ErrorBanner(
               message: isReconnecting
                   ? 'Reconnecting...'
@@ -111,78 +113,105 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
                 }
               },
             ),
-          Expanded(
-            child: daemonDown
-                ? _DaemonOfflineState(
-                    onRefresh: () async {
-                      ref.read(connectionProvider.notifier).loadAgents();
-                    },
-                  )
-                : isConnected && agents.isNotEmpty
-                    ? RefreshIndicator(
-                        onRefresh: () async {
-                          ref.read(connectionProvider.notifier).loadAgents();
-                        },
-                        child: ListView.separated(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          itemCount: agents.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: AppSpacing.sm),
-                          itemBuilder: (context, index) {
-                            final agent = agents[index];
-                            return AgentCard(
-                              id: agent.id,
-                              name: agent.name,
-                              version: agent.version,
-                              isOnline: agent.online,
-                              isSelected:
-                                  agent.id == selectedAgentId,
-                              onTap: agent.online
-                                  ? () {
-                                      HapticFeedback.lightImpact();
-                                      ref
-                                          .read(connectionProvider.notifier)
-                                          .selectAgent(agent.id);
-                                      context.go('/sessions');
-                                    }
-                                  : null,
-                              onInfoTap: () => _showAgentDetail(agent),
-                            );
+            Expanded(
+              child: daemonDown
+                  ? _DaemonOfflineState(
+                      onRefresh: () async {
+                        ref.read(connectionProvider.notifier).loadAgents();
+                      },
+                    )
+                  : isConnected && agents.isNotEmpty
+                      ? RefreshIndicator(
+                          onRefresh: () async {
+                            ref.read(connectionProvider.notifier).loadAgents();
                           },
+                          child: ListView.separated(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.md,
+                            ),
+                            itemCount: agents.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: AppSpacing.md),
+                            itemBuilder: (context, index) {
+                              final agent = agents[index];
+                              return AgentCard(
+                                id: agent.id,
+                                name: agent.name,
+                                version: agent.version,
+                                isOnline: agent.online,
+                                isSelected:
+                                    agent.id == selectedAgentId,
+                                onTap: agent.online
+                                    ? () {
+                                        HapticFeedback.lightImpact();
+                                        ref
+                                            .read(connectionProvider.notifier)
+                                            .selectAgent(agent.id);
+                                        context.go('/sessions');
+                                      }
+                                    : null,
+                                onInfoTap: () => _showAgentDetail(agent),
+                              );
+                            },
+                          ),
+                        )
+                      : Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 48),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: BoxDecoration(
+                                    color: theme.brightness == Brightness.dark 
+                                        ? Colors.white.withValues(alpha: 0.05)
+                                        : Colors.black.withValues(alpha: 0.03),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.smart_toy_outlined,
+                                    size: 64,
+                                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                Text(
+                                  isReconnecting || isConnecting
+                                      ? 'Establishing Connection...'
+                                      : 'No agents detected',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: -0.2,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Make sure a Runmote agent is running on your remote machine to get started.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                    height: 1.5,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 32),
+                                if (isReconnecting || isConnecting)
+                                  const CircularProgressIndicator(strokeWidth: 3)
+                                else
+                                  FilledButton.tonalIcon(
+                                    onPressed: () => ref.read(connectionProvider.notifier).loadAgents(),
+                                    icon: const Icon(Icons.refresh_rounded, size: 20),
+                                    label: const Text('Refresh'),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
-                      )
-                    : Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.smart_toy_outlined,
-                              size: 64,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              isReconnecting || isConnecting
-                                  ? 'Connecting...'
-                                  : 'No agents detected',
-                              style: theme.textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Make sure a Runmote agent is running on your PC.',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 24),
-                            if (isReconnecting || isConnecting)
-                              const CircularProgressIndicator(),
-                          ],
-                        ),
-                      ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -317,90 +346,153 @@ class _DaemonOfflineState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.xl),
         children: [
           const SizedBox(height: AppSpacing.xl),
-          const Center(
-            child: Icon(
-              Icons.power_off_rounded,
-              size: 72,
-              color: AppColors.daemonOffline,
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: isDark 
+                    ? Colors.red.withValues(alpha: 0.05)
+                    : Colors.red.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.red.withValues(alpha: 0.1),
+                ),
+              ),
+              child: const Icon(
+                Icons.power_off_rounded,
+                size: 72,
+                color: Color(0xFFEF4444),
+              ),
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.xl),
           Center(
             child: Text(
-              'Daemon is not running',
-              style: theme.textTheme.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Center(
-            child: Text(
-              'The daemon on your remote device is offline. '
-              'Start it on the remote machine to reconnect.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              'Connection Interrupted',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
               ),
               textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'The Runmote daemon on your remote machine appears to be offline or unreachable.',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  height: 1.6,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+          const SizedBox(height: 40),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(12),
+              color: isDark 
+                  ? Colors.white.withValues(alpha: 0.03)
+                  : Colors.black.withValues(alpha: 0.02),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: isDark 
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.05),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.terminal_rounded,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Re-activate Daemon',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 Text(
-                  'How to start the daemon',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  'Ensure the daemon is running by executing this command in your terminal:',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                    height: 1.5,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Run this command on your remote device:',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: 20),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm + 2,
+                    horizontal: 16,
+                    vertical: 14,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SelectableText(
-                    'runmote',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontFamily: 'monospace',
-                      fontSize: 14,
+                    color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
                     ),
                   ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SelectableText(
+                          'runmote',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.blue.shade300 : Colors.blue.shade700,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.copy_rounded,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: 16),
                 Text(
-                  'The daemon will reconnect automatically once started. '
-                  'Pull down to refresh.',
+                  'The app will automatically reconnect once the daemon is back online.',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: FilledButton.icon(
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Check Connection Status'),
             ),
           ),
         ],

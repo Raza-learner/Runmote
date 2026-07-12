@@ -51,4 +51,37 @@ void main() {
     // Completed icon should be visible (check_circle)
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
   });
+
+  testWidgets('ToolCallCard has Semantics label', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ToolCallCard(
+          name: 'bash',
+          isStreaming: true,
+          isCompleted: false,
+        ),
+      ),
+    ));
+
+    expect(
+      find.bySemanticsLabel('Tool: bash'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('ToolCallCard shows running indicator when streaming',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ToolCallCard(
+          name: 'read_file',
+          isStreaming: true,
+          isCompleted: false,
+        ),
+      ),
+    ));
+
+    // CircularProgressIndicator is shown when streaming
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
 }

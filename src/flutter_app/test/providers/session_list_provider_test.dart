@@ -319,5 +319,61 @@ void main() {
       expect(notifier.state, isEmpty);
       container.dispose();
     });
+
+    // ── Error handling ───────────────────────────────────────────────
+
+    test('loadSessions handles remote error gracefully', () async {
+      final container = createContainer(db);
+      final mock = container.read(connectionProvider.notifier) as _MockConn;
+      mock.setConnected();
+
+      final notifier = container.read(sessionListProvider.notifier);
+      notifier.state = const AsyncValue.data([]);
+
+      notifier.loadSessions();
+      await Future.delayed(Duration.zero);
+
+      // Simulate error response from relay
+      mock.respond({});  // No sessions key
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(sessionListProvider);
+      expect(state.hasValue, isTrue);
+      expect(state.valueOrNull, isEmpty);
+      container.dispose();
+    });
+
+    test('createSession handles error response', () async {
+      final container = createContainer(db);
+      final mock = container.read(connectionProvider.notifier) as _MockConn;
+      mock.setConnected();
+
+      final notifier = container.read(sessionListProvider.notifier);
+      notifier.state = const AsyncValue.data([]);
+
+      final future = notifier.createSession('/home');
+      await Future.delayed(Duration.zero);
+
+      // Simulate error — no result key
+      mock.respond({'error': 'failed'});
+      final session = await future;
+
+      expect(session, isNull);
+      container.dispose();
+    });
+
+    test('ActiveSessionsNotifier.clear removes all timers', () async {
+      final container = createContainer(db);
+      final notifier = container.read(activeSessionsProvider.notifier);
+
+      notifier.markActive('sess-a');
+      notifier.markActive('sess-b');
+      expect(notifier.state.length, 2);
+
+      notifier.clear();
+      expect(notifier.state, isEmpty);
+      expect(notifier.latestSessionId, isNull);
+      container.dispose();
+    });
   });
 }

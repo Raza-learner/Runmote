@@ -42,70 +42,89 @@ class _ToolCallCardState extends State<ToolCallCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final hasOutput = widget.output != null && widget.output!.isNotEmpty;
     final showRunning = widget.isStreaming && !widget.isCompleted && !hasOutput;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
+        color: isDark 
+            ? Colors.black.withValues(alpha: 0.2)
+            : theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+          color: isDark 
+              ? Colors.white.withValues(alpha: 0.05)
+              : theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          InkWell(
-            onTap: hasOutput ? () => setState(() => _expanded = !_expanded) : null,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(
-                children: [
-                  Icon(
-                    _icon,
-                    size: 14,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      widget.name,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (showRunning)
-                    SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: theme.colorScheme.primary,
-                      ),
-                    )
-                  else if (widget.isCompleted)
+          Semantics(
+            label: 'Tool: ${widget.name}',
+            hint: hasOutput
+                ? (_expanded ? 'Tap to collapse' : 'Tap to expand')
+                : null,
+            button: hasOutput,
+            excludeSemantics: true,
+            child: InkWell(
+              onTap: hasOutput ? () => setState(() => _expanded = !_expanded) : null,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(
+                  children: [
                     Icon(
-                      Icons.check_circle,
+                      _icon,
                       size: 14,
-                      color: theme.colorScheme.tertiary,
+                      color: theme.colorScheme.primary,
                     ),
-                  if (hasOutput)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: Icon(
-                        _expanded ? Icons.expand_less : Icons.expand_more,
-                        size: 16,
-                        color: theme.colorScheme.onSurfaceVariant,
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        widget.name,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                ],
+                    if (showRunning)
+                      Semantics(
+                        label: 'Running',
+                        child: SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      )
+                    else if (widget.isCompleted)
+                      Semantics(
+                        label: 'Completed',
+                        child: Icon(
+                          Icons.check_circle,
+                          size: 14,
+                          color: theme.colorScheme.tertiary,
+                        ),
+                      ),
+                    if (hasOutput)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Icon(
+                          _expanded ? Icons.expand_less : Icons.expand_more,
+                          size: 16,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

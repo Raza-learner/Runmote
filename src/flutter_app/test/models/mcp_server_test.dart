@@ -58,5 +58,33 @@ void main() {
       expect(server.url, isNull);
       expect(server.headers, isNull);
     });
+
+    test('fromJson handles null env and args', () {
+      final json = {
+        'name': 'nulls',
+        'command': 'cmd',
+        'args': null,
+        'env': null,
+      };
+      final server = McpServer.fromJson(json);
+      expect(server.args, isEmpty);
+      expect(server.env, isEmpty);
+    });
+
+    test('toJson omits null url and headers for stdio', () {
+      final server = McpServer(name: 'stdio-only', command: 'echo');
+      final json = server.toJson();
+      expect(json.containsKey('url'), isFalse);
+      expect(json.containsKey('headers'), isFalse);
+    });
+
+    test('identical servers have same field values', () {
+      final a = McpServer(name: 'srv', command: 'npx', args: ['run']);
+      final b = McpServer(name: 'srv', command: 'npx', args: ['run']);
+      expect(a.name, b.name);
+      expect(a.command, b.command);
+      expect(a.args, b.args);
+      expect(a.type, b.type);
+    });
   });
 }

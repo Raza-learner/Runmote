@@ -34,25 +34,29 @@ class _ChatSkeletonState extends State<ChatSkeleton>
     final base = theme.colorScheme.surfaceContainerHighest;
     final radius = BorderRadius.circular(12);
 
-    return FadeTransition(
-      opacity: _opacity,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _bubble(base, radius, 0.7, align: Alignment.centerRight),
-            const SizedBox(height: 8),
-            _bubble(base, radius, 0.5),
-            const SizedBox(height: 8),
-            _bubble(base, radius, 0.85),
-            const SizedBox(height: 8),
-            _bubble(base, radius, 0.6, align: Alignment.centerRight),
-            const SizedBox(height: 8),
-            _bubble(base, radius, 0.35),
-            const SizedBox(height: 8),
-            _bubble(base, radius, 0.75, align: Alignment.centerRight),
-          ],
+    return Semantics(
+      label: 'Chat loading skeleton',
+      liveRegion: true,
+      child: FadeTransition(
+        opacity: _opacity,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _bubble(base, radius, 0.7, align: Alignment.centerRight),
+              const SizedBox(height: 8),
+              _bubble(base, radius, 0.5),
+              const SizedBox(height: 8),
+              _bubble(base, radius, 0.85),
+              const SizedBox(height: 8),
+              _bubble(base, radius, 0.6, align: Alignment.centerRight),
+              const SizedBox(height: 8),
+              _bubble(base, radius, 0.35),
+              const SizedBox(height: 8),
+              _bubble(base, radius, 0.75, align: Alignment.centerRight),
+            ],
+          ),
         ),
       ),
     );

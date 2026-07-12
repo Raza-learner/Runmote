@@ -30,13 +30,19 @@ class _ThinkingSectionState extends State<ThinkingSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.4),
+        color: isDark 
+            ? Colors.white.withValues(alpha: 0.02)
+            : theme.colorScheme.surface.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+          color: isDark 
+              ? Colors.white.withValues(alpha: 0.05)
+              : theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
@@ -52,32 +58,34 @@ class _ThinkingSectionState extends State<ThinkingSection> {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.4),
+                      color: isDark 
+                          ? Colors.orange.withValues(alpha: 0.1)
+                          : theme.colorScheme.secondaryContainer.withValues(alpha: 0.4),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.auto_awesome_outlined,
                       size: 14,
-                      color: theme.colorScheme.secondary,
+                      color: isDark ? Colors.orange.shade300 : theme.colorScheme.secondary,
                     ),
                   ),
                   const SizedBox(width: 10),
                   Text(
                     'Thinking Process',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.secondary,
+                      color: isDark ? Colors.orange.shade200 : theme.colorScheme.secondary,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.3,
                     ),
                   ),
                   const SizedBox(width: 8),
                   if (widget.isStreaming) 
-                    const SizedBox(
+                    SizedBox(
                       width: 10,
                       height: 10,
                       child: CircularProgressIndicator(
                         strokeWidth: 1.5,
-                        valueColor: AlwaysStoppedAnimation(Colors.grey),
+                        valueColor: AlwaysStoppedAnimation(isDark ? Colors.orange.shade200 : Colors.grey),
                       ),
                     ),
                   const Spacer(),

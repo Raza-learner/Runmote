@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import '../../../core/providers/preferences_provider.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/models/mcp_server.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../shared/widgets/animated_background.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -20,12 +22,28 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeModeStateProvider);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.4),
+        elevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
         title: const Text('Settings'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        children: [
+      body: AnimatedBackground(
+        showGrid: false,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            MediaQuery.of(context).padding.top + kToolbarHeight + AppSpacing.md,
+            AppSpacing.md,
+            AppSpacing.md,
+          ),
+          children: [
           const _SectionHeader(title: 'Connection'),
           const SizedBox(height: AppSpacing.sm),
           Card(
@@ -242,6 +260,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.xl),
         ],
+      ),
       ),
     );
   }

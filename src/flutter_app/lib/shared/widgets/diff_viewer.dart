@@ -13,34 +13,38 @@ class DiffViewer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final diffLines = _computeDiff(oldText, newText);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+    return Semantics(
+      label: 'Diff viewer',
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? Colors.black.withValues(alpha: 0.3) : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.1) : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
         ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final line in diffLines)
-              _DiffLine(
-                line: line.text,
-                type: line.type,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  height: 1.5,
+        clipBehavior: Clip.antiAlias,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final line in diffLines)
+                _DiffLine(
+                  line: line.text,
+                  type: line.type,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    height: 1.5,
+                  ),
+                  bgColors: _bgColors(theme),
                 ),
-                bgColors: _bgColors(theme),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -161,15 +165,16 @@ class _DiffLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Color? bg;
     Color? fg;
     switch (type) {
       case _DiffType.addition:
         bg = bgColors.addition;
-        fg = Colors.green.shade700;
+        fg = isDark ? Colors.green.shade300 : Colors.green.shade700;
       case _DiffType.deletion:
         bg = bgColors.deletion;
-        fg = Colors.red.shade700;
+        fg = isDark ? Colors.red.shade300 : Colors.red.shade700;
       case _DiffType.unchanged:
     }
 

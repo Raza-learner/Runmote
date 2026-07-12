@@ -158,6 +158,40 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
   int get _nextId => ++_msgId;
 
+  // ── Heartbeat (ping/pong) ────────────────────────────────────────
+  Timer? _pingTimer;
+  bool _pongReceived = true;
+
+  static const _pingInterval = Duration(seconds: 25);
+  static const _pongTimeout = Duration(seconds: 30);
+
+  void _startPing() {
+    _stopPing();
+    _pongReceived = true;
+    _pingTimer = Timer.periodic(_pingInterval, (_) {
+      if (!_pongReceived) {
+        debugPrint('[RUNMOTE] ping timeout — no pong for $_pingInterval');
+        _onDisconnected('Ping timeout');
+        return;
+      }
+      _pongReceived = false;
+      sendRaw({
+        'jsonrpc': '2.0',
+        'method': r'$/ping',
+      });
+      // If no pong within the next interval, the next tick triggers timeout
+    });
+  }
+
+  void _stopPing() {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+  }
+
+  void _handlePong() {
+    _pongReceived = true;
+  }
+
   Future<void> connect(String code, {String? relayUrl}) async {
     if (state.state case AcpConnectionState()
         when state.state is Connected || state.state is Connecting) {
@@ -213,6 +247,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         state: const AcpConnectionState.connected(),
         paired: true,
       );
+      _startPing();
 
       // Save pairing code
       final p = await _ref.read(preferencesServiceProvider.future);
@@ -294,6 +329,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
           state: const AcpConnectionState.connected(),
           paired: true,
         );
+        _startPing();
         final p = await _ref.read(preferencesServiceProvider.future);
         if (state.token != null) {
           await p.setAuthToken(state.token!);
@@ -328,6 +364,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     try {
       final json = jsonDecode(data as String) as Map<String, dynamic>;
       final method = json['method'] as String?;
+
+      if (method == r'$/pong') {
+        _handlePong();
+        return;
+      }
 
       // Handle auth/token response
       if (json['id'] == authId && !completer.isCompleted) {
@@ -415,6 +456,12 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     try {
       final json = jsonDecode(data as String) as Map<String, dynamic>;
       final method = json['method'] as String?;
+
+      // Handle pong
+      if (method == r'$/pong') {
+        _handlePong();
+        return;
+      }
 
       // Handle auth/pair response
       if (json['id'] == pairId && !pairCompleter.isCompleted) {
@@ -710,6 +757,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   }
 
   void _onDisconnected(String reason) {
+    _stopPing();
     _sub?.cancel();
     _sub = null;
     // If Path A (daemon/disconnected message) already handled cleanup,
@@ -754,6 +802,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   }
 
   Future<void> disconnect() async {
+    _stopPing();
     _reconnectTimer?.cancel();
     _sub?.cancel();
     _sub = null;
@@ -765,6 +814,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
   @override
   void dispose() {
+    _stopPing();
     _sub?.cancel();
     _reconnectTimer?.cancel();
     _messageController.close();

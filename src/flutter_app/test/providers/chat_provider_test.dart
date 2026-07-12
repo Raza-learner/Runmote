@@ -1095,5 +1095,102 @@ void main() {
 
       container.dispose();
     });
+
+    // ── Error handling ───────────────────────────────────────────────
+
+    test('sendMessage when disconnected shows not connected message', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+
+      // Override connection to be disconnected (no channel)
+      final disconnectedMock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+      disconnectedMock.state = disconnectedMock.state.copyWith(clearChannel: true);
+
+      final notifier = container.read(
+        chatProvider(('test-session', '/home')).notifier,
+      );
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      await notifier.sendMessage('hello');
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.messages.length, 2);
+      expect(state.valueOrNull!.messages.first.role, ChatMessageRole.user);
+      expect(state.valueOrNull!.messages.last.content,
+          contains('Not connected'));
+      expect(state.valueOrNull!.isBusy, isFalse);
+
+      container.dispose();
+    });
+
+    test('handles JSON-RPC error response gracefully', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      final notifier = container.read(
+        chatProvider(('test-session', '/home')).notifier,
+      );
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      await notifier.sendMessage('hello');
+      expect(container.read(chatProvider(('test-session', '/home')))
+          .valueOrNull!.isBusy, isTrue);
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      // Inject an error response
+      mock.injectMessage({
+        'id': 102,
+        'error': {'code': -32000, 'message': 'session not found'},
+      });
+      await Future.delayed(Duration.zero);
+
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.valueOrNull!.isBusy, isFalse);
+      // Should add a message about the session
+      expect(state.valueOrNull!.messages.any((m) =>
+          m.content.contains('no longer exists')), isTrue);
+
+      container.dispose();
+    });
+
+    test('handles malformed stream payload without crashing', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      // Missing 'update' key
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+        },
+      });
+
+      // Unknown update type
+      mock.injectMessage({
+        'method': 'session/update',
+        'params': {
+          'sessionId': 'test-session',
+          'update': {
+            'sessionUpdate': 'unknown_type',
+            'content': 'test',
+          },
+        },
+      });
+
+      await Future.delayed(Duration.zero);
+
+      // State should still be valid
+      final state = container.read(chatProvider(('test-session', '/home')));
+      expect(state.hasValue, isTrue);
+
+      container.dispose();
+    });
   });
 }

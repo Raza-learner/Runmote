@@ -108,5 +108,55 @@ void main() {
       );
       expect(a, isNot(equals(b)));
     });
+
+    test('toJson/fromJson roundtrip for user message', () {
+      final msg = ChatMessage(
+        id: 'rt-1',
+        role: ChatMessageRole.user,
+        content: 'Hello',
+        createdAt: 5000,
+      );
+      final json = msg.toJson();
+      final restored = ChatMessage.fromJson(json);
+      expect(restored.id, msg.id);
+      expect(restored.role, msg.role);
+      expect(restored.content, msg.content);
+      expect(restored.createdAt, msg.createdAt);
+      expect(restored.isStreaming, msg.isStreaming);
+      expect(restored.segments, isEmpty);
+    });
+
+    test('toJson/fromJson roundtrip for assistant message with segments', () {
+      final msg = ChatMessage(
+        id: 'rt-2',
+        role: ChatMessageRole.assistant,
+        content: '',
+        createdAt: 6000,
+        segments: [
+          AssistantSegment(
+            id: 'seg-rt-1',
+            kind: SegmentKind.thought,
+            text: 'thinking...',
+          ),
+          AssistantSegment(
+            id: 'seg-rt-2',
+            kind: SegmentKind.toolCall,
+            text: 'bash',
+            metadata: {'status': 'running'},
+          ),
+        ],
+        isStreaming: true,
+      );
+      final json = msg.toJson();
+      final restored = ChatMessage.fromJson(json);
+      expect(restored.id, msg.id);
+      expect(restored.role, msg.role);
+      expect(restored.segments.length, 2);
+      expect(restored.segments[0].kind, SegmentKind.thought);
+      expect(restored.segments[0].text, 'thinking...');
+      expect(restored.segments[1].kind, SegmentKind.toolCall);
+      expect(restored.segments[1].metadata['status'], 'running');
+      expect(restored.isStreaming, msg.isStreaming);
+    });
   });
 }

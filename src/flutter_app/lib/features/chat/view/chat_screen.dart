@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -12,6 +14,7 @@ import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/session_list_provider.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/daemon_offline_banner.dart';
+import '../../../shared/widgets/animated_background.dart';
 import 'widgets/chat_skeleton.dart';
 import 'widgets/message_bubble.dart';
 
@@ -206,7 +209,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.1),
+        elevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -239,157 +251,177 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
         ],
       ),
-      body: Consumer(
-        builder: (context, ref, child) {
-          final chatState = ref.watch(
-            chatProvider((widget.sessionId, widget.cwd)),
-          );
-          if (_showSkeleton || chatState.isLoading) {
-            return Column(
-              children: [
-                if (daemonDown) const DaemonOfflineBanner(),
-                const Expanded(child: ChatSkeleton()),
-              ],
-            );
-          }
-
-          return Column(
-            children: [
-              if (daemonDown) const DaemonOfflineBanner(),
-              Consumer(
+      body: AnimatedBackground(
+        showGrid: false,
+        child: Column(
+          children: [
+            SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
+            Expanded(
+              child: Consumer(
                 builder: (context, ref, child) {
-                  final modeOptions = ref.watch(
-                    chatProvider((widget.sessionId, widget.cwd)).select(
-                      (state) => state.valueOrNull?.configOptions
-                              .where((c) => c.category == 'mode')
-                              .toList() ??
-                          [],
-                    ),
+                  final chatState = ref.watch(
+                    chatProvider((widget.sessionId, widget.cwd)),
                   );
-                  if (modeOptions.isEmpty || modeOptions.first.options.length <= 1) {
-                    return const SizedBox.shrink();
+                  if (_showSkeleton || chatState.isLoading) {
+                    return Column(
+                      children: [
+                        if (daemonDown) const DaemonOfflineBanner(),
+                        const Expanded(child: ChatSkeleton()),
+                      ],
+                    );
                   }
-                  return _buildModeSelector(theme, modeOptions.first);
-                },
-              ),
-              Expanded(
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: chatState.whenOrNull(
-                        error: (e, _) {
-                          final t = Theme.of(context);
-                          return Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(32),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.error_outline,
-                                    size: 56,
-                                    color: t.colorScheme.error,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Could not load chat',
-                                    style: t.textTheme.titleMedium,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    e.toString(),
-                                    textAlign: TextAlign.center,
-                                    style: t.textTheme.bodyMedium?.copyWith(
-                                      color: t.colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  FilledButton.tonal(
-                                    onPressed: () => ref
-                                        .read(chatProvider((
-                                                widget.sessionId, widget.cwd))
-                                            .notifier)
-                                        .loadMessages(),
-                                    child: const Text('Retry'),
-                                  ),
-                                ],
-                              ),
+
+                  return Column(
+                    children: [
+                      if (daemonDown) const DaemonOfflineBanner(),
+                      Consumer(
+                        builder: (context, ref, child) {
+                          final modeOptions = ref.watch(
+                            chatProvider((widget.sessionId, widget.cwd)).select(
+                              (state) => state.valueOrNull?.configOptions
+                                      .where((c) => c.category == 'mode')
+                                      .toList() ??
+                                  [],
                             ),
                           );
+                          if (modeOptions.isEmpty || modeOptions.first.options.length <= 1) {
+                            return const SizedBox.shrink();
+                          }
+                          return _buildModeSelector(theme, modeOptions.first);
                         },
-                        data: (cs) {
-                          final messages = cs.messages;
-                          if (messages.isEmpty) {
-                            final t = Theme.of(context);
-                            return Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(32),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.chat_bubble_outline,
-                                      size: 64,
-                                      color: t.colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'Start a conversation',
-                                      style: t.textTheme.titleMedium?.copyWith(
-                                        color: t.colorScheme.onSurfaceVariant,
+                      ),
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: chatState.whenOrNull(
+                                  data: (cs) {
+                                  final messages = cs.messages;
+                                  if (messages.isEmpty) {
+                                    final t = Theme.of(context);
+                                    return Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 48),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(24),
+                                              decoration: BoxDecoration(
+                                                color: t.brightness == Brightness.dark 
+                                                    ? Colors.white.withValues(alpha: 0.05)
+                                                    : Colors.black.withValues(alpha: 0.03),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Icon(
+                                                Icons.chat_bubble_outline_rounded,
+                                                size: 64,
+                                                color: t.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 24),
+                                            Text(
+                                              'Ready to help',
+                                              style: t.textTheme.titleMedium?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              'Type a message below to start your conversation with the agent.',
+                                              style: t.textTheme.bodyMedium?.copyWith(
+                                                color: t.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                                height: 1.5,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  final reversedMessages = messages.reversed.toList();
+                                  return ListView.builder(
+                                    reverse: true,
+                                    controller: _scrollController,
+                                    padding: const EdgeInsets.all(16),
+                                    itemCount: reversedMessages.length,
+                                    addAutomaticKeepAlives: false,
+                                    addRepaintBoundaries: true,
+                                    itemBuilder: (context, index) {
+                                      final msg = reversedMessages[index];
+                                      return RepaintBoundary(
+                                        key: ValueKey(msg.id),
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(bottom: 4),
+                                          child: MessageBubble(message: msg),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                                error: (e, _) {
+                                  final t = Theme.of(context);
+                                  return Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(32),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.error_outline,
+                                            size: 56,
+                                            color: t.colorScheme.error,
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'Could not load chat',
+                                            style: t.textTheme.titleMedium,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            e.toString(),
+                                            textAlign: TextAlign.center,
+                                            style: t.textTheme.bodyMedium?.copyWith(
+                                              color: t.colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          FilledButton.tonal(
+                                            onPressed: () => ref
+                                                .read(chatProvider((
+                                                        widget.sessionId, widget.cwd))
+                                                    .notifier)
+                                                .loadMessages(),
+                                            child: const Text('Retry'),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Type a message below to begin chatting with the agent.',
-                                      style: t.textTheme.bodyMedium?.copyWith(
-                                        color: t.colorScheme.onSurfaceVariant,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
+                                  );
+                                },
+                              ) ?? const Center(child: Text('Could not load chat')),
+                            ),
+                            if (_showScrollButton)
+                              Positioned(
+                                bottom: 8,
+                                right: 8,
+                                child: FloatingActionButton.small(
+                                  onPressed: _scrollToBottom,
+                                  child: const Icon(Icons.keyboard_arrow_down),
                                 ),
                               ),
-                            );
-                          }
-                          final reversedMessages = messages.reversed.toList();
-                          return ListView.builder(
-                            reverse: true,
-                            controller: _scrollController,
-                            padding: const EdgeInsets.all(16),
-                            itemCount: reversedMessages.length,
-                            addAutomaticKeepAlives: false,
-                            addRepaintBoundaries: true,
-                            itemBuilder: (context, index) {
-                              final msg = reversedMessages[index];
-                              return RepaintBoundary(
-                                key: ValueKey(msg.id),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: MessageBubble(message: msg),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ) ?? const Center(child: Text('Could not load chat')),
-                    ),
-                    if (_showScrollButton)
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: FloatingActionButton.small(
-                          onPressed: _scrollToBottom,
-                          child: const Icon(Icons.keyboard_arrow_down),
+                          ],
                         ),
                       ),
-                  ],
-                ),
+                    ],
+                  );
+                },
               ),
-              _buildInputArea(theme, canSendImages, daemonDown),
-            ],
-          );
-        },
+            ),
+            _buildInputArea(theme, canSendImages, daemonDown),
+          ],
+        ),
       ),
     );
   }
@@ -402,18 +434,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildInputArea(ThemeData theme, bool canSendImages, bool daemonDown) {
     final text = _textController.text;
+    final isDark = theme.brightness == Brightness.dark;
     final slashMatch = text.startsWith('/') ? text.substring(1) : null;
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark 
+                ? theme.colorScheme.surface.withValues(alpha: 0.1)
+                : theme.colorScheme.surface.withValues(alpha: 0.4),
+            border: Border(
+              top: BorderSide(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+              ),
+            ),
           ),
-        ),
-      ),
-      child: SafeArea(
-        child: Consumer(
+          child: SafeArea(
+            child: Consumer(
           builder: (context, ref, child) {
             final chatState =
                 ref.watch(chatProvider((widget.sessionId, widget.cwd)));
@@ -660,6 +698,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ],
             );
           },
+            ),
+          ),
         ),
       ),
     );

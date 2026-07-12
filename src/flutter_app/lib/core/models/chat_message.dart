@@ -10,7 +10,9 @@ class ChatMessage with _$ChatMessage {
     required String id,
     required ChatMessageRole role,
     required String content,
-    @Default([]) List<AssistantSegment> segments,
+    @Default([])
+    @JsonKey(toJson: _segmentsToJson)
+    List<AssistantSegment> segments,
     @Default(false) bool isStreaming,
     required int createdAt,
   }) = _ChatMessage;
@@ -18,5 +20,8 @@ class ChatMessage with _$ChatMessage {
   factory ChatMessage.fromJson(Map<String, dynamic> json) =>
       _$ChatMessageFromJson(json);
 }
+
+List<Map<String, dynamic>> _segmentsToJson(List<AssistantSegment> segments) =>
+    segments.map((s) => s.toJson()).toList();
 
 enum ChatMessageRole { user, assistant }

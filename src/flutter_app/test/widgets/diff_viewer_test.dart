@@ -52,4 +52,17 @@ void main() {
     // Diff should render without error
     expect(find.byType(DiffViewer), findsOneWidget);
   });
+
+  testWidgets('DiffViewer has Semantics label', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: DiffViewer(oldText: 'hello', newText: 'world'),
+      ),
+    ));
+
+    expect(
+      find.bySemanticsLabel('Diff viewer'),
+      findsOneWidget,
+    );
+  });
 }

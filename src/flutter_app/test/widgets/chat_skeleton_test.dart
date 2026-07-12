@@ -26,4 +26,15 @@ void main() {
     // Widget still renders after animation tick
     expect(find.byType(Container), findsNWidgets(6));
   });
+
+  testWidgets('ChatSkeleton has Semantics label', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: ChatSkeleton()),
+    ));
+
+    expect(
+      find.bySemanticsLabel('Chat loading skeleton'),
+      findsOneWidget,
+    );
+  });
 }

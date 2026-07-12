@@ -75,4 +75,26 @@ void main() {
     await tester.tap(find.text('Tappable'));
     expect(tapped, isTrue);
   });
+
+  testWidgets('SessionCard delete button has tooltip',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SessionCard(
+          title: 'Session',
+          cwd: '/tmp',
+          timeAgo: '1m ago',
+          isActive: false,
+          onTap: () {},
+          onDelete: () {},
+        ),
+      ),
+    ));
+
+    // IconButton with tooltip 'Delete session' is present
+    expect(
+      find.byIcon(Icons.delete_outline_rounded),
+      findsOneWidget,
+    );
+  });
 }

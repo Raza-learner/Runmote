@@ -34,12 +34,12 @@ ThemeData buildFlexTheme({
   return FlexThemeData.dark(
     scheme: scheme,
     subThemesData: sub.copyWith(
-      cardElevation: 0,
+      cardElevation: 2,
     ),
-    surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
-    blendLevel: 15,
+    surfaceMode: FlexSurfaceMode.highScaffoldLowSurfaces,
+    blendLevel: 4,
     darkIsTrueBlack: false,
-    surface: const Color(0xFF121212),
-    scaffoldBackground: const Color(0xFF0F0F0F),
+    surface: const Color(0xFF0F172A),
+    scaffoldBackground: const Color(0xFF020617),
   );
 }

@@ -24,6 +24,7 @@ mixin _$ChatMessage {
   String get id => throw _privateConstructorUsedError;
   ChatMessageRole get role => throw _privateConstructorUsedError;
   String get content => throw _privateConstructorUsedError;
+  @JsonKey(toJson: _segmentsToJson)
   List<AssistantSegment> get segments => throw _privateConstructorUsedError;
   bool get isStreaming => throw _privateConstructorUsedError;
   int get createdAt => throw _privateConstructorUsedError;
@@ -49,7 +50,7 @@ abstract class $ChatMessageCopyWith<$Res> {
     String id,
     ChatMessageRole role,
     String content,
-    List<AssistantSegment> segments,
+    @JsonKey(toJson: _segmentsToJson) List<AssistantSegment> segments,
     bool isStreaming,
     int createdAt,
   });
@@ -122,7 +123,7 @@ abstract class _$$ChatMessageImplCopyWith<$Res>
     String id,
     ChatMessageRole role,
     String content,
-    List<AssistantSegment> segments,
+    @JsonKey(toJson: _segmentsToJson) List<AssistantSegment> segments,
     bool isStreaming,
     int createdAt,
   });
@@ -187,6 +188,7 @@ class _$ChatMessageImpl implements _ChatMessage {
     required this.id,
     required this.role,
     required this.content,
+    @JsonKey(toJson: _segmentsToJson)
     final List<AssistantSegment> segments = const [],
     this.isStreaming = false,
     required this.createdAt,
@@ -203,7 +205,7 @@ class _$ChatMessageImpl implements _ChatMessage {
   final String content;
   final List<AssistantSegment> _segments;
   @override
-  @JsonKey()
+  @JsonKey(toJson: _segmentsToJson)
   List<AssistantSegment> get segments {
     if (_segments is EqualUnmodifiableListView) return _segments;
     // ignore: implicit_dynamic_type
@@ -267,7 +269,7 @@ abstract class _ChatMessage implements ChatMessage {
     required final String id,
     required final ChatMessageRole role,
     required final String content,
-    final List<AssistantSegment> segments,
+    @JsonKey(toJson: _segmentsToJson) final List<AssistantSegment> segments,
     final bool isStreaming,
     required final int createdAt,
   }) = _$ChatMessageImpl;
@@ -282,6 +284,7 @@ abstract class _ChatMessage implements ChatMessage {
   @override
   String get content;
   @override
+  @JsonKey(toJson: _segmentsToJson)
   List<AssistantSegment> get segments;
   @override
   bool get isStreaming;

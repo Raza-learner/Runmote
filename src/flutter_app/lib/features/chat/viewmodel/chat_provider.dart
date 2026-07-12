@@ -44,6 +44,15 @@ class ConfigOption {
           [],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'description': description,
+    'category': category,
+    'currentValue': currentValue,
+    'options': options.map((e) => e.toJson()).toList(),
+  };
 }
 
 class ConfigOptionValue {
@@ -64,6 +73,12 @@ class ConfigOptionValue {
       description: json['description'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'value': value,
+    'name': name,
+    if (description != null) 'description': description,
+  };
 }
 
 class SlashCommand {
@@ -84,6 +99,12 @@ class SlashCommand {
       inputHint: (json['input'] as Map<String, dynamic>?)?.let((m) => m['hint'] as String?),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'description': description,
+    if (inputHint != null) 'input': {'hint': inputHint},
+  };
 }
 
 extension _Let<T extends Object> on T {
@@ -108,6 +129,12 @@ class PermissionOption {
       kind: json['kind'] as String? ?? 'allow_once',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'optionId': optionId,
+    'name': name,
+    'kind': kind,
+  };
 }
 
 class PermissionRequest {

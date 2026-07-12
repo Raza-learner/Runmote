@@ -164,7 +164,7 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.4),
+        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.1),
         elevation: 0,
         flexibleSpace: ClipRect(
           child: BackdropFilter(
@@ -276,26 +276,50 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
   ) {
     if (sessions.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 64,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Start your first session',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _createSession,
-              icon: const Icon(Icons.add),
-              label: const Text('New Session'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 48),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: theme.brightness == Brightness.dark 
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.black.withValues(alpha: 0.03),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 64,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'No sessions found',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Start your first workspace session to begin interacting with the agent.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              FilledButton.icon(
+                onPressed: _createSession,
+                icon: const Icon(Icons.add, size: 20),
+                label: const Text('New Session'),
+              ),
+            ],
+          ),
         ),
       );
     }

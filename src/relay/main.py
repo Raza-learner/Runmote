@@ -60,4 +60,10 @@ app.include_router(daemon_router)
 app.include_router(app_router)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host=HOST, port=PORT)
+    uvicorn.run(
+        app,
+        host=HOST,
+        port=PORT,
+        ws_ping_interval=25,
+        ws_ping_timeout=10,
+    )
