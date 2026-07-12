@@ -71,20 +71,11 @@ class SessionStore:
                 print(f"DB write failed: {e}")
 
     def remove(self, session_id: str, agent_id: str = "") -> None:
-        existing = self._sessions.get(session_id)
-        if existing and agent_id and existing.get("agentId") != agent_id:
-            # Agent ID mismatch — don't remove from active sessions (it
-            # belongs to another agent), but still mark as deleted so it
-            # doesn't reappear on subsequent session/list responses.
-            self._deleted.add(session_id)
-            if self._db:
-                self._db.mark_deleted(session_id)
-            return
         self._sessions.pop(session_id, None)
+        self._deleted.add(session_id)
         if self._db:
             self._db.delete_session(session_id)
             self._db.mark_deleted(session_id)
-            self._deleted.add(session_id)
 
     def mark_deleted(self, session_id: str) -> None:
         self._deleted.add(session_id)

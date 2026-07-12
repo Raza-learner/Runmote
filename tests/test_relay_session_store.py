@@ -53,10 +53,10 @@ class TestRemove:
         store.remove("sess-1", agent_id="a1")
         assert store.get("sess-1") is None
 
-    def test_remove_with_nonmatching_agent_id_skips(self, store):
+    def test_remove_with_nonmatching_agent_id_still_removes(self, store):
         store.register("sess-1", agent_id="a1")
         store.remove("sess-1", agent_id="a2")
-        assert store.get("sess-1") is not None
+        assert store.get("sess-1") is None
 
     def test_remove_nonexistent(self, store):
         store.remove("nonexistent")

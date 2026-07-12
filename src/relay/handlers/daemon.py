@@ -198,7 +198,8 @@ async def daemon_endpoint(websocket: WebSocket):
                             }
                             if result_agent_id:
                                 for cs in state.store.list_sessions(agent_id=result_agent_id):
-                                    if cs["sessionId"] not in agent_sids:
+                                    if cs["sessionId"] not in agent_sids \
+                                       and not state.store.is_deleted(cs["sessionId"]):
                                         filtered.append(cs)
                             for s in filtered:
                                 if isinstance(s, dict) and not s.get("cwd"):
