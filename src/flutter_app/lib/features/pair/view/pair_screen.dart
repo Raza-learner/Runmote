@@ -9,6 +9,7 @@ import '../../../core/models/connection_state.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../../shared/widgets/animated_background.dart';
 
 const _defaultRelayUrl = 'wss://runmote-relay.onrender.com';
 
@@ -132,13 +133,19 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     final barcode = capture.barcodes.firstOrNull;
     final raw = barcode?.rawValue?.trim();
     debugPrint('[QR] scanned raw: "${raw ?? "null"}" (len=${raw?.length ?? 0})');
-    if (raw != null && _isValidCode(raw)) {
+    if (raw == null) return;
+
+    // The QR may be a plain code ("GGTTFGV5") or a relay URL with
+    // a code query parameter ("https://relay/connect?code=GGTTFGV5").
+    final uri = Uri.tryParse(raw);
+    final code = (uri != null && uri.queryParameters.containsKey('code'))
+        ? uri.queryParameters['code']!
+        : raw;
+
+    if (_isValidCode(code)) {
       _qrScanned = true;
       _scannerController?.stop();
-      _connect(code: raw);
-    } else if (raw != null && raw.isNotEmpty) {
-      final display = raw.length > 20 ? '${raw.substring(0, 20)}...' : raw;
-      setState(() => _error = 'Scanned: "$display" (len=${raw.length})');
+      _connect(code: code);
     }
   }
 
@@ -169,51 +176,22 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         : [const Color(0xFFF9F7F2), const Color(0xFFF2EFE9), const Color(0xFFEBE7DF)];
 
     return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: bgColors,
+      body: AnimatedBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLogo(theme),
+                  const SizedBox(height: 56),
+                  _buildContent(theme, isDark),
+                ],
               ),
             ),
           ),
-          if (isDark)
-            Positioned(
-              top: -100,
-              right: -50,
-              child: _BlurCircle(
-                color: const Color(0xFF6366F1).withOpacity(0.15),
-                size: 300,
-              ),
-            ),
-          if (isDark)
-            Positioned(
-              bottom: -50,
-              left: -50,
-              child: _BlurCircle(
-                color: const Color(0xFFA855F7).withOpacity(0.15),
-                size: 250,
-              ),
-            ),
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildLogo(theme),
-                    const SizedBox(height: 56),
-                    _buildContent(theme, isDark),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -575,16 +553,15 @@ class _BlurCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-        child: Container(color: Colors.transparent),
+    return ImageFiltered(
+      imageFilter: ui.ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+        ),
       ),
     );
   }
@@ -703,7 +680,7 @@ class _GlassCard extends StatelessWidget {
                   : Colors.black.withOpacity(0.05),
             ),
           ),
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: EdgeInsets.all(AppSpacing.lg),
           child: child,
         ),
       ),
