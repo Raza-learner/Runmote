@@ -163,7 +163,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   bool _pongReceived = true;
 
   static const _pingInterval = Duration(seconds: 25);
-  static const _pongTimeout = Duration(seconds: 30);
 
   void _startPing() {
     _stopPing();
@@ -343,6 +342,9 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         });
         return true;
       } else {
+        _sub?.cancel();
+        _sub = null;
+        channel.sink.close();
         state = state.copyWith(
           state: const AcpConnectionState.disconnected(),
           clearChannel: true,
@@ -351,9 +353,12 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       }
     } catch (e) {
       debugPrint('[RUNMOTE] connectWithToken error: $e');
+      _sub?.cancel();
+      _sub = null;
       state = state.copyWith(
         state: AcpConnectionState.failed('$e'),
         error: '$e',
+        clearChannel: true,
       );
       return false;
     }
@@ -795,9 +800,13 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       seconds: min(pow(2, _reconnectAttempts).toInt(), 60),
     );
     _reconnectAttempts++;
-    _reconnectTimer = Timer(delay, () {
+    _reconnectTimer = Timer(delay, () async {
       state = state.copyWith(state: const AcpConnectionState.reconnecting());
-      connectWithToken(token, relayUrl);
+      final ok = await connectWithToken(token, relayUrl);
+      if (!ok) {
+        // Retry on failure — keep backing off
+        _scheduleReconnect();
+      }
     });
   }
 

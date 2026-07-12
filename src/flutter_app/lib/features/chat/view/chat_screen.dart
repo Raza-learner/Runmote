@@ -255,7 +255,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         showGrid: false,
         child: Column(
           children: [
-            SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
+            SizedBox(height: MediaQuery.of(context).padding.top + 8),
             Expanded(
               child: Consumer(
                 builder: (context, ref, child) {
@@ -451,6 +451,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ),
           child: SafeArea(
+            top: false,
             child: Consumer(
           builder: (context, ref, child) {
             final chatState =
@@ -588,7 +589,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 2),
                   child: Row(
                     children: [
                       if (modelLabel != null)
@@ -602,7 +603,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [

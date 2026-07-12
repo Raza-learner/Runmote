@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/models/connection_state.dart';
 import '../../../core/providers/connection_provider.dart';
@@ -26,18 +27,29 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   final _manualPortController = TextEditingController(text: '8000');
   bool _isConnecting = false;
   bool _isAutoConnecting = true;
-  bool _showScanner = false;
   bool _showCodeEntry = false;
   String? _error;
 
-  MobileScannerController? _scannerController;
   bool _qrScanned = false;
+  bool _showScanner = false;
+  late final MobileScannerController _scannerController;
 
   @override
   void initState() {
     super.initState();
     _codeController.addListener(_onCodeChanged);
+    _scannerController = MobileScannerController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _autoConnectWithToken());
+  }
+
+  @override
+  void dispose() {
+    _codeController.removeListener(_onCodeChanged);
+    _codeController.dispose();
+    _manualHostController.dispose();
+    _manualPortController.dispose();
+    _scannerController.dispose();
+    super.dispose();
   }
 
   Future<void> _autoConnectWithToken() async {
@@ -70,31 +82,17 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _codeController.removeListener(_onCodeChanged);
-    _codeController.dispose();
-    _manualHostController.dispose();
-    _manualPortController.dispose();
-    _scannerController?.dispose();
-    super.dispose();
-  }
-
   void _onCodeChanged() {
     final text = _codeController.text;
     final chars = text.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
     if (chars.length > 8) return;
     String formatted;
     if (chars.length <= 4 && chars.length > 0) {
-      // 6-digit codes (old): format as XXX-XXX once we have 5+ chars
-      // 8-char codes (new): format as XXXX-XXXX once we have 5+ chars
       formatted = chars;
     } else {
       if (chars.length >= 5 && chars.length <= 6 && RegExp(r'^\d+$').hasMatch(chars)) {
-        // 6-digit: split 3-3
         formatted = '${chars.substring(0, 3)}-${chars.substring(3)}';
       } else {
-        // 8-char: split 4-4
         formatted = '${chars.substring(0, 4)}-${chars.substring(4)}';
       }
     }
@@ -123,37 +121,29 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   }
 
   bool _isValidCode(String raw) {
-    // Accept 8-char alphanumeric (new relay) or 6-digit (old relay).
     return RegExp(r'^[A-Za-z0-9]{8}$').hasMatch(raw) ||
            RegExp(r'^\d{6}$').hasMatch(raw);
   }
 
-  void _onQrDetect(BarcodeCapture capture) {
-    if (_qrScanned || _isConnecting) return;
-    final barcode = capture.barcodes.firstOrNull;
-    final raw = barcode?.rawValue?.trim();
-    debugPrint('[QR] scanned raw: "${raw ?? "null"}" (len=${raw?.length ?? 0})');
-    if (raw == null) return;
+  void _handleScannedCode(String raw) {
+    raw = raw.trim();
+    debugPrint('[QR] scanned raw: "$raw" (len=${raw.length})');
+    if (raw.isEmpty) return;
 
-    // The QR may be a plain code ("GGTTFGV5") or a relay URL with
-    // a code query parameter ("https://relay/connect?code=GGTTFGV5").
-    // When it's a URL, extract both the relay host and the code so
-    // we connect to the same relay that generated the code.
     String code;
     String? relayUrl;
     final uri = Uri.tryParse(raw);
     if (uri != null && uri.queryParameters.containsKey('code')) {
       code = uri.queryParameters['code']!;
-      // Use the scanned relay's scheme + host + port (without path).
       relayUrl = '${uri.scheme}://${uri.host}${uri.port != 80 && uri.port != 443 ? ':${uri.port}' : ''}';
     } else {
       code = raw;
     }
 
     if (_isValidCode(code)) {
-      _qrScanned = true;
-      _scannerController?.stop();
       _connect(code: code, relayUrl: relayUrl);
+    } else {
+      setState(() => _error = 'Invalid code scanned: $code');
     }
   }
 
@@ -164,6 +154,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
 
     ref.listen<AcpConnection>(connectionProvider, (prev, next) {
       if (next.paired && next.state is Connected) {
+        _scannerController.stop();
         setState(() {
           _isConnecting = false;
           _showScanner = false;
@@ -171,8 +162,10 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         });
         context.go('/agents');
       } else if (next.state is Failed) {
+        _scannerController.stop();
         setState(() {
           _isConnecting = false;
+          _showScanner = false;
           _error = next.error ?? 'Connection failed';
           _qrScanned = false;
         });
@@ -266,14 +259,9 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   }
 
   Widget _buildContent(ThemeData theme, bool isDark) {
-    if (_isAutoConnecting) {
-      return _buildLoading(isDark);
-    }
-    if (_showScanner) {
-      return _buildQrScanner(isDark);
-    } else if (_showCodeEntry) {
-      return _buildCodeInput(isDark);
-    }
+    if (_isAutoConnecting) return _buildLoading(isDark);
+    if (_showScanner) return _buildQrScanner(isDark);
+    if (_showCodeEntry) return _buildCodeInput(isDark);
     return _buildOptions(theme, isDark);
   }
 
@@ -305,16 +293,50 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     return Column(
       children: [
         const SizedBox(height: 8),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0x33FF5252),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Color(0xFFFF8A80), size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Color(0xFFFFCDD2), fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         _OptionCard(
           icon: Icons.qr_code_scanner_rounded,
           title: 'Scan QR Code',
           subtitle: 'Use your camera to quickly link your device',
           isDark: isDark,
           gradient: const [Color(0xFF6366F1), Color(0xFF4F46E5)],
-          onTap: () => setState(() {
-            _showScanner = true;
-            _error = null;
-          }),
+          onTap: () async {
+            final status = await Permission.camera.request();
+            if (!mounted) return;
+            if (status.isGranted || status.isLimited) {
+              setState(() {
+                _showScanner = true;
+                _error = null;
+              });
+            } else if (status.isPermanentlyDenied) {
+              setState(() => _error = 'Camera permission permanently denied. Open app settings to enable.');
+              await openAppSettings();
+            } else {
+              setState(() => _error = 'Camera permission is required to scan QR codes.');
+            }
+          },
         ),
         const SizedBox(height: 16),
         _OptionCard(
@@ -342,63 +364,97 @@ class _PairScreenState extends ConsumerState<PairScreen> {
 
   Widget _buildQrScanner(bool isDark) {
     final theme = Theme.of(context);
-    return _GlassCard(
-      isDark: isDark,
-      child: Column(
-        children: [
-          Row(
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
             children: [
               IconButton(
-                icon: Icon(Icons.arrow_back, color: isDark ? Colors.white.withValues(alpha: 0.7) : theme.colorScheme.onSurface),
-                onPressed: () => setState(() {
-                  _showScanner = false;
-                  _scannerController?.stop();
-                  _qrScanned = false;
-                }),
+                icon: Icon(Icons.arrow_back,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.7)
+                        : theme.colorScheme.onSurface),
+                onPressed: () {
+                  _scannerController.stop();
+                  setState(() {
+                    _showScanner = false;
+                    _error = null;
+                  });
+                },
               ),
               const SizedBox(width: 8),
               Text(
                 'Scan QR Code',
                 style: TextStyle(
-                  color: isDark ? Colors.white.withValues(alpha: 0.7) : theme.colorScheme.onSurface,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.7)
+                      : theme.colorScheme.onSurface,
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Point at the QR code in your daemon terminal',
-            style: TextStyle(
-              color: isDark ? Colors.white.withValues(alpha: 0.6) : theme.colorScheme.onSurfaceVariant,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: 260,
-              height: 260,
+        ),
+        SizedBox(
+          height: 320,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
               child: MobileScanner(
-                controller: _scannerController,
-                onDetect: _onQrDetect,
-                overlayBuilder: (context, constraints) {
-                  return _QrOverlay(constraints);
+                  controller: _scannerController,
+                  onDetect: (capture) {
+                  if (_qrScanned || _isConnecting) return;
+                  final barcode = capture.barcodes.firstOrNull;
+                  final raw = barcode?.rawValue?.trim();
+                  if (raw != null && raw.isNotEmpty) {
+                    _qrScanned = true;
+                    _scannerController.stop();
+                    _handleScannedCode(raw);
+                  }
+                },
+                errorBuilder: (context, error) {
+                  debugPrint('[QR] scanner error: $error');
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.camera_alt_outlined,
+                            size: 48,
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.5)
+                                : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Camera error: ${error.errorCode.name}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.7)
+                                  : theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 },
               ),
             ),
           ),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 13),
-            ),
-          ],
-        ],
-      ),
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Text(_error!, style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 13)),
+          ),
+      ],
     );
   }
 
@@ -413,7 +469,10 @@ class _PairScreenState extends ConsumerState<PairScreen> {
               Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.arrow_back, color: isDark ? Colors.white.withValues(alpha: 0.7) : theme.colorScheme.onSurface),
+                    icon: Icon(Icons.arrow_back,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.7)
+                            : theme.colorScheme.onSurface),
                     onPressed: () => setState(() {
                       _showCodeEntry = false;
                       _error = null;
@@ -423,7 +482,9 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                   Text(
                     'Enter Code',
                     style: TextStyle(
-                      color: isDark ? Colors.white.withValues(alpha: 0.7) : theme.colorScheme.onSurface,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.7)
+                          : theme.colorScheme.onSurface,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
@@ -431,63 +492,61 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _codeController,
-                      textInputAction: TextInputAction.go,
-                      onSubmitted: (_) => _connect(),
-                      textAlign: TextAlign.center,
-                      autofocus: true,
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : theme.colorScheme.onSurface,
-                        letterSpacing: 4,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'XXXX-XXXX',
-                        hintStyle: TextStyle(
-                          color: isDark ? Colors.white.withValues(alpha: 0.3) : theme.colorScheme.onSurface.withOpacity(0.2),
-                          fontSize: 28,
-                          letterSpacing: 4,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: isDark ? Colors.white.withValues(alpha: 0.2) : theme.colorScheme.outline.withOpacity(0.2),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: isDark ? Colors.white.withValues(alpha: 0.2) : theme.colorScheme.outline.withOpacity(0.2),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: isDark ? Colors.white.withValues(alpha: 0.5) : theme.colorScheme.primary.withOpacity(0.5),
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 20,
-                        ),
-                        filled: true,
-                        fillColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withOpacity(0.03),
-                      ),
+              TextField(
+                controller: _codeController,
+                textInputAction: TextInputAction.go,
+                onSubmitted: (_) => _connect(),
+                textAlign: TextAlign.center,
+                autofocus: true,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : theme.colorScheme.onSurface,
+                  letterSpacing: 4,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'XXXX-XXXX',
+                  hintStyle: TextStyle(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.3)
+                        : theme.colorScheme.onSurface.withOpacity(0.2),
+                    fontSize: 28,
+                    letterSpacing: 4,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.2)
+                          : theme.colorScheme.outline.withOpacity(0.2),
                     ),
                   ),
-                ],
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.2)
+                          : theme.colorScheme.outline.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.5)
+                          : theme.colorScheme.primary.withOpacity(0.5),
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                  filled: true,
+                  fillColor: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withOpacity(0.03),
+                ),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 13),
-                ),
+                Text(_error!, style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 13)),
               ],
               const SizedBox(height: 20),
               SizedBox(
@@ -498,7 +557,8 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                   style: FilledButton.styleFrom(
                     backgroundColor: isDark ? Colors.white : theme.colorScheme.primary,
                     foregroundColor: isDark ? Colors.black87 : Colors.white,
-                    disabledBackgroundColor: (isDark ? Colors.white : theme.colorScheme.primary).withValues(alpha: 0.2),
+                    disabledBackgroundColor: (isDark ? Colors.white : theme.colorScheme.primary)
+                        .withValues(alpha: 0.2),
                   ),
                   child: _isConnecting
                       ? const SizedBox(
@@ -571,9 +631,15 @@ class _OptionCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.03),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.black.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05)),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.05),
+        ),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
@@ -622,7 +688,9 @@ class _OptionCard extends StatelessWidget {
                         Text(
                           subtitle,
                           style: TextStyle(
-                            color: isDark ? Colors.white.withValues(alpha: 0.5) : const Color(0xFF64748B),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.5)
+                                : const Color(0xFF64748B),
                             fontSize: 13,
                             fontWeight: FontWeight.w400,
                           ),
@@ -632,7 +700,9 @@ class _OptionCard extends StatelessWidget {
                   ),
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: isDark ? Colors.white.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.2),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.3)
+                        : Colors.black.withValues(alpha: 0.2),
                     size: 24,
                   ),
                 ],
@@ -660,12 +730,12 @@ class _GlassCard extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
           decoration: BoxDecoration(
-            color: isDark 
+            color: isDark
                 ? Colors.white.withValues(alpha: 0.08)
                 : Colors.black.withOpacity(0.02),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isDark 
+              color: isDark
                   ? Colors.white.withValues(alpha: 0.12)
                   : Colors.black.withOpacity(0.05),
             ),
@@ -676,89 +746,4 @@ class _GlassCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _QrOverlay extends StatelessWidget {
-  final BoxConstraints constraints;
-
-  const _QrOverlay(this.constraints);
-
-  @override
-  Widget build(BuildContext context) {
-    final width = constraints.maxWidth * 0.6;
-    final height = constraints.maxHeight * 0.6;
-    final left = (constraints.maxWidth - width) / 2;
-    final top = (constraints.maxHeight - height) / 2;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: CustomPaint(
-            painter: _QrOverlayPainter(
-              scanRect: Rect.fromLTWH(left, top, width, height),
-            ),
-          ),
-        ),
-        _buildCorner(left - 4, top - 4, 1, 1),
-        _buildCorner(constraints.maxWidth - left - width - 4, top - 4, -1, 1),
-        _buildCorner(left - 4, constraints.maxHeight - top - height - 4, 1, -1),
-        _buildCorner(constraints.maxWidth - left - width - 4, constraints.maxHeight - top - height - 4, -1, -1),
-      ],
-    );
-  }
-
-  Widget _buildCorner(double left, double top, int dirX, int dirY) {
-    return Positioned(
-      left: left,
-      top: top,
-      child: CustomPaint(
-        size: const Size(24, 24),
-        painter: _CornerPainter(dirX: dirX, dirY: dirY),
-      ),
-    );
-  }
-}
-
-class _QrOverlayPainter extends CustomPainter {
-  final Rect scanRect;
-
-  _QrOverlayPainter({required this.scanRect});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black.withValues(alpha: 0.4);
-    canvas.drawPath(
-      Path.combine(
-        PathOperation.difference,
-        Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)),
-        Path()..addRect(scanRect),
-      ),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _QrOverlayPainter oldDelegate) => true;
-}
-
-class _CornerPainter extends CustomPainter {
-  final int dirX;
-  final int dirY;
-
-  _CornerPainter({required this.dirX, required this.dirY});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke;
-    const len = 20.0;
-    final ox = dirX > 0 ? 0.0 : size.width;
-    final oy = dirY > 0 ? 0.0 : size.height;
-    canvas.drawLine(Offset(ox, oy), Offset(ox + len * dirX, oy), paint);
-    canvas.drawLine(Offset(ox, oy), Offset(ox, oy + len * dirY), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _CornerPainter oldDelegate) => false;
 }

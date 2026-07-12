@@ -4,11 +4,11 @@ from fastapi import APIRouter, WebSocket
 try:
     from .. import state
     from ..config import RELAY_TOKEN, PUBLIC_URL
-    from ..pairing import generate_pairing_code, cleanup_expired_codes
+    from ..pairing import generate_pairing_code, cleanup_expired_codes, is_code_expired
 except ImportError:
     import state
     from config import RELAY_TOKEN, PUBLIC_URL
-    from pairing import generate_pairing_code, cleanup_expired_codes
+    from pairing import generate_pairing_code, cleanup_expired_codes, is_code_expired
 
 router = APIRouter()
 
@@ -84,6 +84,9 @@ async def daemon_endpoint(websocket: WebSocket):
                     # Generate pairing code unique across all daemons
                     all_codes = set(state.code_to_daemon.keys())
                     cleanup_expired_codes(all_codes)
+                    for c in list(state.code_to_daemon.keys()):
+                        if is_code_expired(c):
+                            state.code_to_daemon.pop(c, None)
                     pairing_code = generate_pairing_code(all_codes)
                     state.code_to_daemon[pairing_code] = daemon_id
 

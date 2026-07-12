@@ -1,7 +1,7 @@
 import secrets
 import time
 
-CODES_TTL = 300  # seconds — codes expire 5 minutes after creation
+CODES_TTL = 900  # seconds — codes expire 15 minutes after creation
 _code_created_at: dict[str, float] = {}
 
 

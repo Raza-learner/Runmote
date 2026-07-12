@@ -82,16 +82,26 @@ show_code_fallback() {
 
 regenerate_code() {
     echo "  ${DIM}Restarting daemon to generate a new pairing code...${RESET}" >&2
+    local old_code=""
+    old_code=$(get_pairing_code)
     stop_daemon >&2
     sleep 1
+    local temp_file="/tmp/runmote-pairing-code.txt"
+    [[ "$OS" == "windows" ]] && temp_file="$TEMP/runmote-pairing-code.txt"
+    rm -f "$temp_file"
     start_daemon >&2
     local code=""
     for i in $(seq 1 15); do
-        sleep 1; code=$(get_pairing_code)
-        [[ -n "$code" ]] && break
+        sleep 1
+        if [[ -f "$temp_file" ]]; then
+            code=$(head -1 "$temp_file" 2>/dev/null)
+        fi
+        [[ -z "$code" ]] && code=$(get_pairing_code)
+        [[ -n "$code" ]] && [[ "$code" != "$old_code" ]] && break
+        code=""
     done
     if [[ -z "$code" ]]; then
-        echo "  ${RED}Could not retrieve new pairing code.${RESET}" >&2
+        echo "  ${RED}Could not retrieve new pairing code. Is the daemon connected?${RESET}" >&2
         return 1
     fi
     echo "$code"
