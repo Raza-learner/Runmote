@@ -166,6 +166,13 @@ async def daemon_endpoint(websocket: WebSocket):
             if session is None:
                 continue
 
+            # Determine which agent produced this response so we can
+            # filter sessions that belong to other agents.
+            result_agent_id = ""
+            fwd_result = data.get("result")
+            if isinstance(fwd_result, dict):
+                result_agent_id = fwd_result.get("agentId", "")
+
             for cid, client in _paired_clients(session):
                 try:
                     fwd = data
@@ -177,13 +184,20 @@ async def daemon_endpoint(websocket: WebSocket):
                                 if not isinstance(s, dict) or
                                    not state.store.is_deleted(s.get("sessionId") or s.get("id") or "")
                             ]
+                            # Cross-agent safety: drop sessions whose
+                            # agentId doesn't match the result-level agentId.
+                            if result_agent_id:
+                                filtered = [
+                                    s for s in filtered
+                                    if not isinstance(s, dict) or
+                                       s.get("agentId") in (None, "", result_agent_id)
+                                ]
                             agent_sids = {
                                 s.get("sessionId") or s.get("id") or ""
                                 for s in filtered if isinstance(s, dict)
                             }
-                            agent_id = fwd["result"].get("agentId", "")
-                            if agent_id:
-                                for cs in state.store.list_sessions(agent_id=agent_id):
+                            if result_agent_id:
+                                for cs in state.store.list_sessions(agent_id=result_agent_id):
                                     if cs["sessionId"] not in agent_sids:
                                         filtered.append(cs)
                             for s in filtered:

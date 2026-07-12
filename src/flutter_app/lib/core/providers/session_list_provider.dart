@@ -302,8 +302,9 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
           .where((s) => !_deletedIds.contains(s.id))
           // Defensive filter: ignore sessions the relay tagged for a different
           // agent. This prevents cross-agent session leakage if the relay ever
-          // forwards a mixed list.
-          .where((s) => selectedAgentId == null || s.agentId == null || s.agentId == selectedAgentId)
+          // forwards a mixed list. Only show agentless sessions when no
+          // specific agent is selected.
+          .where((s) => selectedAgentId == null ? true : s.agentId == selectedAgentId)
           .toList();
 
       // Preserve very recent local sessions while refreshing so a newly
