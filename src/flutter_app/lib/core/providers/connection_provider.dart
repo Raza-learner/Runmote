@@ -9,10 +9,9 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/agent_capabilities.dart';
 import '../models/agent_info.dart';
 import '../models/connection_state.dart';
+import '../env.dart';
 import 'database_provider.dart';
 import 'session_list_provider.dart';
-
-const _defaultRelayUrl = 'wss://runmote-relay.onrender.com';
 
 String _sanitizeRelayUrl(String url) {
   var u = url.trim();
@@ -197,7 +196,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       return;
     }
 
-    final url = _sanitizeRelayUrl(relayUrl ?? state.relayUrl ?? _defaultRelayUrl);
+    final url = _sanitizeRelayUrl(relayUrl ?? state.relayUrl ?? defaultRelayUrl);
     debugPrint('[RUNMOTE] connect: url=$url');
 
     state = state.copyWith(

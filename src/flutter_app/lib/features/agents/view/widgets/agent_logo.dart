@@ -23,8 +23,6 @@ Color agentColor(String id) {
       return const Color(0xFF7B1FA2);
     case 'copilot':
       return const Color(0xFF546E7A);
-    case 'openclaw':
-      return const Color(0xFF512DA8);
     case 'kiro':
       return const Color(0xFF00BCD4);
     case 'hermes':
@@ -42,7 +40,6 @@ String agentInitials(String name) {
   if (id == 'cursor' || id == 'cursor agent') return 'Cu';
   if (id == 'gemini' || id == 'gemini cli') return 'Ge';
   if (id == 'copilot' || id == 'github copilot') return 'Co';
-  if (id == 'openclaw') return 'Oc';
   if (id == 'kiro' || id == 'kiro cli') return 'Ki';
   if (id == 'hermes' || id == 'hermes agent') return 'He';
 

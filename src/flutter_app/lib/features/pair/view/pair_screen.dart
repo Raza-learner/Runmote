@@ -10,9 +10,8 @@ import '../../../core/models/connection_state.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/env.dart';
 import '../../../../shared/widgets/animated_background.dart';
-
-const _defaultRelayUrl = 'wss://runmote-relay.onrender.com';
 
 class PairScreen extends ConsumerStatefulWidget {
   const PairScreen({super.key});
@@ -32,13 +31,14 @@ class _PairScreenState extends ConsumerState<PairScreen> {
 
   bool _qrScanned = false;
   bool _showScanner = false;
+  bool _isStartingCamera = false;
   late final MobileScannerController _scannerController;
 
   @override
   void initState() {
     super.initState();
     _codeController.addListener(_onCodeChanged);
-    _scannerController = MobileScannerController();
+    _scannerController = MobileScannerController(autoStart: false);
     WidgetsBinding.instance.addPostFrameCallback((_) => _autoConnectWithToken());
   }
 
@@ -60,9 +60,9 @@ class _PairScreenState extends ConsumerState<PairScreen> {
       debugPrint('[RUNMOTE] autoConnect: token=${token != null ? "present" : "null"}, savedUrl=$savedUrl');
       if (token == null || savedUrl == null) return;
 
-      final urlsToTry = savedUrl == _defaultRelayUrl
+      final urlsToTry = savedUrl == defaultRelayUrl
           ? [savedUrl]
-          : [savedUrl, _defaultRelayUrl];
+          : [savedUrl, defaultRelayUrl];
 
       for (final url in urlsToTry) {
         for (var attempt = 0; attempt < 2; attempt++) {
@@ -117,7 +117,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
       _isConnecting = true;
       _error = null;
     });
-    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: relayUrl ?? _defaultRelayUrl);
+    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: relayUrl ?? defaultRelayUrl);
   }
 
   bool _isValidCode(String raw) {
@@ -323,18 +323,40 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           isDark: isDark,
           gradient: const [Color(0xFF6366F1), Color(0xFF4F46E5)],
           onTap: () async {
-            final status = await Permission.camera.request();
-            if (!mounted) return;
-            if (status.isGranted || status.isLimited) {
-              setState(() {
-                _showScanner = true;
-                _error = null;
-              });
-            } else if (status.isPermanentlyDenied) {
-              setState(() => _error = 'Camera permission permanently denied. Open app settings to enable.');
-              await openAppSettings();
-            } else {
-              setState(() => _error = 'Camera permission is required to scan QR codes.');
+            try {
+              final status = await Permission.camera.request();
+              if (!mounted) return;
+              if (status.isGranted || status.isLimited) {
+                setState(() {
+                  _showScanner = true;
+                  _isStartingCamera = true;
+                  _error = null;
+                });
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  try {
+                    await _scannerController.start();
+                    if (mounted) {
+                      setState(() => _isStartingCamera = false);
+                    }
+                  } catch (e) {
+                    debugPrint('[QR] start error: $e');
+                    if (mounted) {
+                      setState(() {
+                        _error = 'Camera error: $e';
+                        _isStartingCamera = false;
+                      });
+                    }
+                  }
+                });
+              } else if (status.isPermanentlyDenied) {
+                setState(() => _error = 'Camera permission permanently denied. Open app settings to enable.');
+                await openAppSettings();
+              } else {
+                setState(() => _error = 'Camera permission is required to scan QR codes.');
+              }
+            } catch (e) {
+              debugPrint('[QR] scanner onTap error: $e');
+              if (mounted) setState(() => _error = 'Camera error: $e');
             }
           },
         ),
@@ -379,6 +401,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                   _scannerController.stop();
                   setState(() {
                     _showScanner = false;
+                    _isStartingCamera = false;
                     _error = null;
                   });
                 },
@@ -403,48 +426,77 @@ class _PairScreenState extends ConsumerState<PairScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: MobileScanner(
-                  controller: _scannerController,
-                  onDetect: (capture) {
-                  if (_qrScanned || _isConnecting) return;
-                  final barcode = capture.barcodes.firstOrNull;
-                  final raw = barcode?.rawValue?.trim();
-                  if (raw != null && raw.isNotEmpty) {
-                    _qrScanned = true;
-                    _scannerController.stop();
-                    _handleScannedCode(raw);
-                  }
-                },
-                errorBuilder: (context, error) {
-                  debugPrint('[QR] scanner error: $error');
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.camera_alt_outlined,
-                            size: 48,
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.5)
-                                : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  MobileScanner(
+                    controller: _scannerController,
+                    onDetect: (capture) {
+                      if (_qrScanned || _isConnecting) return;
+                      final barcode = capture.barcodes.firstOrNull;
+                      final raw = barcode?.rawValue?.trim();
+                      if (raw != null && raw.isNotEmpty) {
+                        _qrScanned = true;
+                        _scannerController.stop();
+                        _handleScannedCode(raw);
+                      }
+                    },
+                    errorBuilder: (context, error) {
+                      debugPrint('[QR] scanner error: $error');
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.camera_alt_outlined,
+                                size: 48,
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.5)
+                                    : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Camera error: ${error.errorCode.name}',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.7)
+                                      : theme.colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Camera error: ${error.errorCode.name}',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: isDark
-                                  ? Colors.white.withValues(alpha: 0.7)
-                                  : theme.colorScheme.onSurface,
+                        ),
+                      );
+                    },
+                  ),
+                  if (_isStartingCamera)
+                    Container(
+                      color: Colors.black,
+                      child: const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                              ),
                             ),
-                          ),
-                        ],
+                            SizedBox(height: 16),
+                            Text(
+                              'Starting camera...',
+                              style: TextStyle(color: Colors.white70, fontSize: 14),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  );
-                },
+                ],
               ),
             ),
           ),

@@ -86,10 +86,6 @@ def _detect_acp_agents() -> list[dict]:
                  _localbin, _npm):
         agents.append({"id": "copilot", "name": "Copilot", "command": ["copilot", "--acp", "--stdio"]})
 
-    # openclaw — native ACP mode
-    if _find_exe("openclaw", _localbin, _npm, _cargo, _bun):
-        agents.append({"id": "openclaw", "name": "OpenClaw", "command": ["openclaw", "acp"]})
-
     return agents if agents else [{"id": "default", "name": "Agent", "command": AGENT_COMMAND}]
 
 
