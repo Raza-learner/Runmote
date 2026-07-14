@@ -157,16 +157,30 @@ class TestSessionIntegration:
             daemon_id = resp["result"].get("daemonId")
             print(f"  ✓ Paired with daemon: {daemon_id}")
 
-            # Wait for agent/list to arrive
-            await asyncio.sleep(1)
+            # Drain daemon/identified notification before agent/list
+            await asyncio.sleep(0.25)
+            # Read and discard any queued notifications
+            while True:
+                try:
+                    msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=0.3))
+                    print(f"  draining: {msg.get('method', msg.get('id', 'unknown'))}")
+                    if msg.get('id') == 2:
+                        # that was our agent/list response, keep it
+                        resp = msg
+                        break
+                except asyncio.TimeoutError:
+                    resp = None
+                    break
 
             # --- agent/list ---
-            await ws.send(json.dumps({
-                "jsonrpc": "2.0", "id": 2,
-                "method": "agent/list",
-                "params": {},
-            }))
-            resp = json.loads(await ws.recv())
+            if resp is None:
+                await ws.send(json.dumps({
+                    "jsonrpc": "2.0", "id": 2,
+                    "method": "agent/list",
+                    "params": {},
+                }))
+                resp = json.loads(await ws.recv())
+
             agents = (resp.get("result") or resp.get("params") or {}).get("agents", [])
             print(f"  ✓ Got {len(agents)} agent(s): {[a['id'] for a in agents]}")
             assert len(agents) > 0, f"No agents found: {resp}"

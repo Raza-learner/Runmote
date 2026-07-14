@@ -37,9 +37,9 @@ ThemeData buildFlexTheme({
       cardElevation: 2,
     ),
     surfaceMode: FlexSurfaceMode.highScaffoldLowSurfaces,
-    blendLevel: 4,
+    blendLevel: 5,
     darkIsTrueBlack: false,
-    surface: const Color(0xFF0F172A),
-    scaffoldBackground: const Color(0xFF020617),
+    surface: const Color(0xFF1E1E1E),
+    scaffoldBackground: const Color(0xFF121212),
   );
 }

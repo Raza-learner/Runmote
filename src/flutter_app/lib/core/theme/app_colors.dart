@@ -8,5 +8,5 @@ abstract final class AppColors {
   static const daemonOffline = Color(0xFFE65100);
 
   static const glassLight = Color(0xCCFFFFFF);
-  static const glassDark = Color(0xCC1E1E1E);
+  static const glassDark = Color(0xCC2C2C2C);
 }

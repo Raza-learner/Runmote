@@ -165,6 +165,7 @@ async def daemon_endpoint(websocket: WebSocket):
                         state.store.remove(sid)
             except Exception as e:
                 print(f"  → failed to process daemon message: {e}")
+                continue
 
             if session is None:
                 continue
