@@ -18,8 +18,6 @@ void main() {
       home: Scaffold(body: ChatSkeleton()),
     ));
 
-    final before = tester.binding.toString();
-
     // Let animation advance
     await tester.pump(const Duration(milliseconds: 600));
 

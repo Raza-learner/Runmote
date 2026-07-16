@@ -1,4 +1,5 @@
-# test_client.py
+# Standalone client script — run directly via `python tests/test_client.py`
+
 import asyncio
 from websockets.asyncio.client import connect
 
@@ -13,4 +14,5 @@ async def main():
         print(f"response: {response}")
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

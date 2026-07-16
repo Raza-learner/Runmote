@@ -35,7 +35,7 @@ class TestDetectAcpAgents:
 
     def test_detects_codex_binary(self):
         def which_side_effect(cmd: str):
-            return "/usr/bin/" + cmd if cmd == "codex-acp" else None
+            return "/usr/bin/" + cmd if cmd in ("codex", "codex-acp") else None
 
         with mock.patch("daemon.config.shutil.which", side_effect=which_side_effect):
             from daemon.config import _detect_acp_agents
@@ -46,7 +46,7 @@ class TestDetectAcpAgents:
 
     def test_codex_falls_back_to_npx(self):
         def which_side_effect(cmd: str):
-            return "/usr/bin/" + cmd if cmd == "npx" else None
+            return "/usr/bin/" + cmd if cmd in ("codex", "npx") else None
 
         with mock.patch("daemon.config.shutil.which", side_effect=which_side_effect):
             from daemon.config import _detect_acp_agents
@@ -59,7 +59,7 @@ class TestDetectAcpAgents:
 
     def test_detects_multiple_agents(self):
         def which_side_effect(cmd: str):
-            found = {"opencode", "gemini", "claude-agent-acp"}
+            found = {"opencode", "gemini", "claude", "claude-agent-acp"}
             return "/usr/bin/" + cmd if cmd in found else None
 
         with mock.patch("daemon.config.shutil.which", side_effect=which_side_effect):

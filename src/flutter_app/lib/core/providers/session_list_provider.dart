@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'connection_provider.dart';
 import 'database_provider.dart';
-import 'preferences_provider.dart';
 import '../models/connection_state.dart';
 
 class ActiveSessionsNotifier extends StateNotifier<Set<String>> {
@@ -298,7 +297,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
                 completer.complete([]);
               }
             }
-          } catch (e, st) {
+          } catch (e) {
             if (!completer.isCompleted) {
               completer.complete([]);
             }
@@ -417,7 +416,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
                 completer.complete(null);
               }
             }
-          } catch (e, st) {
+          } catch (e) {
             if (!completer.isCompleted) {
               completer.complete(null);
             }

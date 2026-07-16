@@ -420,32 +420,6 @@ class _ToolCallGroupState extends State<ToolCallGroup>
   }
 }
 
-class _ToolChip extends StatelessWidget {
-  final String name;
-  final int count;
-
-  const _ToolChip({required this.name, required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        count > 1 ? '$name ×$count' : name,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onPrimaryContainer,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-}
-
 class _MessageAvatar extends StatelessWidget {
   final bool isUser;
 

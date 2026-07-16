@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/models/connection_state.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_colors.dart';
 import 'widgets/agent_card.dart';
 import 'widgets/agent_logo.dart';
 import '../../../../shared/widgets/error_banner.dart';
@@ -105,12 +104,10 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
                   ? 'Reconnecting...'
                   : 'Connection lost. Tap to reconnect.',
               onRetry: () {
-                if (pairingCode != null) {
-                  ref.read(connectionProvider.notifier).connect(
-                    pairingCode,
-                    relayUrl: relayUrl,
-                  );
-                }
+                ref.read(connectionProvider.notifier).connect(
+                  pairingCode,
+                  relayUrl: relayUrl,
+                );
               },
             ),
             Expanded(

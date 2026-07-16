@@ -11,6 +11,7 @@ class ChatMessage with _$ChatMessage {
     required ChatMessageRole role,
     required String content,
     @Default([])
+    // ignore: invalid_annotation_target
     @JsonKey(toJson: _segmentsToJson)
     List<AssistantSegment> segments,
     @Default(false) bool isStreaming,
