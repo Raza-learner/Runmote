@@ -1,0 +1,36 @@
+name: Docker
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - Dockerfile.relay
+      - src/relay/**
+      - src/common/**
+      - pyproject.toml
+      - uv.lock
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build relay image
+        run: docker build -f Dockerfile.relay -t runmote-relay .
+
+      - name: Health check
+        run: |
+          docker run -d --name relay-test -p 8000:8000 runmote-relay
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:8000/health; then
+              echo "Relay healthy"
+              break
+            fi
+            sleep 1
+          done
+          docker logs relay-test
+          curl -f http://localhost:8000/health
+          docker stop relay-test

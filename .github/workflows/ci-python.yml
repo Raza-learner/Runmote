@@ -1,0 +1,52 @@
+name: Python CI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - src/daemon/**
+      - src/relay/**
+      - src/common/**
+      - tests/**
+      - pyproject.toml
+      - uv.lock
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    env:
+      ACP_AGENT_COMMANDS: '[{"id":"test","name":"Test","command":["echo","acp"]}]'
+      ACP_RELAY_DB: ":memory:"
+      ACP_LOG_DIR: /tmp/acp_test_logs
+      ACP_LOG_LEVEL: ERROR
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Lint
+        run: uv run ruff check src/ tests/
+
+      - name: Format check
+        run: uv run ruff format --check src/ tests/
+
+      - name: Unit tests
+        run: uv run pytest tests/ --ignore=tests/test_integration.py -v
+
+      - name: Integration tests
+        if: matrix.os == 'ubuntu-latest'
+        run: uv run pytest tests/test_integration.py -v
