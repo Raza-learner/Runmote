@@ -12,9 +12,7 @@ def db():
 
 class TestInit:
     def test_creates_tables(self, db):
-        rows = db._conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        ).fetchall()
+        rows = db._conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
         names = [r["name"] for r in rows]
         assert "deleted_sessions" in names
         assert "sessions" in names
@@ -89,9 +87,7 @@ class TestDeletedSessions:
 
     def test_mark_deleted_uses_default_timestamp(self, db):
         db.mark_deleted("s1")
-        rows = db._conn.execute(
-            "SELECT * FROM deleted_sessions WHERE session_id = ?", ("s1",)
-        ).fetchall()
+        rows = db._conn.execute("SELECT * FROM deleted_sessions WHERE session_id = ?", ("s1",)).fetchall()
         assert len(rows) == 1
         assert rows[0]["deleted_at"] is not None
 

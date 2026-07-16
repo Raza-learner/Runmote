@@ -8,6 +8,7 @@ from fastapi import WebSocket
 @pytest.fixture(autouse=True)
 def _reset_state():
     import relay.state
+
     relay.state.store = mock.MagicMock()
     relay.state.store.is_deleted.return_value = False
     relay.state.store.register.return_value = None
@@ -20,6 +21,7 @@ def _reset_state():
 
 def _make_session(daemon_id="test-daemon"):
     from relay.state import DaemonSession
+
     ws = mock.AsyncMock(spec=WebSocket)
     return DaemonSession(websocket=ws, daemon_id=daemon_id, token="test-token")
 
@@ -27,6 +29,7 @@ def _make_session(daemon_id="test-daemon"):
 class TestDaemonPairedClients:
     def _import(self):
         import relay.handlers.daemon as m
+
         return m
 
     def test_yields_paired_clients(self):
@@ -50,6 +53,7 @@ class TestDaemonPairedClients:
 class TestRegisterSession:
     def _import(self):
         import relay.handlers.daemon as m
+
         return m
 
     def test_register_with_sessionId(self):
@@ -108,6 +112,7 @@ class TestRegisterSession:
 class TestSendError:
     def _import(self):
         import relay.handlers.app as m
+
         return m
 
     @pytest.mark.asyncio
@@ -133,6 +138,7 @@ class TestSendError:
 class TestGetDaemonWs:
     def _import(self):
         import relay.handlers.app as m
+
         return m
 
     def test_returns_none_when_no_session(self):

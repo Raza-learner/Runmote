@@ -56,9 +56,7 @@ class Database:
         self._conn.commit()
 
     def update_name(self, session_id: str, name: str):
-        self._conn.execute(
-            "UPDATE sessions SET name = ? WHERE session_id = ?", (name, session_id)
-        )
+        self._conn.execute("UPDATE sessions SET name = ? WHERE session_id = ?", (name, session_id))
         self._conn.commit()
 
     def delete_session(self, session_id: str):
@@ -83,9 +81,7 @@ class Database:
         return {row["session_id"] for row in rows}
 
     def is_deleted(self, session_id: str) -> bool:
-        row = self._conn.execute(
-            "SELECT 1 FROM deleted_sessions WHERE session_id = ?", (session_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT 1 FROM deleted_sessions WHERE session_id = ?", (session_id,)).fetchone()
         return row is not None
 
     def _migrate_add_agent_id(self):

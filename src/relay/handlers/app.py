@@ -19,11 +19,15 @@ _PAIR_WINDOW_SEC = 60
 
 
 async def _send_error(ws: WebSocket, msg_id, code: int, message: str):
-    await ws.send_text(json.dumps({
-        "jsonrpc": "2.0",
-        "id": msg_id,
-        "error": {"code": code, "message": message},
-    }))
+    await ws.send_text(
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": msg_id,
+                "error": {"code": code, "message": message},
+            }
+        )
+    )
 
 
 def _get_daemon_ws(client_id: str) -> WebSocket | None:
@@ -38,21 +42,24 @@ async def app_endpoint(websocket: WebSocket):
     state.app_clients[client_id] = websocket
     try:
         async for message in websocket.iter_text():
-
             try:
                 data = json.loads(message)
                 method = data.get("method", "")
                 msg_id = data.get("id")
 
                 if method == "$/ping":
-                    await websocket.send_text(json.dumps({
-                        "jsonrpc": "2.0",
-                        "method": "$/pong",
-                    }))
+                    await websocket.send_text(
+                        json.dumps(
+                            {
+                                "jsonrpc": "2.0",
+                                "method": "$/pong",
+                            }
+                        )
+                    )
                     continue
 
                 if method == "auth/pair":
-                    client_ip = websocket.client.host if hasattr(websocket.client, 'host') else 'unknown'
+                    client_ip = websocket.client.host if hasattr(websocket.client, "host") else "unknown"
                     now = time.time()
 
                     params = data.get("params") or {}
@@ -80,26 +87,38 @@ async def app_endpoint(websocket: WebSocket):
                         state.app_to_daemon[client_id] = daemon_session.daemon_id
                         daemon_session.paired_apps.add(client_id)
                         state.claimed_codes.add(code)
-                        await websocket.send_text(json.dumps({
-                            "jsonrpc": "2.0",
-                            "id": msg_id,
-                            "result": {
-                                "paired": True,
-                                "daemonId": daemon_session.daemon_id,
-                                "token": daemon_session.token,
-                            },
-                        }))
+                        await websocket.send_text(
+                            json.dumps(
+                                {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "result": {
+                                        "paired": True,
+                                        "daemonId": daemon_session.daemon_id,
+                                        "token": daemon_session.token,
+                                    },
+                                }
+                            )
+                        )
                         if daemon_session.daemon_id:
-                            await websocket.send_text(json.dumps({
-                                "jsonrpc": "2.0",
-                                "method": "daemon/identified",
-                                "params": {"daemonId": daemon_session.daemon_id},
-                            }))
-                        await daemon_session.websocket.send_text(json.dumps({
-                            "jsonrpc": "2.0",
-                            "method": "pairing/complete",
-                            "params": {"clientId": client_id},
-                        }))
+                            await websocket.send_text(
+                                json.dumps(
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "method": "daemon/identified",
+                                        "params": {"daemonId": daemon_session.daemon_id},
+                                    }
+                                )
+                            )
+                        await daemon_session.websocket.send_text(
+                            json.dumps(
+                                {
+                                    "jsonrpc": "2.0",
+                                    "method": "pairing/complete",
+                                    "params": {"clientId": client_id},
+                                }
+                            )
+                        )
                         state.daemon_ever_paired.add(daemon_session.daemon_id)
                     continue
 
@@ -112,15 +131,19 @@ async def app_endpoint(websocket: WebSocket):
                         active = state.daemons.get(daemon_id)
                         if active:
                             active.paired_apps.add(client_id)
-                        await websocket.send_text(json.dumps({
-                            "jsonrpc": "2.0",
-                            "id": msg_id,
-                            "result": {
-                                "authenticated": True,
-                                "daemonId": daemon_id,
-                                "daemonConnected": active is not None,
-                            },
-                        }))
+                        await websocket.send_text(
+                            json.dumps(
+                                {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "result": {
+                                        "authenticated": True,
+                                        "daemonId": daemon_id,
+                                        "daemonConnected": active is not None,
+                                    },
+                                }
+                            )
+                        )
                     else:
                         await _send_error(websocket, msg_id, -32002, "invalid token")
                     continue
@@ -132,14 +155,18 @@ async def app_endpoint(websocket: WebSocket):
 
                 if method == "daemon/status":
                     session = state.get_daemon_for_app(client_id)
-                    await websocket.send_text(json.dumps({
-                        "jsonrpc": "2.0",
-                        "id": msg_id,
-                        "result": {
-                            "connected": session is not None,
-                            "daemonId": session.daemon_id if session else state.store.get_daemon_id(),
-                        },
-                    }))
+                    await websocket.send_text(
+                        json.dumps(
+                            {
+                                "jsonrpc": "2.0",
+                                "id": msg_id,
+                                "result": {
+                                    "connected": session is not None,
+                                    "daemonId": session.daemon_id if session else state.store.get_daemon_id(),
+                                },
+                            }
+                        )
+                    )
                     continue
 
                 if method == "session/list":
@@ -150,11 +177,15 @@ async def app_endpoint(websocket: WebSocket):
                     sid = (data.get("params") or {}).get("sessionId")
                     name = (data.get("params") or {}).get("name", "")
                     if sid and state.store.rename(sid, name):
-                        await websocket.send_text(json.dumps({
-                            "jsonrpc": "2.0",
-                            "id": msg_id,
-                            "result": {"sessionId": sid, "name": name},
-                        }))
+                        await websocket.send_text(
+                            json.dumps(
+                                {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "result": {"sessionId": sid, "name": name},
+                                }
+                            )
+                        )
                     else:
                         await _send_error(websocket, msg_id, -32000, "session not found")
                     continue
@@ -169,12 +200,14 @@ async def app_endpoint(websocket: WebSocket):
                         close_params = {"sessionId": sid}
                         if agent_id:
                             close_params["agentId"] = agent_id
-                        close_msg = json.dumps({
-                            "jsonrpc": "2.0",
-                            "id": msg_id,
-                            "method": "session/close",
-                            "params": close_params,
-                        })
+                        close_msg = json.dumps(
+                            {
+                                "jsonrpc": "2.0",
+                                "id": msg_id,
+                                "method": "session/close",
+                                "params": close_params,
+                            }
+                        )
                         await daemon_ws.send_text(close_msg)
                     continue
 

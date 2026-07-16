@@ -160,8 +160,10 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   // ── Heartbeat (ping/pong) ────────────────────────────────────────
   Timer? _pingTimer;
   bool _pongReceived = true;
+  Timer? _pongCheckTimer;
 
-  static const _pingInterval = Duration(seconds: 25);
+  static const _pingInterval = Duration(seconds: 15);
+  static const _pongCheckDelay = Duration(seconds: 5);
 
   void _startPing() {
     _stopPing();
@@ -177,13 +179,21 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         'jsonrpc': '2.0',
         'method': r'$/ping',
       });
-      // If no pong within the next interval, the next tick triggers timeout
+      // Asynchronous re-check after short delay for faster disconnect detection
+      _pongCheckTimer?.cancel();
+      _pongCheckTimer = Timer(_pongCheckDelay, () {
+        if (!_pongReceived) {
+          _onDisconnected('Ping timeout');
+        }
+      });
     });
   }
 
   void _stopPing() {
     _pingTimer?.cancel();
     _pingTimer = null;
+    _pongCheckTimer?.cancel();
+    _pongCheckTimer = null;
   }
 
   void _handlePong() {
@@ -807,6 +817,21 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         _scheduleReconnect();
       }
     });
+  }
+
+  /// Cancel any pending reconnect and immediately try to reconnect with
+  /// the saved token/URL. Called when the app resumes from background.
+  Future<void> retryNow() async {
+    final token = state.token;
+    final relayUrl = state.relayUrl;
+    if (token == null || relayUrl == null) return;
+    _reconnectTimer?.cancel();
+    if (state.state is Connected || state.state is Connecting) return;
+    state = state.copyWith(state: const AcpConnectionState.reconnecting());
+    final ok = await connectWithToken(token, relayUrl);
+    if (!ok) {
+      _scheduleReconnect();
+    }
   }
 
   Future<void> disconnect() async {

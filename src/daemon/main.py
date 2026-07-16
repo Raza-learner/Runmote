@@ -83,6 +83,7 @@ def _pairing_banner(code: str, public_url: str = "") -> str:
         lines.append(f"  Relay: {public_url}")
     return "\n" + "\n".join(lines) + "\n"
 
+
 # Tracks request info (cwd, method) keyed by message id, so
 # cwd can be injected into the agent response and method-level
 # error handling can be applied (e.g. session/close "Method not found").
@@ -125,18 +126,22 @@ class AgentProcess:
             stderr=asyncio.subprocess.PIPE,
         )
         self.online = True
-        await self.send({
-            "jsonrpc": "2.0",
-            "method": "initialize",
-            "id": f"daemon_init_{self.id}",
-            "params": {"protocolVersion": 1},
-        })
-        await self.send({
-            "jsonrpc": "2.0",
-            "method": "session/list",
-            "id": f"daemon_sessions_{self.id}",
-            "params": {},
-        })
+        await self.send(
+            {
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "id": f"daemon_init_{self.id}",
+                "params": {"protocolVersion": 1},
+            }
+        )
+        await self.send(
+            {
+                "jsonrpc": "2.0",
+                "method": "session/list",
+                "id": f"daemon_sessions_{self.id}",
+                "params": {},
+            }
+        )
         log(f"Started {self.id}: {' '.join(self.command)}")
 
     async def send(self, message: dict):
@@ -222,11 +227,15 @@ def _tag_agent_response(message: dict, agent: AgentProcess, session_cwd: str = "
     if session_method == "session/resume":
         error = tagged.get("error")
         if isinstance(error, dict) and error.get("code") in (-32601, -32603):
-            return {"jsonrpc": "2.0", "id": message.get("id"), "result": {
-                "sessionId": "",
-                "agentId": agent.id,
-                "note": "Session resume not available, create a new session",
-            }}
+            return {
+                "jsonrpc": "2.0",
+                "id": message.get("id"),
+                "result": {
+                    "sessionId": "",
+                    "agentId": agent.id,
+                    "note": "Session resume not available, create a new session",
+                },
+            }
 
     # Regular handling
     result = tagged.get("result")
@@ -280,9 +289,7 @@ async def _send_json(websocket, message: dict):
 
 async def run_daemon():
     agents = {
-        config["id"]: AgentProcess(config)
-        for config in AGENT_CONFIGS
-        if config.get("id") and config.get("command")
+        config["id"]: AgentProcess(config) for config in AGENT_CONFIGS if config.get("id") and config.get("command")
     }
     if not agents:
         raise RuntimeError("no ACP agents configured")
@@ -293,13 +300,15 @@ async def run_daemon():
                 log("Connected to relay!")
 
                 identify_id = "daemon_ident"
-                await _send_json(websocket, {
-                    "jsonrpc": "2.0",
-                    "id": identify_id,
-                    "method": "daemon/identify",
-                    "params": {"daemonId": DAEMON_ID, "token": DAEMON_TOKEN},
-                })
-
+                await _send_json(
+                    websocket,
+                    {
+                        "jsonrpc": "2.0",
+                        "id": identify_id,
+                        "method": "daemon/identify",
+                        "params": {"daemonId": DAEMON_ID, "token": DAEMON_TOKEN},
+                    },
+                )
 
                 async for msg in websocket:
                     try:
@@ -360,12 +369,12 @@ async def run_daemon():
                         msg_id = data.get("id")
                         if method == "pairing/complete":
                             from pathlib import Path
+
                             Path("/tmp/acp-paired").write_text("paired")
                             continue
 
                         if method == "agent/list":
-                            detected = {a["id"]: a for a in _detect_acp_agents()
-                                        if a.get("id") != "default"}
+                            detected = {a["id"]: a for a in _detect_acp_agents() if a.get("id") != "default"}
                             for aid in list(agents.keys()):
                                 if aid not in detected:
                                     log(f"Agent '{aid}' no longer detected, stopping...")
@@ -414,43 +423,57 @@ async def run_daemon():
                                 drives = []
                                 if sys.platform == "win32":
                                     import string
+
                                     for letter in string.ascii_uppercase:
                                         drive = f"{letter}:\\"
                                         if os.path.exists(drive):
-                                            drives.append({
-                                                "name": f"{letter}:",
-                                                "path": _normalize_path(os.path.abspath(drive)),
-                                                "type": "directory",
-                                                "size": 0,
-                                                "isSymlink": False,
-                                            })
+                                            drives.append(
+                                                {
+                                                    "name": f"{letter}:",
+                                                    "path": _normalize_path(os.path.abspath(drive)),
+                                                    "type": "directory",
+                                                    "size": 0,
+                                                    "isSymlink": False,
+                                                }
+                                            )
                                 else:
-                                    drives.append({
-                                        "name": "/",
-                                        "path": "/",
-                                        "type": "directory",
-                                        "size": 0,
-                                        "isSymlink": False,
-                                    })
-                                await _send_json(websocket, {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "result": {"entries": drives},
-                                })
+                                    drives.append(
+                                        {
+                                            "name": "/",
+                                            "path": "/",
+                                            "type": "directory",
+                                            "size": 0,
+                                            "isSymlink": False,
+                                        }
+                                    )
+                                await _send_json(
+                                    websocket,
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": msg_id,
+                                        "result": {"entries": drives},
+                                    },
+                                )
                             except Exception as e:
-                                await _send_json(websocket, {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "error": {"code": -32000, "message": f"Failed to list drives: {e}"},
-                                })
+                                await _send_json(
+                                    websocket,
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": msg_id,
+                                        "error": {"code": -32000, "message": f"Failed to list drives: {e}"},
+                                    },
+                                )
                             continue
 
                         if method == "filesystem/get_home":
-                            await _send_json(websocket, {
-                                "jsonrpc": "2.0",
-                                "id": msg_id,
-                                "result": {"home": _normalize_path(os.path.expanduser("~"))},
-                            })
+                            await _send_json(
+                                websocket,
+                                {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "result": {"home": _normalize_path(os.path.expanduser("~"))},
+                                },
+                            )
                             continue
 
                         if method == "filesystem/list_directory":
@@ -467,52 +490,64 @@ async def run_daemon():
                                         is_file = entry.is_file()
                                         is_symlink = entry.is_symlink()
                                         stat_info = entry.stat(follow_symlinks=False)
-                                        entries.append({
-                                            "name": entry.name,
-                                            "path": _normalize_path(os.path.abspath(entry.path)),
-                                            "type": "directory" if is_dir else "file" if is_file else "other",
-                                            "size": stat_info.st_size if is_file else 0,
-                                            "isSymlink": is_symlink,
-                                        })
+                                        entries.append(
+                                            {
+                                                "name": entry.name,
+                                                "path": _normalize_path(os.path.abspath(entry.path)),
+                                                "type": "directory" if is_dir else "file" if is_file else "other",
+                                                "size": stat_info.st_size if is_file else 0,
+                                                "isSymlink": is_symlink,
+                                            }
+                                        )
                                     except OSError:
                                         pass
                                 entries.sort(key=lambda e: (0 if e["type"] == "directory" else 1, e["name"].lower()))
-                                await _send_json(websocket, {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "result": {
-                                        "entries": entries,
-                                        "path": _normalize_path(os.path.abspath(path)),
+                                await _send_json(
+                                    websocket,
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": msg_id,
+                                        "result": {
+                                            "entries": entries,
+                                            "path": _normalize_path(os.path.abspath(path)),
+                                        },
                                     },
-                                })
+                                )
                             except Exception as e:
-                                await _send_json(websocket, {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "error": {"code": -32000, "message": f"Failed to list directory: {e}"},
-                                })
+                                await _send_json(
+                                    websocket,
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": msg_id,
+                                        "error": {"code": -32000, "message": f"Failed to list directory: {e}"},
+                                    },
+                                )
                             continue
 
                         if method == "fs/read_text_file":
                             params = data.get("params") or {}
                             path = os.path.expanduser(params.get("path", ""))
-                            line = params.get("line")
-                            limit = params.get("limit")
                             try:
                                 with open(path, "r") as f:
                                     content = f.read()
                                 result = {"content": content}
-                                await _send_json(websocket, {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "result": result,
-                                })
+                                await _send_json(
+                                    websocket,
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": msg_id,
+                                        "result": result,
+                                    },
+                                )
                             except Exception as e:
-                                await _send_json(websocket, {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "error": {"code": -32000, "message": f"Failed to read file: {e}"},
-                                })
+                                await _send_json(
+                                    websocket,
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": msg_id,
+                                        "error": {"code": -32000, "message": f"Failed to read file: {e}"},
+                                    },
+                                )
                             continue
 
                         if method == "fs/write_text_file":
@@ -523,30 +558,39 @@ async def run_daemon():
                                 os.makedirs(os.path.dirname(path), exist_ok=True)
                                 with open(path, "w") as f:
                                     f.write(content)
-                                await _send_json(websocket, {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "result": None,
-                                })
+                                await _send_json(
+                                    websocket,
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": msg_id,
+                                        "result": None,
+                                    },
+                                )
                             except Exception as e:
-                                await _send_json(websocket, {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "error": {"code": -32000, "message": f"Failed to write file: {e}"},
-                                })
+                                await _send_json(
+                                    websocket,
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": msg_id,
+                                        "error": {"code": -32000, "message": f"Failed to write file: {e}"},
+                                    },
+                                )
                             continue
 
                         agent = agents[_extract_agent_id(data, agents)]
                         if not agent.online:
-                            await _send_json(websocket, {
-                                "jsonrpc": "2.0",
-                                "id": msg_id,
-                                "error": {
-                                    "code": -32005,
-                                    "message": f"agent {agent.id} is not running",
-                                    "data": {"agentId": agent.id},
+                            await _send_json(
+                                websocket,
+                                {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "error": {
+                                        "code": -32005,
+                                        "message": f"agent {agent.id} is not running",
+                                        "data": {"agentId": agent.id},
+                                    },
                                 },
-                            })
+                            )
                             continue
 
                         # Save request info (cwd, method) keyed by message id.
@@ -569,7 +613,7 @@ async def run_daemon():
                 async def agent_to_relay(agent: AgentProcess):
                     if not agent.proc or not agent.proc.stdout:
                         return
-                    buf = b''
+                    buf = b""
                     while True:
                         try:
                             chunk = await agent.proc.stdout.read(65536)
@@ -578,9 +622,9 @@ async def run_daemon():
                         if not chunk:
                             break
                         buf += chunk
-                        while b'\n' in buf:
-                            line, buf = buf.split(b'\n', 1)
-                            raw = line.decode(errors='replace').strip()
+                        while b"\n" in buf:
+                            line, buf = buf.split(b"\n", 1)
+                            raw = line.decode(errors="replace").strip()
                             if not raw:
                                 continue
                             try:
@@ -596,9 +640,9 @@ async def run_daemon():
                                 await websocket.send(raw)
                         if len(buf) > 1_048_576:
                             log(f"{agent.id} stdout: discarding oversized buffer ({len(buf)} bytes without newline)")
-                            buf = b''
+                            buf = b""
                     if buf:
-                        raw = buf.decode(errors='replace').strip()
+                        raw = buf.decode(errors="replace").strip()
                         if raw:
                             try:
                                 data = json.loads(raw)
@@ -697,6 +741,7 @@ async def run_daemon():
             log(f"Connection error: {e}")
             try:
                 import traceback
+
                 log(traceback.format_exc())
             except Exception:
                 pass

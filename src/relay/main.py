@@ -13,13 +13,13 @@ from fastapi.responses import JSONResponse  # noqa: E402
 import uvicorn  # noqa: E402
 
 try:
-    from .config import HOST, PORT, DISABLE_DISCOVERY, ALLOWED_ORIGINS
+    from .config import HOST, PORT, DISABLE_DISCOVERY, ALLOWED_ORIGINS, WS_PING_INTERVAL, WS_PING_TIMEOUT
     from .handlers.daemon import router as daemon_router
     from .handlers.app import router as app_router
     from .discovery import RelayDiscovery
     from . import state
 except ImportError:
-    from config import HOST, PORT, DISABLE_DISCOVERY, ALLOWED_ORIGINS
+    from config import HOST, PORT, DISABLE_DISCOVERY, ALLOWED_ORIGINS, WS_PING_INTERVAL, WS_PING_TIMEOUT
     from handlers.daemon import router as daemon_router
     from handlers.app import router as app_router
     from discovery import RelayDiscovery
@@ -50,10 +50,12 @@ app.add_middleware(
 
 @app.get("/health")
 async def health():
-    return JSONResponse({
-        "status": "ok",
-        "daemons_connected": len(state.daemons),
-    })
+    return JSONResponse(
+        {
+            "status": "ok",
+            "daemons_connected": len(state.daemons),
+        }
+    )
 
 
 app.include_router(daemon_router)
@@ -64,6 +66,6 @@ if __name__ == "__main__":
         app,
         host=HOST,
         port=PORT,
-        ws_ping_interval=25,
-        ws_ping_timeout=10,
+        ws_ping_interval=WS_PING_INTERVAL,
+        ws_ping_timeout=WS_PING_TIMEOUT,
     )

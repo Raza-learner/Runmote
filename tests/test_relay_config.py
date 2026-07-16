@@ -15,6 +15,7 @@ class TestRelayConfig:
     def test_host_from_env(self):
         with mock.patch.dict(os.environ, {"ACP_RELAY_HOST": "127.0.0.1"}, clear=False):
             import importlib
+
             importlib.reload(relay.config)
             assert relay.config.HOST == "127.0.0.1"
             assert relay.config.PORT == 8000
@@ -22,12 +23,14 @@ class TestRelayConfig:
     def test_port_from_env(self):
         with mock.patch.dict(os.environ, {"ACP_RELAY_PORT": "9000"}, clear=False):
             import importlib
+
             importlib.reload(relay.config)
             assert relay.config.PORT == 9000
 
     def test_token_from_env(self):
         with mock.patch.dict(os.environ, {"ACP_RELAY_TOKEN": "my-secret"}, clear=False):
             import importlib
+
             importlib.reload(relay.config)
             assert relay.config.RELAY_TOKEN == "my-secret"
 
@@ -36,5 +39,6 @@ class TestRelayConfig:
             if "ACP_RELAY_TOKEN" in os.environ:
                 del os.environ["ACP_RELAY_TOKEN"]
             import importlib
+
             importlib.reload(relay.config)
             assert relay.config.RELAY_TOKEN is None

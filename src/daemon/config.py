@@ -47,11 +47,15 @@ def _detect_acp_agents() -> list[dict]:
     _bun = os.path.join(_home, ".bun", "bin") if _home else ""
 
     # opencode — native ACP mode
-    if _find_exe("opencode",
-                 os.path.join(_local, "Programs", "opencode") if _local else "",
-                 os.path.join(_pf, "OpenCode") if _pf else "",
-                 os.path.join(_home, ".opencode", "bin") if _home else "",
-                 _localbin, _cargo, _bun):
+    if _find_exe(
+        "opencode",
+        os.path.join(_local, "Programs", "opencode") if _local else "",
+        os.path.join(_pf, "OpenCode") if _pf else "",
+        os.path.join(_home, ".opencode", "bin") if _home else "",
+        _localbin,
+        _cargo,
+        _bun,
+    ):
         agents.append({"id": "opencode", "name": "OpenCode", "command": ["opencode", "acp"]})
 
     # codex — CLI + ACP adapter
@@ -66,24 +70,35 @@ def _detect_acp_agents() -> list[dict]:
         if _find_exe("claude-agent-acp", _npm, _localbin):
             agents.append({"id": "claude", "name": "Claude Code", "command": ["claude-agent-acp"]})
         elif shutil.which("npx"):
-            agents.append({"id": "claude", "name": "Claude Code", "command": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"]})
+            agents.append(
+                {
+                    "id": "claude",
+                    "name": "Claude Code",
+                    "command": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"],
+                }
+            )
 
     # gemini — native ACP mode
     if _find_exe("gemini", _localbin, _npm):
         agents.append({"id": "gemini", "name": "Gemini", "command": ["gemini", "--acp"]})
 
     # cursor — native ACP mode
-    if _find_exe("cursor-agent",
-                 os.path.join(_local, "Programs", "Cursor") if _local else "",
-                 os.path.join(_pf, "Cursor") if _pf else "",
-                 _localbin):
+    if _find_exe(
+        "cursor-agent",
+        os.path.join(_local, "Programs", "Cursor") if _local else "",
+        os.path.join(_pf, "Cursor") if _pf else "",
+        _localbin,
+    ):
         agents.append({"id": "cursor", "name": "Cursor", "command": ["cursor-agent", "acp"]})
 
     # copilot — native ACP mode
-    if _find_exe("copilot",
-                 os.path.join(_local, "GitHubCLI") if _local else "",
-                 os.path.join(_pf, "GitHub CLI") if _pf else "",
-                 _localbin, _npm):
+    if _find_exe(
+        "copilot",
+        os.path.join(_local, "GitHubCLI") if _local else "",
+        os.path.join(_pf, "GitHub CLI") if _pf else "",
+        _localbin,
+        _npm,
+    ):
         agents.append({"id": "copilot", "name": "Copilot", "command": ["copilot", "--acp", "--stdio"]})
 
     return agents if agents else [{"id": "default", "name": "Agent", "command": AGENT_COMMAND}]

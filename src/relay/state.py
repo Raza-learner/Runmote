@@ -1,10 +1,8 @@
-import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import WebSocket
-from common.logger import ACPLogger
 
 try:
     from .database import Database
@@ -35,7 +33,7 @@ recently_deleted_sessions: set = store.deleted_sessions()
 # Auth state
 _AUTH_STATE_PATH = Path(os.environ.get("ACP_CONFIG_DIR", Path.home() / ".config" / "runmote")) / "relay_auth.json"
 code_to_daemon: dict[str, str] = {}  # pairing code -> daemon_id
-app_to_daemon: dict[str, str] = {}   # client_id -> daemon_id
+app_to_daemon: dict[str, str] = {}  # client_id -> daemon_id
 claimed_codes: set[str] = set()
 
 # Persisted token -> daemon_id mapping.  Survives daemon disconnects so that
@@ -72,7 +70,3 @@ def get_daemon_id_by_token(token: str) -> str | None:
         if session.token == token:
             return did
     return known_tokens.get(token)
-
-
-
-

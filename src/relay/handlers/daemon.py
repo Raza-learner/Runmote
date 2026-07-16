@@ -52,11 +52,21 @@ async def daemon_endpoint(websocket: WebSocket):
 
     try:
         async for message in websocket.iter_text():
-
             try:
                 data = json.loads(message)
                 method = data.get("method", "")
                 msg_id = data.get("id")
+
+                if method == "$/ping":
+                    await websocket.send_text(
+                        json.dumps(
+                            {
+                                "jsonrpc": "2.0",
+                                "method": "$/pong",
+                            }
+                        )
+                    )
+                    continue
 
                 if method == "daemon/identify":
                     params = data.get("params") or {}
@@ -66,11 +76,15 @@ async def daemon_endpoint(websocket: WebSocket):
                     if RELAY_TOKEN is not None and token != RELAY_TOKEN:
                         print(f"  → daemon {daemon_id} token rejected (got '{token}')")
                         if msg_id:
-                            await websocket.send_text(json.dumps({
-                                "jsonrpc": "2.0",
-                                "id": msg_id,
-                                "error": {"code": -32001, "message": "invalid token"},
-                            }))
+                            await websocket.send_text(
+                                json.dumps(
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": msg_id,
+                                        "error": {"code": -32001, "message": "invalid token"},
+                                    }
+                                )
+                            )
                         await websocket.close()
                         return
 
@@ -93,10 +107,7 @@ async def daemon_endpoint(websocket: WebSocket):
                     # Derive paired apps from persistent app_to_daemon mapping
                     # (survives daemon disconnects — only cleared when the app
                     # explicitly disconnects).
-                    paired_apps = {
-                        cid for cid, did in state.app_to_daemon.items()
-                        if did == daemon_id
-                    }
+                    paired_apps = {cid for cid, did in state.app_to_daemon.items() if did == daemon_id}
 
                     session = state.DaemonSession(
                         websocket=websocket,
@@ -109,7 +120,9 @@ async def daemon_endpoint(websocket: WebSocket):
                     if token:
                         state.known_tokens[token] = daemon_id
                     state.store.set_daemon_id(daemon_id)
-                    print(f"  → daemon {daemon_id} identified (paired_apps={len(session.paired_apps)}, ever_paired={ever_paired})")
+                    print(
+                        f"  → daemon {daemon_id} identified (paired_apps={len(session.paired_apps)}, ever_paired={ever_paired})"
+                    )
                     print(f"  → pairing code: {pairing_code}")
 
                     if msg_id:
@@ -118,11 +131,15 @@ async def daemon_endpoint(websocket: WebSocket):
                             result["publicUrl"] = PUBLIC_URL
                         result["pairedAppCount"] = len(session.paired_apps)
                         result["everPaired"] = ever_paired
-                        await websocket.send_text(json.dumps({
-                            "jsonrpc": "2.0",
-                            "id": msg_id,
-                            "result": result,
-                        }))
+                        await websocket.send_text(
+                            json.dumps(
+                                {
+                                    "jsonrpc": "2.0",
+                                    "id": msg_id,
+                                    "result": result,
+                                }
+                            )
+                        )
 
                     forward = {
                         "jsonrpc": "2.0",
@@ -184,26 +201,27 @@ async def daemon_endpoint(websocket: WebSocket):
                         sess_list = fwd["result"].get("sessions")
                         if isinstance(sess_list, list):
                             filtered = [
-                                s for s in sess_list
-                                if not isinstance(s, dict) or
-                                   not state.store.is_deleted(s.get("sessionId") or s.get("id") or "")
+                                s
+                                for s in sess_list
+                                if not isinstance(s, dict)
+                                or not state.store.is_deleted(s.get("sessionId") or s.get("id") or "")
                             ]
                             # Cross-agent safety: drop sessions whose
                             # agentId doesn't match the result-level agentId.
                             if result_agent_id:
                                 filtered = [
-                                    s for s in filtered
-                                    if not isinstance(s, dict) or
-                                       s.get("agentId") in (None, "", result_agent_id)
+                                    s
+                                    for s in filtered
+                                    if not isinstance(s, dict) or s.get("agentId") in (None, "", result_agent_id)
                                 ]
                             agent_sids = {
-                                s.get("sessionId") or s.get("id") or ""
-                                for s in filtered if isinstance(s, dict)
+                                s.get("sessionId") or s.get("id") or "" for s in filtered if isinstance(s, dict)
                             }
                             if result_agent_id:
                                 for cs in state.store.list_sessions(agent_id=result_agent_id):
-                                    if cs["sessionId"] not in agent_sids \
-                                       and not state.store.is_deleted(cs["sessionId"]):
+                                    if cs["sessionId"] not in agent_sids and not state.store.is_deleted(
+                                        cs["sessionId"]
+                                    ):
                                         filtered.append(cs)
                             for s in filtered:
                                 if isinstance(s, dict) and not s.get("cwd"):

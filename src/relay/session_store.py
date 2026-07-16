@@ -64,9 +64,7 @@ class SessionStore:
         }
         if self._db:
             try:
-                self._db.insert_session(
-                    session_id, client_id, agent_id, display_name, self._daemon_id, timestamp, cwd
-                )
+                self._db.insert_session(session_id, client_id, agent_id, display_name, self._daemon_id, timestamp, cwd)
             except Exception as e:
                 print(f"DB write failed: {e}")
 
@@ -89,10 +87,7 @@ class SessionStore:
         return set(self._deleted)
 
     def remove_client(self, client_id: str) -> list[str]:
-        removed = [
-            sid for sid, info in self._sessions.items()
-            if info["clientId"] == client_id
-        ]
+        removed = [sid for sid, info in self._sessions.items() if info["clientId"] == client_id]
         for sid in removed:
             del self._sessions[sid]
         if self._db and removed:
@@ -111,10 +106,7 @@ class SessionStore:
     def list_sessions(self, agent_id: str = "") -> list[dict]:
         if not agent_id:
             return list(self._sessions.values())
-        return [
-            session for session in self._sessions.values()
-            if session.get("agentId") == agent_id
-        ]
+        return [session for session in self._sessions.values() if session.get("agentId") == agent_id]
 
     def get(self, session_id: str) -> dict | None:
         return self._sessions.get(session_id)

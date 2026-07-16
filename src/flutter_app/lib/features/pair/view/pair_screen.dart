@@ -27,6 +27,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   bool _isConnecting = false;
   bool _isAutoConnecting = true;
   bool _showCodeEntry = false;
+  bool _daemonDisconnected = false;
   String? _error;
 
   bool _qrScanned = false;
@@ -159,6 +160,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           _isConnecting = false;
           _showScanner = false;
           _showCodeEntry = false;
+          _daemonDisconnected = false;
         });
         context.go('/agents');
       } else if (next.state is Failed) {
@@ -168,6 +170,12 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           _showScanner = false;
           _error = next.error ?? 'Connection failed';
           _qrScanned = false;
+        });
+      } else if ((prev?.daemonConnected ?? false) && !next.daemonConnected && !next.paired) {
+        setState(() {
+          _daemonDisconnected = true;
+          _isConnecting = false;
+          _error = 'Daemon disconnected. Run \'runmote\' on your device to reconnect.';
         });
       }
     });
@@ -260,6 +268,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
 
   Widget _buildContent(ThemeData theme, bool isDark) {
     if (_isAutoConnecting) return _buildLoading(isDark);
+    if (_daemonDisconnected) return _buildDaemonDisconnected(theme, isDark);
     if (_showScanner) return _buildQrScanner(isDark);
     if (_showCodeEntry) return _buildCodeInput(isDark);
     return _buildOptions(theme, isDark);
@@ -379,6 +388,66 @@ class _PairScreenState extends ConsumerState<PairScreen> {
             foregroundColor: isDark ? Colors.white.withOpacity(0.5) : theme.colorScheme.primary.withOpacity(0.7),
           ),
           child: const Text('Need help finding your code?'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDaemonDisconnected(ThemeData theme, bool isDark) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: const Color(0x33FF5252),
+            borderRadius: BorderRadius.circular(40),
+          ),
+          child: const Icon(Icons.cloud_off_rounded, size: 44, color: Color(0xFFFF8A80)),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Connection Lost',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : const Color(0xFF1E293B),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'The remote device disconnected.\nMake sure the daemon is running on your PC.\n\nRun this command in your terminal:\nrunmote',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            color: isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF64748B),
+          ),
+        ),
+        const SizedBox(height: 32),
+        SizedBox(
+          width: 220,
+          height: 48,
+          child: FilledButton(
+            onPressed: () {
+              setState(() {
+                _daemonDisconnected = false;
+                _showScanner = false;
+                _showCodeEntry = false;
+                _error = null;
+                _isConnecting = false;
+              });
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: isDark ? Colors.white : theme.colorScheme.primary,
+              foregroundColor: isDark ? Colors.black87 : Colors.white,
+            ),
+            child: const Text(
+              'Back to Pairing Options',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
         ),
       ],
     );

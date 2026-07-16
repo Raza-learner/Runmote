@@ -65,10 +65,20 @@ def env_setup():
 @pytest.fixture(scope="module")
 def relay_process(env_setup):
     import subprocess
+
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "relay.main:app",
-         "--host", "127.0.0.1", "--port", str(RELAY_PORT),
-         "--log-level", "error"],
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "relay.main:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(RELAY_PORT),
+            "--log-level",
+            "error",
+        ],
         cwd=SRC,
         env=env_setup,
         stdout=subprocess.DEVNULL,
@@ -76,6 +86,7 @@ def relay_process(env_setup):
     )
     # Wait for relay to be ready
     import socket
+
     deadline = time.time() + 10
     while time.time() < deadline:
         try:
@@ -100,6 +111,7 @@ def relay_process(env_setup):
 @pytest.fixture(scope="module")
 def daemon_process(env_setup):
     import subprocess
+
     proc = subprocess.Popen(
         [sys.executable, "-m", "daemon.main"],
         cwd=SRC,
@@ -146,14 +158,18 @@ class TestSessionIntegration:
 
         async with connect(APP_URL) as ws:
             # --- Pair ---
-            await ws.send(json.dumps({
-                "jsonrpc": "2.0", "id": 1,
-                "method": "auth/pair",
-                "params": {"code": pairing_code},
-            }))
+            await ws.send(
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "auth/pair",
+                        "params": {"code": pairing_code},
+                    }
+                )
+            )
             resp = json.loads(await ws.recv())
-            assert resp.get("result", {}).get("paired") is True, \
-                f"Pairing failed: {resp}"
+            assert resp.get("result", {}).get("paired") is True, f"Pairing failed: {resp}"
             daemon_id = resp["result"].get("daemonId")
             print(f"  ✓ Paired with daemon: {daemon_id}")
 
@@ -164,7 +180,7 @@ class TestSessionIntegration:
                 try:
                     msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=0.3))
                     print(f"  draining: {msg.get('method', msg.get('id', 'unknown'))}")
-                    if msg.get('id') == 2:
+                    if msg.get("id") == 2:
                         # that was our agent/list response, keep it
                         resp = msg
                         break
@@ -174,11 +190,16 @@ class TestSessionIntegration:
 
             # --- agent/list ---
             if resp is None:
-                await ws.send(json.dumps({
-                    "jsonrpc": "2.0", "id": 2,
-                    "method": "agent/list",
-                    "params": {},
-                }))
+                await ws.send(
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 2,
+                            "method": "agent/list",
+                            "params": {},
+                        }
+                    )
+                )
                 resp = json.loads(await ws.recv())
 
             agents = (resp.get("result") or resp.get("params") or {}).get("agents", [])
@@ -190,14 +211,19 @@ class TestSessionIntegration:
                 agent_id = agent["id"]
                 print(f"\n  Testing session/new for agent '{agent_id}'...")
 
-                await ws.send(json.dumps({
-                    "jsonrpc": "2.0", "id": 3,
-                    "method": "session/new",
-                    "params": {
-                        "agentId": agent_id,
-                        "cwd": "/tmp",
-                    },
-                }))
+                await ws.send(
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 3,
+                            "method": "session/new",
+                            "params": {
+                                "agentId": agent_id,
+                                "cwd": "/tmp",
+                            },
+                        }
+                    )
+                )
                 resp = json.loads(await ws.recv())
 
                 # Response might be a direct result or have method/params
@@ -208,24 +234,27 @@ class TestSessionIntegration:
                     continue
 
                 session_id = result.get("sessionId") or result.get("id")
-                assert session_id is not None, \
-                    f"No sessionId in session/new for {agent_id}: {resp}"
+                assert session_id is not None, f"No sessionId in session/new for {agent_id}: {resp}"
                 print(f"    ✓ Created session: {session_id}")
                 print(f"    ✓ configOptions present: {'configOptions' in result}")
 
                 # Check that cwd is reflected (some agents return it)
                 returned_cwd = result.get("cwd", "")
                 if returned_cwd:
-                    assert "/tmp" in returned_cwd, \
-                        f"cwd not /tmp: {returned_cwd}"
+                    assert "/tmp" in returned_cwd, f"cwd not /tmp: {returned_cwd}"
 
             # --- session/list ---
             print("\n  Testing session/list...")
-            await ws.send(json.dumps({
-                "jsonrpc": "2.0", "id": 4,
-                "method": "session/list",
-                "params": {},
-            }))
+            await ws.send(
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 4,
+                        "method": "session/list",
+                        "params": {},
+                    }
+                )
+            )
             resp = json.loads(await ws.recv())
             sessions = resp.get("result", {}).get("sessions", [])
             print(f"    Got {len(sessions)} session(s)")
@@ -235,15 +264,19 @@ class TestSessionIntegration:
                 print(f"    - {sid}  cwd={cwd}")
 
             # --- daemon/status ---
-            await ws.send(json.dumps({
-                "jsonrpc": "2.0", "id": 5,
-                "method": "daemon/status",
-                "params": {},
-            }))
+            await ws.send(
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 5,
+                        "method": "daemon/status",
+                        "params": {},
+                    }
+                )
+            )
             resp = json.loads(await ws.recv())
             status = resp.get("result", {})
-            assert status.get("connected") is True, \
-                f"Daemon not connected: {status}"
+            assert status.get("connected") is True, f"Daemon not connected: {status}"
             print(f"  ✓ Daemon status: connected={status.get('connected')}")
 
     @pytest.mark.asyncio
@@ -254,21 +287,31 @@ class TestSessionIntegration:
         pairing_code = daemon_process.pairing_code
 
         async with connect(APP_URL) as ws:
-            await ws.send(json.dumps({
-                "jsonrpc": "2.0", "id": 1,
-                "method": "auth/pair",
-                "params": {"code": pairing_code},
-            }))
+            await ws.send(
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "auth/pair",
+                        "params": {"code": pairing_code},
+                    }
+                )
+            )
             resp = json.loads(await ws.recv())
             assert resp.get("result", {}).get("paired") is True
 
             await asyncio.sleep(0.5)
 
-            await ws.send(json.dumps({
-                "jsonrpc": "2.0", "id": 2,
-                "method": "session/list",
-                "params": {},
-            }))
+            await ws.send(
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 2,
+                        "method": "session/list",
+                        "params": {},
+                    }
+                )
+            )
             resp = json.loads(await ws.recv())
 
             # The relay returns cached sessions when daemon reconnects

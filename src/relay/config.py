@@ -31,3 +31,7 @@ if DISABLE_DISCOVERY and not RELAY_TOKEN:
         file=sys.stderr,
     )
     sys.exit(1)
+
+# WebSocket keepalive settings — keep Render's proxy from killing idle connections
+WS_PING_INTERVAL = int(os.environ.get("ACP_RELAY_WS_PING_INTERVAL", "15"))
+WS_PING_TIMEOUT = int(os.environ.get("ACP_RELAY_WS_PING_TIMEOUT", "20"))
