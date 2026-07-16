@@ -21,7 +21,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     env:
-      ACP_AGENT_COMMANDS: '[{"id":"test","name":"Test","command":["echo","acp"]}]'
+      ACP_AGENT_COMMANDS: '[{"id":"test","name":"Test","command":["cat"]}]'
       ACP_RELAY_DB: ":memory:"
       ACP_LOG_DIR: /tmp/acp_test_logs
       ACP_LOG_LEVEL: ERROR
