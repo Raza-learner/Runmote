@@ -309,6 +309,7 @@ class TestIsHidden:
         entry.name = ".hidden_file"
         assert _is_hidden(entry) is True
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows file attributes make mock return True")
     def test_non_dot_not_hidden_on_unix(self):
         entry = mock.MagicMock(spec=os.DirEntry)
         entry.name = "visible_file"
