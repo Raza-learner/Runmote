@@ -14,7 +14,7 @@ _src = Path(__file__).resolve().parent
 if str(_src) not in sys.path:
     sys.path.insert(0, str(_src))
 
-from config import AGENT_CONFIGS, DAEMON_ID, DAEMON_TOKEN, RECONNECT_DELAY, RELAY_URL, _detect_acp_agents
+from config import AGENT_CONFIGS, DAEMON_ID, DAEMON_TOKEN, RECONNECT_DELAY, RELAY_URL
 from websockets.asyncio.client import connect
 
 
