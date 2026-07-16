@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - .github/workflows/**
       - Dockerfile.relay
       - src/relay/**
       - src/common/**
