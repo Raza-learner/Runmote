@@ -33,11 +33,7 @@ jobs:
         run: flutter pub get
 
       - name: Analyze
-        run: |
-          flutter --version
-          flutter analyze 2>&1 || true
-          echo "---"
-          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 || true
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Run tests
         run: flutter test
