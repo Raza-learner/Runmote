@@ -374,10 +374,12 @@ async def run_daemon():
                             continue
 
                         if method == "agent/list":
-                            detected = {a["id"]: a for a in _detect_acp_agents() if a.get("id") != "default"}
+                            # Use initial configs (AGENT_CONFIGS) for re-detection instead of
+                            # live system detection, so explicit ACP_AGENT_COMMANDS is respected.
+                            detected = {a["id"]: a for a in AGENT_CONFIGS if a.get("id") and a.get("command")}
                             for aid in list(agents.keys()):
                                 if aid not in detected:
-                                    log(f"Agent '{aid}' no longer detected, stopping...")
+                                    log(f"Agent '{aid}' no longer configured, stopping...")
                                     if aid in agent_tasks:
                                         at = agent_tasks.pop(aid)
                                         for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
@@ -398,7 +400,7 @@ async def run_daemon():
                                     del agents[aid]
                             for aid, cfg in detected.items():
                                 if aid not in agents:
-                                    log(f"Agent '{aid}' newly detected, starting...")
+                                    log(f"Agent '{aid}' newly configured, starting...")
                                     agents[aid] = AgentProcess(cfg)
                                     try:
                                         await agents[aid].start()
@@ -726,12 +728,15 @@ async def run_daemon():
                                 if exc:
                                     log(f"Relay task exception: {exc}")
                             break
-                else:
-                    # No agents — stay connected so pairing/mobile app works
-                    await relay_task
 
+                # Cancel remaining agent tasks, but keep relay_task alive
                 for t in pending:
-                    t.cancel()
+                    if t is not relay_task:
+                        t.cancel()
+
+                # Stay connected after agents exit so pairing/mobile app works
+                if not relay_task.done():
+                    await relay_task
 
         except asyncio.CancelledError:
             raise
