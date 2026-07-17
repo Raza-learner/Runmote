@@ -39,6 +39,24 @@ dev_dependencies:
   freezed: ^2.5.7
   json_serializable: ^6.8.0
   drift_dev: ^2.22.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  image_path: "assets/logos/app_icon.png"
+  android: true
+  ios: true
+  web:
+    generate: true
+    image_path: "assets/logos/app_icon.png"
+    background_color: "#F5E6D8"
+    theme_color: "#F5E6D8"
+  windows:
+    generate: true
+    image_path: "assets/logos/app_icon.png"
+    icon_size: 48
+  macos:
+    generate: true
+    image_path: "assets/logos/app_icon.png"
 
 flutter:
   uses-material-design: true
