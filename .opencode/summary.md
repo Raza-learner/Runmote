@@ -2,7 +2,7 @@
 
 ## Work State
 
-**Phase**: Dev branch installer + relay defaults fixed; daemon manually running; pending push/merge and app rebuild.
+**Phase**: CI passing, main branch updated, Flutter app icon fixed, pending app rebuild and end-to-end test.
 
 ### Completed
 
@@ -29,16 +29,27 @@
    - Main relay (`runmote-relay-u2zi.onrender.com`): `67bcb1b81fd2ae0e6c3b93ddf6a5e445`.
    - Dev relay (`runmote-relay.onrender.com`): `00a89de233437a8f8482c4aab2af80a9`.
 
+6. **CI pipelines fixed and passing**:
+   - Python CI: fixed daemon integration tests (agent disconnect, agent/list handler), fixed CI workflow test env (`echo acp` → `cat`), skipped Windows-only test.
+   - Flutter CI: fixed 30+ lint warnings, added `flutter analyze --no-fatal-infos --no-fatal-warnings`, build-apk succeeds.
+
+7. **Flutter app icon fixed**:
+   - Removed black/rounded corners from the source logo, filled the background with the detected beige color (`#FAEFE2`), and scaled the content to fill the 1024x1024 canvas.
+   - Added `flutter_launcher_icons` configuration with `adaptive_icon_background` and `adaptive_icon_foreground` for Android, and `remove_alpha_ios: true`.
+   - Regenerated launcher icons for Android, iOS, web, macOS, and Windows.
+   - Verified `flutter analyze` and `flutter build apk --debug` pass.
+
+8. **Branches merged**: latest fixes are on both `dev` and `main`.
+
 ### Active
 
-- Push dev branch so the Worker serves the updated `install.sh/dev`.
-- Update main branch so `curl https://runmote.dev/install.sh | bash` works (currently main still has `relay.runmote.dev` default). Requires merging dev into main or manually updating main branch files.
+- (none)
 
 ### Next Move
 
-1. Push the dev branch to deploy the updated `install.sh/dev`.
-2. Merge dev into main (or manually update main branch files) so the production installer points to the working relay.
-3. Rebuild and deploy the Flutter app; test end-to-end pair/connect flow.
+1. Rebuild and deploy the Flutter app (APK / web).
+2. Test end-to-end pair/connect flow.
+3. Consider upgrading `actions/checkout@v4` to a Node.js 24 compatible version (CI warning).
 4. For new dev installs, use:
    ```bash
    curl -fsSL https://runmote.dev/install.sh/dev | ACP_RELAY_TOKEN=00a89de233437a8f8482c4aab2af80a9 bash
