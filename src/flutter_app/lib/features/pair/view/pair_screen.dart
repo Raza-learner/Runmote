@@ -235,10 +235,12 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.auto_awesome_rounded,
-              size: 56,
+            child: Image.asset(
+              'assets/logos/app_icon_foreground.png',
+              width: 56,
+              height: 56,
               color: Colors.white,
+              colorBlendMode: BlendMode.srcIn,
             ),
           ),
         ),
