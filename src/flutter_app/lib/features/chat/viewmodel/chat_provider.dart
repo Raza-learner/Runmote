@@ -196,6 +196,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
 
   ChatNotifier(this._ref, this._sessionId, this._cwd)
       : super(const AsyncValue.loading()) {
+    debugPrint('[chat_provider] ChatNotifier created for session=$_sessionId cwd=$_cwd');
     _listenToRelay();
     _watchConnection();
     _loadSessionFromAgent();
@@ -256,9 +257,13 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   PermissionRequest? _permissionRequest;
 
   void _syncState() {
-    if (!_connected) return;
+    if (!_connected) {
+      debugPrint('[chat_provider] _syncState skipped: not connected');
+      return;
+    }
     _logBusy('sync');
     final current = state.valueOrNull;
+    debugPrint('[chat_provider] _syncState: ${_buffer.length} messages, was loading=${state.isLoading}');
     state = AsyncValue.data(ChatState(
       messages: List.of(_buffer),
       configOptions: current?.configOptions ?? [],

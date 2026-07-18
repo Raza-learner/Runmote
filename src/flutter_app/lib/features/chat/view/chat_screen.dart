@@ -2,9 +2,9 @@ import 'dart:ui' as ui;
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -44,7 +44,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _scrollController.addListener(_onScroll);
     _textController.addListener(() => setState(() {}));
     Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) setState(() => _showSkeleton = false);
+      if (mounted) {
+        debugPrint('[chat_screen] skeleton timer fired, hiding skeleton');
+        setState(() => _showSkeleton = false);
+      }
     });
   }
 
@@ -263,6 +266,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     chatProvider((widget.sessionId, widget.cwd)),
                   );
                   if (_showSkeleton || chatState.isLoading) {
+                    debugPrint('[chat_screen] skeleton: _showSkeleton=$_showSkeleton chatState.isLoading=${chatState.isLoading}');
                     return Column(
                       children: [
                         if (daemonDown) const DaemonOfflineBanner(),

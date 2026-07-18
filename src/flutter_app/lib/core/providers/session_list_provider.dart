@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'connection_provider.dart';
@@ -166,10 +167,15 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
         // Riverpod listen callback (outside build phase), so mutating
         // state here is safe.
         if (next.selectedAgentId != _loadedAgentId) {
+          debugPrint('[session_list] AGENT CHANGED: $_loadedAgentId -> ${next.selectedAgentId}');
           _loadedAgentId = next.selectedAgentId;
           _isLoading = false;
+          debugPrint('[session_list] Setting EMPTY state (line 171)');
           state = const AsyncValue.data([]);
-          Future.microtask(() => loadSessions());
+          Future.microtask(() {
+            debugPrint('[session_list] Calling loadSessions() via microtask');
+            loadSessions();
+          });
           return;
         }
 
@@ -214,9 +220,10 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
     }
     _isLoading = true;
 
-    if (!state.hasValue) {
-      state = const AsyncValue.loading();
-    }
+      if (!state.hasValue) {
+        debugPrint('[session_list] Setting LOADING state');
+        state = const AsyncValue.loading();
+      }
     try {
       if (connection.channel == null) {
         state = const AsyncValue.data([]);
@@ -257,6 +264,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
           .where((s) => !_deletedIds.contains(s.id))
           .toList();
 
+      debugPrint('[session_list] Cached sessions loaded: ${cachedSessions.length} sessions');
       state = AsyncValue.data(cachedSessions);
 
       if (!supportsList) {
@@ -372,6 +380,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
         );
       }
 
+      debugPrint('[session_list] Remote sessions loaded: ${remoteSessions.length} sessions, merging ${cachedSessions.length} cached');
       state = AsyncValue.data(sessions);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
