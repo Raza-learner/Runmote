@@ -38,6 +38,7 @@
    - Added `flutter_launcher_icons` configuration with `adaptive_icon_background` and `adaptive_icon_foreground` for Android, and `remove_alpha_ios: true`.
    - Regenerated launcher icons for Android, iOS, web, macOS, and Windows.
    - Later made the robot logo ~15% larger while keeping all content within the safe area so the launcher mask doesn't clip it.
+   - Replaced the pair screen's purple gradient star icon (`Icons.auto_awesome_rounded`) with the Runmote logo (white, using `app_icon_foreground.png` with `BlendMode.srcIn`).
    - Verified `flutter analyze` and `flutter build apk --debug` pass.
 
 8. **Branches merged**: latest fixes are on both `dev` and `main`.
