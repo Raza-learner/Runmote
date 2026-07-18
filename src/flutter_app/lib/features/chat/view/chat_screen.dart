@@ -32,7 +32,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   bool _showScrollButton = false;
-  bool _userScrolledUp = false;
   final List<Map<String, String>> _attachments = [];
   late String _title;
   bool _showSkeleton = true;
@@ -43,11 +42,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _title = _fallbackTitle(widget.cwd);
     _scrollController.addListener(_onScroll);
     _textController.addListener(() => setState(() {}));
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        debugPrint('[chat_screen] skeleton timer fired, hiding skeleton');
-        setState(() => _showSkeleton = false);
-      }
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _showSkeleton = false);
     });
   }
 
@@ -70,12 +66,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (!_scrollController.hasClients) return;
     final pixels = _scrollController.position.pixels;
     final show = pixels > 160;
-    final scrolledUp = pixels > 80;
 
     if (show != _showScrollButton) {
       setState(() => _showScrollButton = show);
     }
-    _userScrolledUp = scrolledUp;
   }
 
   Future<void> _pickFile() async {
@@ -131,7 +125,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ref
         .read(chatProvider((widget.sessionId, widget.cwd)).notifier)
         .sendMessage(text, extra: extra);
-    _scrollToBottom();
   }
 
   void _scrollToBottom({bool animate = true}) {
@@ -145,11 +138,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } else {
       _scrollController.jumpTo(0);
     }
-  }
-
-  void _scrollToBottomIfNearEnd() {
-    if (!_scrollController.hasClients || _userScrolledUp) return;
-    _scrollToBottom(animate: true);
   }
 
   String _sessionTitle(List<AcpSession> sessions) {
@@ -176,19 +164,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ref.listen(
       chatProvider((widget.sessionId, widget.cwd)),
       (previous, next) {
-        final prevCount = previous?.valueOrNull?.messages.length ?? 0;
-        final nextCount = next.valueOrNull?.messages.length ?? 0;
-        final wasStreaming =
-            previous?.valueOrNull?.messages.lastOrNull?.isStreaming ?? false;
-        final isStreaming =
-            next.valueOrNull?.messages.lastOrNull?.isStreaming ?? false;
-
-        final newMessageArrived = nextCount > prevCount;
-        final streamingStarted = isStreaming && !wasStreaming;
-        if (newMessageArrived || streamingStarted) {
-          Future.microtask(_scrollToBottomIfNearEnd);
-        }
-
         final prevReq = previous?.valueOrNull?.permissionRequest;
         final nextReq = next.valueOrNull?.permissionRequest;
         if (nextReq != null && prevReq != nextReq) {
@@ -265,20 +240,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   final chatState = ref.watch(
                     chatProvider((widget.sessionId, widget.cwd)),
                   );
-                  if (_showSkeleton || chatState.isLoading) {
-                    debugPrint('[chat_screen] skeleton: _showSkeleton=$_showSkeleton chatState.isLoading=${chatState.isLoading}');
-                    return Column(
-                      children: [
-                        if (daemonDown) const DaemonOfflineBanner(),
-                        const Expanded(child: ChatSkeleton()),
-                      ],
-                    );
-                  }
-
-                  return Column(
-                    children: [
-                      if (daemonDown) const DaemonOfflineBanner(),
-                      Consumer(
+                  final cs = chatState.valueOrNull;
+                  final showSkeleton = _showSkeleton || chatState.isLoading || (cs?.isBusy ?? false);
+                  return AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    child: showSkeleton
+                        ? Column(
+                            key: const ValueKey('skeleton'),
+                            children: [
+                              if (daemonDown) const DaemonOfflineBanner(),
+                              const Expanded(child: ChatSkeleton()),
+                            ],
+                          )
+                        : Column(
+                            key: const ValueKey('chat'),
+                            children: [
+                              if (daemonDown) const DaemonOfflineBanner(),
+                              Consumer(
                         builder: (context, ref, child) {
                           final modeOptions = ref.watch(
                             chatProvider((widget.sessionId, widget.cwd)).select(
@@ -350,6 +330,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     controller: _scrollController,
                                     padding: const EdgeInsets.all(16),
                                     itemCount: reversedMessages.length,
+                                    cacheExtent: 400,
                                     addAutomaticKeepAlives: false,
                                     addRepaintBoundaries: true,
                                     itemBuilder: (context, index) {
@@ -419,8 +400,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                       ),
                     ],
-                  );
-                },
+                  ),
+                );
+              },
               ),
             ),
             _buildInputArea(theme, canSendImages, daemonDown),
@@ -635,11 +617,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           maxLines: 6,
                           style: t.textTheme.bodyLarge,
                           decoration: InputDecoration(
-                            hintText: daemonDown
-                                ? 'Daemon not connected'
-                                : isBusy
-                                    ? 'Agent is responding...'
-                                    : 'Message...',
+                            hintText: daemonDown ? 'Daemon not connected' : 'Message...',
                             hintStyle: t.textTheme.bodyLarge?.copyWith(
                               color: t.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                             ),
@@ -670,31 +648,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         child: SizedBox(
                           width: 46,
                           height: 46,
-                          child: isBusy
-                              ? Center(
-                                  child: SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: t.colorScheme.primary,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              IconButton.filled(
+                                onPressed: isBusy || daemonDown ||
+                                        (_textController.text.trim().isEmpty &&
+                                            _attachments.isEmpty)
+                                    ? null
+                                    : _sendMessage,
+                                icon: const Icon(Icons.arrow_upward, size: 24),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: t.colorScheme.primary,
+                                  foregroundColor: t.colorScheme.onPrimary,
+                                  disabledBackgroundColor: t.colorScheme.surfaceContainerHighest,
+                                  disabledForegroundColor: t.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              if (isBusy)
+                                Positioned.fill(
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: t.colorScheme.primary,
+                                      ),
                                     ),
                                   ),
-                                )
-                              : IconButton.filled(
-                                  onPressed: daemonDown ||
-                                          (_textController.text.trim().isEmpty &&
-                                              _attachments.isEmpty)
-                                      ? null
-                                      : _sendMessage,
-                                  icon: const Icon(Icons.arrow_upward, size: 24),
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: t.colorScheme.primary,
-                                    foregroundColor: t.colorScheme.onPrimary,
-                                    disabledBackgroundColor: t.colorScheme.surfaceContainerHighest,
-                                    disabledForegroundColor: t.colorScheme.onSurfaceVariant,
-                                  ),
                                 ),
+                            ],
+                          ),
                         ),
                       ),
                     ],

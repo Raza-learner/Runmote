@@ -53,6 +53,7 @@ def _detect_acp_agents() -> list[dict]:
         os.path.join(_pf, "OpenCode") if _pf else "",
         os.path.join(_home, ".opencode", "bin") if _home else "",
         _localbin,
+        _npm,
         _cargo,
         _bun,
     ):
@@ -88,6 +89,7 @@ def _detect_acp_agents() -> list[dict]:
         os.path.join(_local, "Programs", "Cursor") if _local else "",
         os.path.join(_pf, "Cursor") if _pf else "",
         _localbin,
+        _npm,
     ):
         agents.append({"id": "cursor", "name": "Cursor", "command": ["cursor-agent", "acp"]})
 

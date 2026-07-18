@@ -554,6 +554,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   void _handleUpdate(Map<String, dynamic> params) {
     final update = params['update'] as Map<String, dynamic>?;
     if (update == null) return;
+    _finalizeTimer?.cancel();
 
     final type = update['sessionUpdate'] as String?;
     final text = _extractText(update['content']);
@@ -636,7 +637,17 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     }
   }
 
+  Timer? _finalizeTimer;
+
   void _finalizeStreaming() {
+    if (!_connected) return;
+    _finalizeTimer?.cancel();
+    _finalizeTimer = Timer(const Duration(milliseconds: 600), () {
+      _doFinalizeStreaming();
+    });
+  }
+
+  void _doFinalizeStreaming() {
     if (!_connected) return;
     for (var i = 0; i < _buffer.length; i++) {
       if (_buffer[i].isStreaming) {
@@ -647,6 +658,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   }
 
   void _upsertMessage(String text, ChatMessageRole role, String? msgId) {
+    if (role == ChatMessageRole.assistant) _finalizeTimer?.cancel();
     if (msgId != null) {
       for (var i = 0; i < _buffer.length; i++) {
         if (_buffer[i].id == msgId) {

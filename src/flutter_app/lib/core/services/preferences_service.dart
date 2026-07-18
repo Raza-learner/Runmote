@@ -11,6 +11,7 @@ class PreferencesService {
   static const _keyDeviceName = 'device_name';
   static const _keyDefaultCwd = 'default_cwd';
   static const _keyThemeMode = 'theme_mode';
+  static const _keyDeletedIds = 'deleted_session_ids';
   static const _keyMcpServers = 'mcp_servers';
 
   final SharedPreferences _prefs;
@@ -44,6 +45,15 @@ class PreferencesService {
   String getThemeMode() => _prefs.getString(_keyThemeMode) ?? 'system';
   Future<void> setThemeMode(String mode) =>
       _prefs.setString(_keyThemeMode, mode);
+
+  List<String> getDeletedSessionIds() {
+    final raw = _prefs.getStringList(_keyDeletedIds);
+    return raw ?? [];
+  }
+
+  Future<void> setDeletedSessionIds(List<String> ids) async {
+    await _prefs.setStringList(_keyDeletedIds, ids);
+  }
 
   List<McpServer> getMcpServers() {
     final raw = _prefs.getString(_keyMcpServers);

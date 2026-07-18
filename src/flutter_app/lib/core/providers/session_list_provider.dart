@@ -113,7 +113,8 @@ class AcpSession {
 
 class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
   final Ref _ref;
-  final _deletedIds = <String>{};
+  Set<String> _deletedIds = {};
+  bool _deletedIdsLoaded = false;
   StreamSubscription<Map<String, dynamic>>? _messageSub;
   ProviderSubscription<AcpConnection>? _connectionSub;
   Timer? _debounceTimer;
@@ -137,12 +138,15 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
         return;
       }
 
-      // Passive session-list responses forwarded from relay (no method, just
-      // id + result.sessions).  Refresh so the list stays in sync when the
-      // agent sends its initial list or after a daemon reconnect.
+      // Passive session-list responses from the daemon (string IDs like
+      // "daemon_sessions_agent", or no ID).  Skip responses to our own
+      // session/list requests (which have integer IDs) to avoid a cycle
+      // where each response triggers another session/list.
       final result = msg['result'] as Map<String, dynamic>?;
       if (result != null && result.containsKey('sessions')) {
-        _debouncedRefresh();
+        if (msg['id'] is! int) {
+          _debouncedRefresh();
+        }
         return;
       }
 
@@ -161,17 +165,14 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
       (previous, next) {
         final isConnected = next.state is Connected;
 
-        // If the selected agent changed, cancel any in-flight load and
-        // immediately clear state so the widget renders empty / cached
-        // instead of the previous agent's sessions.  This runs in a
-        // Riverpod listen callback (outside build phase), so mutating
-        // state here is safe.
+        // If the selected agent changed, cancel any in-flight load and let
+        // loadSessions() overwrite state with the new agent's cached data.
+        // Don't touch state here — leaving the previous data avoids a
+        // rebuild flash (spinner → list or empty → list).
         if (next.selectedAgentId != _loadedAgentId) {
           debugPrint('[session_list] AGENT CHANGED: $_loadedAgentId -> ${next.selectedAgentId}');
           _loadedAgentId = next.selectedAgentId;
           _isLoading = false;
-          debugPrint('[session_list] Setting EMPTY state (line 171)');
-          state = const AsyncValue.data([]);
           Future.microtask(() {
             debugPrint('[session_list] Calling loadSessions() via microtask');
             loadSessions();
@@ -185,6 +186,14 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
         _wasConnected = isConnected;
       },
     );
+  }
+
+  Future<void> _ensureDeletedIds() async {
+    if (!_deletedIdsLoaded) {
+      final prefs = await _ref.read(preferencesServiceProvider.future);
+      _deletedIds = prefs.getDeletedSessionIds().toSet();
+      _deletedIdsLoaded = true;
+    }
   }
 
   void _debouncedRefresh() {
@@ -205,6 +214,7 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
   }
 
   Future<void> loadSessions() async {
+    await _ensureDeletedIds();
     final connection = _ref.read(connectionProvider);
     final currentAgentId = connection.selectedAgentId;
 
@@ -481,9 +491,12 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
   }
 
   Future<void> deleteSession(String id) async {
+    await _ensureDeletedIds();
     _deletedIds.add(id);
     final db = _ref.read(databaseProvider);
     await db.removeCachedSession(id);
+    final prefs = await _ref.read(preferencesServiceProvider.future);
+    await prefs.setDeletedSessionIds(_deletedIds.toList());
     state.whenData((sessions) {
       state = AsyncValue.data(sessions.where((s) => s.id != id).toList());
     });
