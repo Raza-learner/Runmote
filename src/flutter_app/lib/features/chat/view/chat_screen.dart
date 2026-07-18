@@ -325,24 +325,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     );
                                   }
                                   final reversedMessages = messages.reversed.toList();
-                                  return ListView.builder(
-                                    reverse: true,
-                                    controller: _scrollController,
-                                    padding: const EdgeInsets.all(16),
-                                    itemCount: reversedMessages.length,
-                                    cacheExtent: 400,
-                                    addAutomaticKeepAlives: false,
-                                    addRepaintBoundaries: true,
-                                    itemBuilder: (context, index) {
-                                      final msg = reversedMessages[index];
-                                      return RepaintBoundary(
-                                        key: ValueKey(msg.id),
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(bottom: 4),
-                                          child: MessageBubble(message: msg),
-                                        ),
-                                      );
-                                    },
+                                  return ScrollConfiguration(
+                                    behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                                    child: ListView.builder(
+                                      reverse: true,
+                                      controller: _scrollController,
+                                      padding: const EdgeInsets.all(16),
+                                      itemCount: reversedMessages.length,
+                                      cacheExtent: 400,
+                                      addAutomaticKeepAlives: false,
+                                      addRepaintBoundaries: true,
+                                      itemBuilder: (context, index) {
+                                        final msg = reversedMessages[index];
+                                        return RepaintBoundary(
+                                          key: ValueKey(msg.id),
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(bottom: 4),
+                                            child: MessageBubble(message: msg),
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   );
                                 },
                                 error: (e, _) {
