@@ -399,52 +399,52 @@ async def run_daemon():
                                 continue
 
                             if method == "agent/list":
-                            log("agent/list requested by relay")
-                            # Use initial configs (AGENT_CONFIGS) for re-detection instead of
-                            # live system detection, so explicit ACP_AGENT_COMMANDS is respected.
-                            detected = {a["id"]: a for a in AGENT_CONFIGS if a.get("id") and a.get("command")}
-                            for aid in list(agents.keys()):
-                                if aid not in detected:
-                                    log("Agent '%s' no longer configured, stopping...", aid)
-                                    if aid in agent_tasks:
-                                        at = agent_tasks.pop(aid)
-                                        for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
-                                            if t and not t.done():
-                                                t.cancel()
-                                    send_queues.pop(aid, None)
-                                    await agents[aid].stop()
-                                    del agents[aid]
-                                elif not agents[aid].online:
-                                    log("Agent '%s' was offline, restarting...", aid)
-                                    if aid in agent_tasks:
-                                        at = agent_tasks.pop(aid)
-                                        for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
-                                            if t and not t.done():
-                                                t.cancel()
-                                    send_queues.pop(aid, None)
-                                    await agents[aid].stop()
-                                    del agents[aid]
-                            for aid, cfg in detected.items():
-                                if aid not in agents:
-                                    log("Agent '%s' newly configured, starting...", aid)
-                                    agents[aid] = AgentProcess(cfg)
-                                    try:
-                                        await agents[aid].start()
-                                    except Exception as e:
-                                        agents[aid].online = False
-                                        log("Failed to start new agent %s: %s", aid, e)
-                                    if agents[aid].online:
-                                        send_q = asyncio.Queue()
-                                        send_queues[aid] = send_q
-                                        agent_tasks[aid] = {
-                                            "agent": agents[aid],
-                                            "relay": asyncio.create_task(agent_to_relay(agents[aid])),
-                                            "stderr": asyncio.create_task(log_stderr(agents[aid])),
-                                            "watch": asyncio.create_task(watch_agent(agents[aid])),
-                                            "sender": asyncio.create_task(agent_sender(agents[aid], send_q)),
-                                        }
-                            await _send_json(websocket, _agent_list_message(agents, msg_id))
-                            continue
+                                log("agent/list requested by relay")
+                                # Use initial configs (AGENT_CONFIGS) for re-detection instead of
+                                # live system detection, so explicit ACP_AGENT_COMMANDS is respected.
+                                detected = {a["id"]: a for a in AGENT_CONFIGS if a.get("id") and a.get("command")}
+                                for aid in list(agents.keys()):
+                                    if aid not in detected:
+                                        log("Agent '%s' no longer configured, stopping...", aid)
+                                        if aid in agent_tasks:
+                                            at = agent_tasks.pop(aid)
+                                            for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
+                                                if t and not t.done():
+                                                    t.cancel()
+                                        send_queues.pop(aid, None)
+                                        await agents[aid].stop()
+                                        del agents[aid]
+                                    elif not agents[aid].online:
+                                        log("Agent '%s' was offline, restarting...", aid)
+                                        if aid in agent_tasks:
+                                            at = agent_tasks.pop(aid)
+                                            for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
+                                                if t and not t.done():
+                                                    t.cancel()
+                                        send_queues.pop(aid, None)
+                                        await agents[aid].stop()
+                                        del agents[aid]
+                                for aid, cfg in detected.items():
+                                    if aid not in agents:
+                                        log("Agent '%s' newly configured, starting...", aid)
+                                        agents[aid] = AgentProcess(cfg)
+                                        try:
+                                            await agents[aid].start()
+                                        except Exception as e:
+                                            agents[aid].online = False
+                                            log("Failed to start new agent %s: %s", aid, e)
+                                        if agents[aid].online:
+                                            send_q = asyncio.Queue()
+                                            send_queues[aid] = send_q
+                                            agent_tasks[aid] = {
+                                                "agent": agents[aid],
+                                                "relay": asyncio.create_task(agent_to_relay(agents[aid])),
+                                                "stderr": asyncio.create_task(log_stderr(agents[aid])),
+                                                "watch": asyncio.create_task(watch_agent(agents[aid])),
+                                                "sender": asyncio.create_task(agent_sender(agents[aid], send_q)),
+                                            }
+                                await _send_json(websocket, _agent_list_message(agents, msg_id))
+                                continue
 
                         if method == "filesystem/list_drives":
                             try:
