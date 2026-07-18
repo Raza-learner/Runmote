@@ -446,197 +446,197 @@ async def run_daemon():
                                 await _send_json(websocket, _agent_list_message(agents, msg_id))
                                 continue
 
-                        if method == "filesystem/list_drives":
-                            try:
-                                drives = []
-                                if sys.platform == "win32":
-                                    import string
-
-                                    for letter in string.ascii_uppercase:
-                                        drive = f"{letter}:\\"
-                                        if os.path.exists(drive):
-                                            drives.append(
-                                                {
-                                                    "name": f"{letter}:",
-                                                    "path": _normalize_path(os.path.abspath(drive)),
-                                                    "type": "directory",
-                                                    "size": 0,
-                                                    "isSymlink": False,
-                                                }
-                                            )
-                                else:
-                                    drives.append(
-                                        {
-                                            "name": "/",
-                                            "path": "/",
-                                            "type": "directory",
-                                            "size": 0,
-                                            "isSymlink": False,
-                                        }
-                                    )
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "result": {"entries": drives},
-                                    },
-                                )
-                            except Exception as e:
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "error": {"code": -32000, "message": f"Failed to list drives: {e}"},
-                                    },
-                                )
-                            continue
-
-                        if method == "filesystem/get_home":
-                            await _send_json(
-                                websocket,
-                                {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "result": {"home": _normalize_path(os.path.expanduser("~"))},
-                                },
-                            )
-                            continue
-
-                        if method == "filesystem/list_directory":
-                            params = data.get("params") or {}
-                            path = os.path.expanduser(params.get("path", ".") or ".")
-                            show_hidden = params.get("showHidden", False)
-                            try:
-                                entries = []
-                                for entry in os.scandir(path):
-                                    if not show_hidden and _is_hidden(entry):
-                                        continue
-                                    try:
-                                        is_dir = entry.is_dir()
-                                        is_file = entry.is_file()
-                                        is_symlink = entry.is_symlink()
-                                        stat_info = entry.stat(follow_symlinks=False)
-                                        entries.append(
+                            if method == "filesystem/list_drives":
+                                try:
+                                    drives = []
+                                    if sys.platform == "win32":
+                                        import string
+    
+                                        for letter in string.ascii_uppercase:
+                                            drive = f"{letter}:\\"
+                                            if os.path.exists(drive):
+                                                drives.append(
+                                                    {
+                                                        "name": f"{letter}:",
+                                                        "path": _normalize_path(os.path.abspath(drive)),
+                                                        "type": "directory",
+                                                        "size": 0,
+                                                        "isSymlink": False,
+                                                    }
+                                                )
+                                    else:
+                                        drives.append(
                                             {
-                                                "name": entry.name,
-                                                "path": _normalize_path(os.path.abspath(entry.path)),
-                                                "type": "directory" if is_dir else "file" if is_file else "other",
-                                                "size": stat_info.st_size if is_file else 0,
-                                                "isSymlink": is_symlink,
+                                                "name": "/",
+                                                "path": "/",
+                                                "type": "directory",
+                                                "size": 0,
+                                                "isSymlink": False,
                                             }
                                         )
-                                    except OSError:
-                                        pass
-                                entries.sort(key=lambda e: (0 if e["type"] == "directory" else 1, e["name"].lower()))
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "result": {"entries": drives},
+                                        },
+                                    )
+                                except Exception as e:
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "error": {"code": -32000, "message": f"Failed to list drives: {e}"},
+                                        },
+                                    )
+                                continue
+    
+                            if method == "filesystem/get_home":
                                 await _send_json(
                                     websocket,
                                     {
                                         "jsonrpc": "2.0",
                                         "id": msg_id,
-                                        "result": {
-                                            "entries": entries,
-                                            "path": _normalize_path(os.path.abspath(path)),
+                                        "result": {"home": _normalize_path(os.path.expanduser("~"))},
+                                    },
+                                )
+                                continue
+    
+                            if method == "filesystem/list_directory":
+                                params = data.get("params") or {}
+                                path = os.path.expanduser(params.get("path", ".") or ".")
+                                show_hidden = params.get("showHidden", False)
+                                try:
+                                    entries = []
+                                    for entry in os.scandir(path):
+                                        if not show_hidden and _is_hidden(entry):
+                                            continue
+                                        try:
+                                            is_dir = entry.is_dir()
+                                            is_file = entry.is_file()
+                                            is_symlink = entry.is_symlink()
+                                            stat_info = entry.stat(follow_symlinks=False)
+                                            entries.append(
+                                                {
+                                                    "name": entry.name,
+                                                    "path": _normalize_path(os.path.abspath(entry.path)),
+                                                    "type": "directory" if is_dir else "file" if is_file else "other",
+                                                    "size": stat_info.st_size if is_file else 0,
+                                                    "isSymlink": is_symlink,
+                                                }
+                                            )
+                                        except OSError:
+                                            pass
+                                    entries.sort(key=lambda e: (0 if e["type"] == "directory" else 1, e["name"].lower()))
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "result": {
+                                                "entries": entries,
+                                                "path": _normalize_path(os.path.abspath(path)),
+                                            },
+                                        },
+                                    )
+                                except Exception as e:
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "error": {"code": -32000, "message": f"Failed to list directory: {e}"},
+                                        },
+                                    )
+                                continue
+    
+                            if method == "fs/read_text_file":
+                                params = data.get("params") or {}
+                                path = os.path.expanduser(params.get("path", ""))
+                                try:
+                                    with open(path, "r") as f:
+                                        content = f.read()
+                                    result = {"content": content}
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "result": result,
+                                        },
+                                    )
+                                except Exception as e:
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "error": {"code": -32000, "message": f"Failed to read file: {e}"},
+                                        },
+                                    )
+                                continue
+    
+                            if method == "fs/write_text_file":
+                                params = data.get("params") or {}
+                                path = os.path.expanduser(params.get("path", ""))
+                                content = params.get("content", "")
+                                try:
+                                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                                    with open(path, "w") as f:
+                                        f.write(content)
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "result": None,
+                                        },
+                                    )
+                                except Exception as e:
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "error": {"code": -32000, "message": f"Failed to write file: {e}"},
+                                        },
+                                    )
+                                continue
+    
+                            agent = agents[_extract_agent_id(data, agents)]
+                            if not agent.online:
+                                await _send_json(
+                                    websocket,
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": msg_id,
+                                        "error": {
+                                            "code": -32005,
+                                            "message": f"agent {agent.id} is not running",
+                                            "data": {"agentId": agent.id},
                                         },
                                     },
                                 )
-                            except Exception as e:
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "error": {"code": -32000, "message": f"Failed to list directory: {e}"},
-                                    },
-                                )
-                            continue
-
-                        if method == "fs/read_text_file":
-                            params = data.get("params") or {}
-                            path = os.path.expanduser(params.get("path", ""))
-                            try:
-                                with open(path, "r") as f:
-                                    content = f.read()
-                                result = {"content": content}
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "result": result,
-                                    },
-                                )
-                            except Exception as e:
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "error": {"code": -32000, "message": f"Failed to read file: {e}"},
-                                    },
-                                )
-                            continue
-
-                        if method == "fs/write_text_file":
-                            params = data.get("params") or {}
-                            path = os.path.expanduser(params.get("path", ""))
-                            content = params.get("content", "")
-                            try:
-                                os.makedirs(os.path.dirname(path), exist_ok=True)
-                                with open(path, "w") as f:
-                                    f.write(content)
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "result": None,
-                                    },
-                                )
-                            except Exception as e:
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "error": {"code": -32000, "message": f"Failed to write file: {e}"},
-                                    },
-                                )
-                            continue
-
-                        agent = agents[_extract_agent_id(data, agents)]
-                        if not agent.online:
-                            await _send_json(
-                                websocket,
-                                {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "error": {
-                                        "code": -32005,
-                                        "message": f"agent {agent.id} is not running",
-                                        "data": {"agentId": agent.id},
-                                    },
-                                },
-                            )
-                            continue
-
-                        # Save request info (cwd, method) keyed by message id.
-                        # Used to inject cwd into the agent response and to
-                        # handle method-level errors (e.g. session/close).
-                        if msg_id is not None:
-                            info: dict[str, str] = {"method": method or ""}
-                            if method in ("session/new", "session/resume"):
-                                params = data.get("params") or {}
-                                cwd = params.get("cwd", "")
-                                if cwd:
-                                    info["cwd"] = cwd
-                            _request_info[str(msg_id)] = info
-
-                        if agent.id in send_queues:
-                            await send_queues[agent.id].put(_message_for_agent(data))
-                        else:
-                            log("No send queue for %s, dropping message", agent.id)
+                                continue
+    
+                            # Save request info (cwd, method) keyed by message id.
+                            # Used to inject cwd into the agent response and to
+                            # handle method-level errors (e.g. session/close).
+                            if msg_id is not None:
+                                info: dict[str, str] = {"method": method or ""}
+                                if method in ("session/new", "session/resume"):
+                                    params = data.get("params") or {}
+                                    cwd = params.get("cwd", "")
+                                    if cwd:
+                                        info["cwd"] = cwd
+                                _request_info[str(msg_id)] = info
+    
+                            if agent.id in send_queues:
+                                await send_queues[agent.id].put(_message_for_agent(data))
+                            else:
+                                log("No send queue for %s, dropping message", agent.id)
                     except asyncio.CancelledError:
                         log("relay_to_agents: cancelled")
                         raise
