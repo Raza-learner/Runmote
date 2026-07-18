@@ -13,6 +13,7 @@ import '../../../shared/widgets/ongoing_session_banner.dart';
 import '../../../shared/widgets/daemon_offline_banner.dart';
 import '../../../shared/widgets/animated_background.dart';
 import 'widgets/session_card.dart';
+import 'widgets/session_list_skeleton.dart';
 import 'widgets/directory_picker_sheet.dart';
 
 class SessionListScreen extends ConsumerStatefulWidget {
@@ -219,7 +220,7 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
             SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
             Expanded(
               child: sessionsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const SessionListSkeleton(),
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (sessions) {
                   final supportsSessionList =

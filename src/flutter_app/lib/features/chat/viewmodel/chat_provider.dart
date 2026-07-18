@@ -196,6 +196,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
 
   ChatNotifier(this._ref, this._sessionId, this._cwd)
       : super(const AsyncValue.loading()) {
+    debugPrint('[chat_provider] ChatNotifier created for session=$_sessionId cwd=$_cwd');
     _listenToRelay();
     _watchConnection();
     _loadSessionFromAgent();
@@ -256,9 +257,13 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   PermissionRequest? _permissionRequest;
 
   void _syncState() {
-    if (!_connected) return;
+    if (!_connected) {
+      debugPrint('[chat_provider] _syncState skipped: not connected');
+      return;
+    }
     _logBusy('sync');
     final current = state.valueOrNull;
+    debugPrint('[chat_provider] _syncState: ${_buffer.length} messages, was loading=${state.isLoading}');
     state = AsyncValue.data(ChatState(
       messages: List.of(_buffer),
       configOptions: current?.configOptions ?? [],
@@ -549,6 +554,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   void _handleUpdate(Map<String, dynamic> params) {
     final update = params['update'] as Map<String, dynamic>?;
     if (update == null) return;
+    _finalizeTimer?.cancel();
 
     final type = update['sessionUpdate'] as String?;
     final text = _extractText(update['content']);
@@ -631,7 +637,17 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     }
   }
 
+  Timer? _finalizeTimer;
+
   void _finalizeStreaming() {
+    if (!_connected) return;
+    _finalizeTimer?.cancel();
+    _finalizeTimer = Timer(const Duration(milliseconds: 600), () {
+      _doFinalizeStreaming();
+    });
+  }
+
+  void _doFinalizeStreaming() {
     if (!_connected) return;
     for (var i = 0; i < _buffer.length; i++) {
       if (_buffer[i].isStreaming) {
@@ -642,6 +658,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   }
 
   void _upsertMessage(String text, ChatMessageRole role, String? msgId) {
+    if (role == ChatMessageRole.assistant) _finalizeTimer?.cancel();
     if (msgId != null) {
       for (var i = 0; i < _buffer.length; i++) {
         if (_buffer[i].id == msgId) {

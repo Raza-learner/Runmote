@@ -3,6 +3,7 @@
     [switch]$Remove,
     [switch]$Status,
     [switch]$InstallCmd,
+    [switch]$Start,
     [string]$Dir = ""
 )
 
@@ -72,14 +73,37 @@ function Install-AutoStart {
     Set-Content -Path $wrapperPath -Value ($wrapperLines -join "`r`n")
     Write-Host "  wrapper created: $wrapperPath"
 
-    # Register scheduled task
-    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
-    $trigger = New-ScheduledTaskTrigger -AtLogOn
-    $trigger.Delay = "PT15S"
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
-    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
-    Write-Host "  scheduled task created: $taskName"
+    if ($isAdmin) {
+        # Admin: register scheduled task (runs at login, survives reboots)
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
+        $trigger = New-ScheduledTaskTrigger -AtLogOn
+        $trigger.Delay = "PT15S"
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+        Write-Host "  scheduled task created: $taskName"
+    } else {
+        # Non-admin: use HKCU Run key (no admin required)
+        $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+        $regValue = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
+        Set-ItemProperty -Path $runKey -Name "Runmote Daemon" -Value $regValue
+        Write-Host "  startup registry entry added (HKCU Run key)"
+
+        # Also add a shortcut to the Startup folder as a visual backup
+        $startupFolder = [Environment]::GetFolderPath("Startup")
+        $shortcutPath = Join-Path $startupFolder "Runmote Daemon.lnk"
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut($shortcutPath)
+        $shortcut.TargetPath = "powershell.exe"
+        $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`""
+        $shortcut.WindowStyle = 7
+        $shortcut.Description = "Runmote Daemon"
+        $shortcut.Save()
+        Write-Host "  startup folder shortcut added"
+
+        Write-Host "  (scheduled task skipped — run PowerShell as Administrator for Task Scheduler)"
+    }
 
     # Create runmote.cmd in user PATH
     Install-RunmoteCmd
@@ -87,8 +111,23 @@ function Install-AutoStart {
 
 function Remove-AutoStart {
     Write-Host "Removing Runmote daemon auto-start..."
+
+    # Remove scheduled task (admin) — silently ignore if not admin
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
     Write-Host "  scheduled task removed: $taskName"
+
+    # Remove HKCU Run key (non-admin)
+    $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+    Remove-ItemProperty -Path $runKey -Name "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null
+    Write-Host "  registry entry removed"
+
+    # Remove Startup folder shortcut
+    $startupFolder = [Environment]::GetFolderPath("Startup")
+    $shortcutPath = Join-Path $startupFolder "Runmote Daemon.lnk"
+    if (Test-Path $shortcutPath) {
+        Remove-Item $shortcutPath -Force
+        Write-Host "  startup folder shortcut removed"
+    }
 
     $wrapperPath = Join-Path (Join-Path $Dir "scripts") "run-daemon.ps1"
     if (Test-Path $wrapperPath) {
@@ -100,12 +139,41 @@ function Remove-AutoStart {
 }
 
 function Get-AutoStartStatus {
+    $found = $false
+
+    # Check scheduled task
     try {
         $task = Get-ScheduledTask -TaskName $taskName -ErrorAction Stop
         Write-Host "Runmote daemon: ENABLED (Task Scheduler)"
         Write-Host "  State: $($task.State)"
         Write-Host "  Next Run: $($task.NextRunTime)"
+        $found = $true
     } catch {
+        Write-Host "Runmote daemon: Task Scheduler — NOT INSTALLED"
+    }
+
+    # Check HKCU Run key
+    $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+    $regValue = Get-ItemProperty -Path $runKey -Name "Runmote Daemon" -ErrorAction SilentlyContinue
+    if ($regValue) {
+        Write-Host "Runmote daemon: ENABLED (HKCU Run key)"
+        Write-Host "  Value: $($regValue.'Runmote Daemon')"
+        $found = $true
+    } else {
+        Write-Host "Runmote daemon: HKCU Run key — NOT INSTALLED"
+    }
+
+    # Check Startup folder
+    $startupFolder = [Environment]::GetFolderPath("Startup")
+    $shortcutPath = Join-Path $startupFolder "Runmote Daemon.lnk"
+    if (Test-Path $shortcutPath) {
+        Write-Host "Runmote daemon: ENABLED (Startup Folder)"
+        $found = $true
+    } else {
+        Write-Host "Runmote daemon: Startup Folder — NOT INSTALLED"
+    }
+
+    if (-not $found) {
         Write-Host "Runmote daemon: NOT INSTALLED"
     }
 }
@@ -133,6 +201,24 @@ function Remove-RunmoteCmd {
     }
 }
 
+# --- Start directly (non-admin, works from CMD) ---
+function Start-DaemonDirect {
+    Write-Host "Starting Runmote daemon..."
+    $logFile = "$env:TEMP\runmote-daemon.log"
+    $errFile = "$env:TEMP\runmote-daemon.err"
+    $pidFile = "$env:TEMP\runmote-daemon.pid"
+    Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+
+    $env:ACP_DAEMON_ID = if ($env:ACP_DAEMON_ID) { $env:ACP_DAEMON_ID } else { $env:COMPUTERNAME }
+    $env:PYTHONIOENCODING = "utf-8"
+
+    $proc = Start-Process -WindowStyle Hidden -FilePath $python -ArgumentList "-m", "src.daemon.main" -WorkingDirectory $Dir -RedirectStandardOutput $logFile -RedirectStandardError $errFile -PassThru
+    if ($proc) { $proc.Id | Out-File $pidFile -Force }
+    Start-Sleep -Seconds 1
+    Write-Host "  Daemon started (PID: $($proc.Id))." -ForegroundColor Green
+    Write-Host "  Log: $logFile"
+}
+
 # --- Dispatch ---
 if ($Install) {
     Install-AutoStart
@@ -142,6 +228,8 @@ if ($Install) {
     Get-AutoStartStatus
 } elseif ($InstallCmd) {
     Install-RunmoteCmd
+} elseif ($Start) {
+    Start-DaemonDirect
 } else {
-    Write-Host "Usage: .\setup-autostart.ps1 -Install | -Remove | -Status | -InstallCmd"
+    Write-Host "Usage: .\setup-autostart.ps1 -Install | -Remove | -Status | -Start | -InstallCmd"
 }

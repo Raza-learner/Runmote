@@ -4,7 +4,9 @@ import os
 import signal
 import stat
 import sys
+import time
 from copy import deepcopy
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -23,13 +25,15 @@ class DaemonUnpaired(Exception):
     after having been paired previously — indicates the mobile app unpaired."""
 
 
-def log(msg: str):
+def log(msg: str, *args):
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:23]
+    if args:
+        msg = msg % args
     try:
-        print(msg, flush=True)
+        print(f"[{ts}] {msg}", flush=True)
     except Exception:
-        # Windows console can't handle some Unicode — fall back to stderr
         try:
-            print(msg, file=sys.stderr, flush=True)
+            print(f"[{ts}] {msg}", file=sys.stderr, flush=True)
         except Exception:
             pass
 
@@ -292,12 +296,22 @@ async def run_daemon():
         config["id"]: AgentProcess(config) for config in AGENT_CONFIGS if config.get("id") and config.get("command")
     }
     if not agents:
-        raise RuntimeError("no ACP agents configured")
+        log("WARNING: no ACP agents detected — daemon will start with no agents")
+        log("  Set ACP_AGENT_COMMANDS env var or check agent installation")
+        log("  The app will see the daemon as online with no agents")
 
     while True:
+        log("Connecting to relay: %s ...", RELAY_URL)
+        ping_tag = id(RELAY_URL) & 0xFFFF  # don't leak address
         try:
-            async with connect(RELAY_URL, additional_headers={"Origin": "https://runmote.dev"}) as websocket:
-                log("Connected to relay!")
+            async with connect(
+                RELAY_URL,
+                additional_headers={"Origin": "https://runmote.dev"},
+                ping_interval=30,
+                ping_timeout=15,
+                close_timeout=10,
+            ) as websocket:
+                log("Connected to relay!  (socket %#x)", ping_tag)
 
                 identify_id = "daemon_ident"
                 await _send_json(
@@ -318,9 +332,13 @@ async def run_daemon():
                             pairing_code = result.get("pairingCode", "")
                             paired_count = result.get("pairedAppCount", 0)
                             ever_paired = result.get("everPaired", False)
+                            public_url = result.get("publicUrl", "")
+                            log(
+                                "identify response: pairedAppCount=%d everPaired=%s publicUrl=%s",
+                                paired_count, ever_paired, public_url or "(none)",
+                            )
                             if pairing_code:
-                                public_url = result.get("publicUrl", "")
-                                log(f"pairing code: {pairing_code}")
+                                log("pairing code: %s", pairing_code)
                                 try:
                                     print(_pairing_banner(pairing_code, public_url), flush=True)
                                 except Exception:
@@ -342,15 +360,18 @@ async def run_daemon():
                                 log("No paired mobile apps — daemon was unpaired, shutting down")
                                 raise DaemonUnpaired()
                             break
+                        else:
+                            log("Ignoring non-identify message during handshake: %s", msg[:200])
                     except json.JSONDecodeError:
-                        log(f"Invalid JSON from relay during identify: {msg[:200]}")
+                        log("Invalid JSON from relay during identify: %s", msg[:200])
 
+                log("Starting %d agent(s)...", len(agents))
                 for agent in agents.values():
                     try:
                         await agent.start()
                     except Exception as e:
                         agent.online = False
-                        log(f"Failed to start {agent.id}: {e}")
+                        log("Failed to start %s: %s", agent.id, e)
 
                 await _send_json(websocket, _agent_list_message(agents))
 
@@ -358,259 +379,272 @@ async def run_daemon():
                 # `agents` defined later in this function scope. This works because
                 # the closure doesn't execute until the event loop yields.
                 async def relay_to_agents():
-                    async for message in websocket:
-                        try:
-                            data = json.loads(message)
-                        except json.JSONDecodeError:
-                            log(f"Invalid JSON from relay: {message[:200]}")
-                            continue
-
-                        method = data.get("method")
-                        msg_id = data.get("id")
-                        if method == "pairing/complete":
-                            from pathlib import Path
-
-                            Path("/tmp/acp-paired").write_text("paired")
-                            continue
-
-                        if method == "agent/list":
-                            # Use initial configs (AGENT_CONFIGS) for re-detection instead of
-                            # live system detection, so explicit ACP_AGENT_COMMANDS is respected.
-                            detected = {a["id"]: a for a in AGENT_CONFIGS if a.get("id") and a.get("command")}
-                            for aid in list(agents.keys()):
-                                if aid not in detected:
-                                    log(f"Agent '{aid}' no longer configured, stopping...")
-                                    if aid in agent_tasks:
-                                        at = agent_tasks.pop(aid)
-                                        for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
-                                            if t and not t.done():
-                                                t.cancel()
-                                    send_queues.pop(aid, None)
-                                    await agents[aid].stop()
-                                    del agents[aid]
-                                elif not agents[aid].online:
-                                    log(f"Agent '{aid}' was offline, restarting...")
-                                    if aid in agent_tasks:
-                                        at = agent_tasks.pop(aid)
-                                        for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
-                                            if t and not t.done():
-                                                t.cancel()
-                                    send_queues.pop(aid, None)
-                                    await agents[aid].stop()
-                                    del agents[aid]
-                            for aid, cfg in detected.items():
-                                if aid not in agents:
-                                    log(f"Agent '{aid}' newly configured, starting...")
-                                    agents[aid] = AgentProcess(cfg)
-                                    try:
-                                        await agents[aid].start()
-                                    except Exception as e:
-                                        agents[aid].online = False
-                                        log(f"Failed to start new agent {aid}: {e}")
-                                    if agents[aid].online:
-                                        send_q = asyncio.Queue()
-                                        send_queues[aid] = send_q
-                                        agent_tasks[aid] = {
-                                            "agent": agents[aid],
-                                            "relay": asyncio.create_task(agent_to_relay(agents[aid])),
-                                            "stderr": asyncio.create_task(log_stderr(agents[aid])),
-                                            "watch": asyncio.create_task(watch_agent(agents[aid])),
-                                            "sender": asyncio.create_task(agent_sender(agents[aid], send_q)),
-                                        }
-                            await _send_json(websocket, _agent_list_message(agents, msg_id))
-                            continue
-
-                        if method == "filesystem/list_drives":
+                    log("relay_to_agents: started")
+                    try:
+                        async for message in websocket:
                             try:
-                                drives = []
-                                if sys.platform == "win32":
-                                    import string
+                                data = json.loads(message)
+                            except json.JSONDecodeError:
+                                log("Invalid JSON from relay: %s", message[:200])
+                                continue
 
-                                    for letter in string.ascii_uppercase:
-                                        drive = f"{letter}:\\"
-                                        if os.path.exists(drive):
-                                            drives.append(
-                                                {
-                                                    "name": f"{letter}:",
-                                                    "path": _normalize_path(os.path.abspath(drive)),
-                                                    "type": "directory",
-                                                    "size": 0,
-                                                    "isSymlink": False,
-                                                }
-                                            )
-                                else:
-                                    drives.append(
-                                        {
-                                            "name": "/",
-                                            "path": "/",
-                                            "type": "directory",
-                                            "size": 0,
-                                            "isSymlink": False,
-                                        }
-                                    )
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "result": {"entries": drives},
-                                    },
-                                )
-                            except Exception as e:
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "error": {"code": -32000, "message": f"Failed to list drives: {e}"},
-                                    },
-                                )
-                            continue
+                            method = data.get("method")
+                            msg_id = data.get("id")
+                            # log("relay msg: method=%s id=%s", method, str(msg_id)[:20])
+                            if method == "pairing/complete":
+                                from pathlib import Path
 
-                        if method == "filesystem/get_home":
-                            await _send_json(
-                                websocket,
-                                {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "result": {"home": _normalize_path(os.path.expanduser("~"))},
-                                },
-                            )
-                            continue
+                                Path("/tmp/acp-paired").write_text("paired")
+                                log("pairing/complete received")
+                                continue
 
-                        if method == "filesystem/list_directory":
-                            params = data.get("params") or {}
-                            path = os.path.expanduser(params.get("path", ".") or ".")
-                            show_hidden = params.get("showHidden", False)
-                            try:
-                                entries = []
-                                for entry in os.scandir(path):
-                                    if not show_hidden and _is_hidden(entry):
-                                        continue
-                                    try:
-                                        is_dir = entry.is_dir()
-                                        is_file = entry.is_file()
-                                        is_symlink = entry.is_symlink()
-                                        stat_info = entry.stat(follow_symlinks=False)
-                                        entries.append(
+                            if method == "agent/list":
+                                log("agent/list requested by relay")
+                                # Use initial configs (AGENT_CONFIGS) for re-detection instead of
+                                # live system detection, so explicit ACP_AGENT_COMMANDS is respected.
+                                detected = {a["id"]: a for a in AGENT_CONFIGS if a.get("id") and a.get("command")}
+                                for aid in list(agents.keys()):
+                                    if aid not in detected:
+                                        log("Agent '%s' no longer configured, stopping...", aid)
+                                        if aid in agent_tasks:
+                                            at = agent_tasks.pop(aid)
+                                            for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
+                                                if t and not t.done():
+                                                    t.cancel()
+                                        send_queues.pop(aid, None)
+                                        await agents[aid].stop()
+                                        del agents[aid]
+                                    elif not agents[aid].online:
+                                        log("Agent '%s' was offline, restarting...", aid)
+                                        if aid in agent_tasks:
+                                            at = agent_tasks.pop(aid)
+                                            for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
+                                                if t and not t.done():
+                                                    t.cancel()
+                                        send_queues.pop(aid, None)
+                                        await agents[aid].stop()
+                                        del agents[aid]
+                                for aid, cfg in detected.items():
+                                    if aid not in agents:
+                                        log("Agent '%s' newly configured, starting...", aid)
+                                        agents[aid] = AgentProcess(cfg)
+                                        try:
+                                            await agents[aid].start()
+                                        except Exception as e:
+                                            agents[aid].online = False
+                                            log("Failed to start new agent %s: %s", aid, e)
+                                        if agents[aid].online:
+                                            send_q = asyncio.Queue()
+                                            send_queues[aid] = send_q
+                                            agent_tasks[aid] = {
+                                                "agent": agents[aid],
+                                                "relay": asyncio.create_task(agent_to_relay(agents[aid])),
+                                                "stderr": asyncio.create_task(log_stderr(agents[aid])),
+                                                "watch": asyncio.create_task(watch_agent(agents[aid])),
+                                                "sender": asyncio.create_task(agent_sender(agents[aid], send_q)),
+                                            }
+                                await _send_json(websocket, _agent_list_message(agents, msg_id))
+                                continue
+
+                            if method == "filesystem/list_drives":
+                                try:
+                                    drives = []
+                                    if sys.platform == "win32":
+                                        import string
+    
+                                        for letter in string.ascii_uppercase:
+                                            drive = f"{letter}:\\"
+                                            if os.path.exists(drive):
+                                                drives.append(
+                                                    {
+                                                        "name": f"{letter}:",
+                                                        "path": _normalize_path(os.path.abspath(drive)),
+                                                        "type": "directory",
+                                                        "size": 0,
+                                                        "isSymlink": False,
+                                                    }
+                                                )
+                                    else:
+                                        drives.append(
                                             {
-                                                "name": entry.name,
-                                                "path": _normalize_path(os.path.abspath(entry.path)),
-                                                "type": "directory" if is_dir else "file" if is_file else "other",
-                                                "size": stat_info.st_size if is_file else 0,
-                                                "isSymlink": is_symlink,
+                                                "name": "/",
+                                                "path": "/",
+                                                "type": "directory",
+                                                "size": 0,
+                                                "isSymlink": False,
                                             }
                                         )
-                                    except OSError:
-                                        pass
-                                entries.sort(key=lambda e: (0 if e["type"] == "directory" else 1, e["name"].lower()))
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "result": {"entries": drives},
+                                        },
+                                    )
+                                except Exception as e:
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "error": {"code": -32000, "message": f"Failed to list drives: {e}"},
+                                        },
+                                    )
+                                continue
+    
+                            if method == "filesystem/get_home":
                                 await _send_json(
                                     websocket,
                                     {
                                         "jsonrpc": "2.0",
                                         "id": msg_id,
-                                        "result": {
-                                            "entries": entries,
-                                            "path": _normalize_path(os.path.abspath(path)),
+                                        "result": {"home": _normalize_path(os.path.expanduser("~"))},
+                                    },
+                                )
+                                continue
+    
+                            if method == "filesystem/list_directory":
+                                params = data.get("params") or {}
+                                path = os.path.expanduser(params.get("path", ".") or ".")
+                                show_hidden = params.get("showHidden", False)
+                                try:
+                                    entries = []
+                                    for entry in os.scandir(path):
+                                        if not show_hidden and _is_hidden(entry):
+                                            continue
+                                        try:
+                                            is_dir = entry.is_dir()
+                                            is_file = entry.is_file()
+                                            is_symlink = entry.is_symlink()
+                                            stat_info = entry.stat(follow_symlinks=False)
+                                            entries.append(
+                                                {
+                                                    "name": entry.name,
+                                                    "path": _normalize_path(os.path.abspath(entry.path)),
+                                                    "type": "directory" if is_dir else "file" if is_file else "other",
+                                                    "size": stat_info.st_size if is_file else 0,
+                                                    "isSymlink": is_symlink,
+                                                }
+                                            )
+                                        except OSError:
+                                            pass
+                                    entries.sort(key=lambda e: (0 if e["type"] == "directory" else 1, e["name"].lower()))
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "result": {
+                                                "entries": entries,
+                                                "path": _normalize_path(os.path.abspath(path)),
+                                            },
+                                        },
+                                    )
+                                except Exception as e:
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "error": {"code": -32000, "message": f"Failed to list directory: {e}"},
+                                        },
+                                    )
+                                continue
+    
+                            if method == "fs/read_text_file":
+                                params = data.get("params") or {}
+                                path = os.path.expanduser(params.get("path", ""))
+                                try:
+                                    with open(path, "r") as f:
+                                        content = f.read()
+                                    result = {"content": content}
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "result": result,
+                                        },
+                                    )
+                                except Exception as e:
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "error": {"code": -32000, "message": f"Failed to read file: {e}"},
+                                        },
+                                    )
+                                continue
+    
+                            if method == "fs/write_text_file":
+                                params = data.get("params") or {}
+                                path = os.path.expanduser(params.get("path", ""))
+                                content = params.get("content", "")
+                                try:
+                                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                                    with open(path, "w") as f:
+                                        f.write(content)
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "result": None,
+                                        },
+                                    )
+                                except Exception as e:
+                                    await _send_json(
+                                        websocket,
+                                        {
+                                            "jsonrpc": "2.0",
+                                            "id": msg_id,
+                                            "error": {"code": -32000, "message": f"Failed to write file: {e}"},
+                                        },
+                                    )
+                                continue
+    
+                            agent = agents[_extract_agent_id(data, agents)]
+                            if not agent.online:
+                                await _send_json(
+                                    websocket,
+                                    {
+                                        "jsonrpc": "2.0",
+                                        "id": msg_id,
+                                        "error": {
+                                            "code": -32005,
+                                            "message": f"agent {agent.id} is not running",
+                                            "data": {"agentId": agent.id},
                                         },
                                     },
                                 )
-                            except Exception as e:
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "error": {"code": -32000, "message": f"Failed to list directory: {e}"},
-                                    },
-                                )
-                            continue
-
-                        if method == "fs/read_text_file":
-                            params = data.get("params") or {}
-                            path = os.path.expanduser(params.get("path", ""))
-                            try:
-                                with open(path, "r") as f:
-                                    content = f.read()
-                                result = {"content": content}
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "result": result,
-                                    },
-                                )
-                            except Exception as e:
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "error": {"code": -32000, "message": f"Failed to read file: {e}"},
-                                    },
-                                )
-                            continue
-
-                        if method == "fs/write_text_file":
-                            params = data.get("params") or {}
-                            path = os.path.expanduser(params.get("path", ""))
-                            content = params.get("content", "")
-                            try:
-                                os.makedirs(os.path.dirname(path), exist_ok=True)
-                                with open(path, "w") as f:
-                                    f.write(content)
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "result": None,
-                                    },
-                                )
-                            except Exception as e:
-                                await _send_json(
-                                    websocket,
-                                    {
-                                        "jsonrpc": "2.0",
-                                        "id": msg_id,
-                                        "error": {"code": -32000, "message": f"Failed to write file: {e}"},
-                                    },
-                                )
-                            continue
-
-                        agent = agents[_extract_agent_id(data, agents)]
-                        if not agent.online:
-                            await _send_json(
-                                websocket,
-                                {
-                                    "jsonrpc": "2.0",
-                                    "id": msg_id,
-                                    "error": {
-                                        "code": -32005,
-                                        "message": f"agent {agent.id} is not running",
-                                        "data": {"agentId": agent.id},
-                                    },
-                                },
-                            )
-                            continue
-
-                        # Save request info (cwd, method) keyed by message id.
-                        # Used to inject cwd into the agent response and to
-                        # handle method-level errors (e.g. session/close).
-                        if msg_id is not None:
-                            info: dict[str, str] = {"method": method or ""}
-                            if method in ("session/new", "session/resume"):
-                                params = data.get("params") or {}
-                                cwd = params.get("cwd", "")
-                                if cwd:
-                                    info["cwd"] = cwd
-                            _request_info[str(msg_id)] = info
-
-                        if agent.id in send_queues:
-                            await send_queues[agent.id].put(_message_for_agent(data))
-                        else:
-                            log(f"No send queue for {agent.id}, dropping message")
+                                continue
+    
+                            # Save request info (cwd, method) keyed by message id.
+                            # Used to inject cwd into the agent response and to
+                            # handle method-level errors (e.g. session/close).
+                            if msg_id is not None:
+                                info: dict[str, str] = {"method": method or ""}
+                                if method in ("session/new", "session/resume"):
+                                    params = data.get("params") or {}
+                                    cwd = params.get("cwd", "")
+                                    if cwd:
+                                        info["cwd"] = cwd
+                                _request_info[str(msg_id)] = info
+    
+                            if agent.id in send_queues:
+                                await send_queues[agent.id].put(_message_for_agent(data))
+                            else:
+                                log("No send queue for %s, dropping message", agent.id)
+                    except asyncio.CancelledError:
+                        log("relay_to_agents: cancelled")
+                        raise
+                    except Exception as exc:
+                        log("relay_to_agents: error %s", exc)
+                        import traceback
+                        log(traceback.format_exc().rstrip())
+                    log("relay_to_agents: websocket loop ended")
 
                 async def agent_to_relay(agent: AgentProcess):
                     if not agent.proc or not agent.proc.stdout:
@@ -641,7 +675,7 @@ async def run_daemon():
                             except json.JSONDecodeError:
                                 await websocket.send(raw)
                         if len(buf) > 1_048_576:
-                            log(f"{agent.id} stdout: discarding oversized buffer ({len(buf)} bytes without newline)")
+                            log("%s stdout: discarding oversized buffer (%d bytes without newline)", agent.id, len(buf))
                             buf = b""
                     if buf:
                         raw = buf.decode(errors="replace").strip()
@@ -657,24 +691,29 @@ async def run_daemon():
                                 await _send_json(websocket, tagged)
                             except json.JSONDecodeError:
                                 await websocket.send(raw)
+                    log("%s agent_to_relay: stdout pipe closed", agent.id)
 
                 async def log_stderr(agent: AgentProcess):
                     if not agent.proc or not agent.proc.stderr:
                         return
                     async for line in agent.proc.stderr:
                         if line:
-                            print(
-                                f"{agent.id} stderr: {line.decode().strip()}",
-                                file=sys.stderr,
-                                flush=True,
-                            )
+                            try:
+                                print(
+                                    f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:23]}] {agent.id} stderr: {line.decode().strip()}",
+                                    file=sys.stderr,
+                                    flush=True,
+                                )
+                            except Exception:
+                                pass
+                    log("%s stderr pipe closed", agent.id)
 
                 async def watch_agent(agent: AgentProcess):
                     if not agent.proc:
                         return
                     await agent.proc.wait()
                     agent.online = False
-                    log(f"Agent {agent.id} exited with code {agent.proc.returncode}")
+                    log("Agent %s exited with code %s", agent.id, agent.proc.returncode)
                     await _send_json(websocket, _agent_list_message(agents))
 
                 async def agent_sender(agent: AgentProcess, queue: asyncio.Queue):
@@ -700,6 +739,7 @@ async def run_daemon():
                             "sender": asyncio.create_task(agent_sender(agent, send_q)),
                         }
 
+                log("Starting %d agent task(s)", len(agent_tasks))
                 if agent_tasks:
                     while agent_tasks:
                         # Wait for any agent to fail
@@ -714,7 +754,7 @@ async def run_daemon():
                         # Check which agent's watch task completed
                         for aid, at in list(agent_tasks.items()):
                             if at["watch"].done():
-                                log(f"Agent {aid} stopped, continuing others...")
+                                log("Agent %s stopped, continuing others...", aid)
                                 for t in [at["relay"], at["stderr"], at.get("sender")]:
                                     if t and not t.done():
                                         t.cancel()
@@ -726,7 +766,7 @@ async def run_daemon():
                             if relay_task.done():
                                 exc = relay_task.exception()
                                 if exc:
-                                    log(f"Relay task exception: {exc}")
+                                    log("Relay task exception: %s", exc)
                             break
 
                 # Cancel remaining agent tasks, but keep relay_task alive
@@ -736,18 +776,22 @@ async def run_daemon():
 
                 # Stay connected after agents exit so pairing/mobile app works
                 if not relay_task.done():
+                    log("Waiting for relay task to finish...")
                     await relay_task
+                    log("Relay task finished")
 
         except asyncio.CancelledError:
+            log("run_daemon: cancelled")
             raise
         except DaemonUnpaired:
+            log("run_daemon: daemon was unpaired, raising")
             raise
         except Exception as e:
-            log(f"Connection error: {e}")
+            log("Connection error: %s", e)
             try:
                 import traceback
 
-                log(traceback.format_exc())
+                log(traceback.format_exc().rstrip())
             except Exception:
                 pass
 
@@ -757,7 +801,7 @@ async def run_daemon():
             except Exception:
                 pass
 
-        log(f"Reconnecting in {RECONNECT_DELAY}s...")
+        log("Reconnecting in %ss...", RECONNECT_DELAY)
         await asyncio.sleep(RECONNECT_DELAY)
 
 
@@ -794,7 +838,7 @@ async def main():
                         raise exc
                     # Daemon exited normally
                     if sys.platform == "win32":
-                        log("Daemon exited, restarting...")
+                        log("Daemon exited, restarting in 5s...")
                         await asyncio.sleep(5)
                         continue
                     else:

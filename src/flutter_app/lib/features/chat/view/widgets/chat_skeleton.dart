@@ -17,9 +17,9 @@ class _ChatSkeletonState extends State<ChatSkeleton>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
-    _opacity = Tween<double>(begin: 0.3, end: 0.6).animate(_controller);
+    _opacity = Tween<double>(begin: 0.55, end: 0.9).animate(_controller);
   }
 
   @override
@@ -32,7 +32,6 @@ class _ChatSkeletonState extends State<ChatSkeleton>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final base = theme.colorScheme.surfaceContainerHighest;
-    final radius = BorderRadius.circular(12);
 
     return Semantics(
       label: 'Chat loading skeleton',
@@ -44,36 +43,68 @@ class _ChatSkeletonState extends State<ChatSkeleton>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _bubble(base, radius, 0.7, align: Alignment.centerRight),
-              const SizedBox(height: 8),
-              _bubble(base, radius, 0.5),
-              const SizedBox(height: 8),
-              _bubble(base, radius, 0.85),
-              const SizedBox(height: 8),
-              _bubble(base, radius, 0.6, align: Alignment.centerRight),
-              const SizedBox(height: 8),
-              _bubble(base, radius, 0.35),
-              const SizedBox(height: 8),
-              _bubble(base, radius, 0.75, align: Alignment.centerRight),
+              _MessageRow(base, isUser: true, widthFactor: 0.72, lines: 1),
+              const SizedBox(height: 12),
+              _MessageRow(base, isUser: false, widthFactor: 0.85, lines: 2),
+              const SizedBox(height: 12),
+              _MessageRow(base, isUser: false, widthFactor: 0.62, lines: 1),
+              const SizedBox(height: 12),
+              _MessageRow(base, isUser: true, widthFactor: 0.55, lines: 1),
+              const SizedBox(height: 12),
+              _MessageRow(base, isUser: false, widthFactor: 0.78, lines: 3),
+              const SizedBox(height: 12),
+              _MessageRow(base, isUser: false, widthFactor: 0.45, lines: 1),
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _bubble(Color base, BorderRadius radius, double widthFraction,
-      {AlignmentGeometry align = Alignment.centerLeft}) {
-    return Align(
-      alignment: align,
-      child: Container(
-        width: MediaQuery.of(context).size.width * widthFraction,
-        height: 36,
-        decoration: BoxDecoration(
-          color: base,
-          borderRadius: radius,
-        ),
+class _MessageRow extends StatelessWidget {
+  final Color base;
+  final bool isUser;
+  final double widthFactor;
+  final int lines;
+
+  const _MessageRow(this.base, {
+    required this.isUser,
+    required this.widthFactor,
+    required this.lines,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final avatar = Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: base,
+        shape: BoxShape.circle,
       ),
+    );
+
+    final bubble = Column(
+      crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: MediaQuery.of(context).size.width * widthFactor,
+          height: 14.0 * lines + 16,
+          decoration: BoxDecoration(
+            color: base,
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ],
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+      children: isUser
+          ? [Flexible(child: bubble), const SizedBox(width: 8), avatar]
+          : [avatar, const SizedBox(width: 8), Flexible(child: bubble)],
     );
   }
 }

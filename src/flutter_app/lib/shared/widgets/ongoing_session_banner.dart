@@ -1,4 +1,3 @@
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,12 +16,14 @@ class OngoingSessionBanner extends ConsumerWidget {
     if (activeIds.isEmpty || !connection.daemonConnected) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final latestId = ref.read(activeSessionsProvider.notifier).latestSessionId;
     final agentName = connection.agentInfo?.name ?? 'Agent';
+    final label = activeIds.length == 1
+        ? '$agentName is responding...'
+        : '${activeIds.length} sessions active';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: GestureDetector(
         onTap: () {
           if (latestId != null) {
@@ -35,60 +36,28 @@ class OngoingSessionBanner extends ConsumerWidget {
             context.push(path);
           }
         },
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: isDark 
-                ? theme.colorScheme.primary.withValues(alpha: 0.1)
-                : theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: theme.colorScheme.primary.withValues(alpha: 0.2),
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        activeIds.length == 1
-                            ? '$agentName is responding...'
-                            : '${activeIds.length} sessions active',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: isDark ? Colors.white : theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 18,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ],
-                ),
+        child: Row(
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                shape: BoxShape.circle,
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );

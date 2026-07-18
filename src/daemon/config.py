@@ -21,14 +21,22 @@ AGENT_COMMAND = json.loads(_raw_agent_command)
 
 def _find_exe(name, *win_dirs):
     """Find executable on PATH. On Windows also check known install dirs."""
-    if shutil.which(name):
+    path_hit = shutil.which(name)
+    if path_hit:
+        print(f"[ACP-DETECT] {name}: found on PATH at {path_hit}", flush=True)
         return True
     if sys.platform != "win32":
         return False
     for directory in win_dirs:
+        if not directory:
+            continue
         if os.path.isdir(directory):
             for entry in os.scandir(directory):
                 if entry.name.lower().startswith(name.lower()) and entry.is_file():
+                    print(
+                        f"[ACP-DETECT] {name}: found in {directory} ({entry.name})",
+                        flush=True,
+                    )
                     return True
     return False
 
@@ -40,34 +48,46 @@ def _detect_acp_agents() -> list[dict]:
     _local = os.environ.get("LOCALAPPDATA", "")
     _appdata = os.environ.get("APPDATA", "")
     _pf = os.environ.get("PROGRAMFILES", "")
+    _pf86 = os.environ.get("PROGRAMFILES(X86)", "")
     _home = os.environ.get("USERPROFILE", "")
+    _programdata = os.environ.get("PROGRAMDATA", "")
     _npm = os.path.join(_appdata, "npm") if _appdata else ""
     _localbin = os.path.join(_home, ".local", "bin") if _home else ""
     _cargo = os.path.join(_home, ".cargo", "bin") if _home else ""
     _bun = os.path.join(_home, ".bun", "bin") if _home else ""
+    _scoop = os.path.join(_home, "scoop", "shims") if _home else ""
+    _choco = os.path.join(_programdata, "chocolatey", "bin") if _programdata else ""
+    _winget = os.path.join(_local, "Microsoft", "WinGet", "Links") if _local else ""
 
     # opencode — native ACP mode
     if _find_exe(
         "opencode",
         os.path.join(_local, "Programs", "opencode") if _local else "",
         os.path.join(_pf, "OpenCode") if _pf else "",
+        os.path.join(_pf86, "OpenCode") if _pf86 else "",
         os.path.join(_home, ".opencode", "bin") if _home else "",
         _localbin,
+        _npm,
         _cargo,
         _bun,
+        _scoop,
+        _choco,
+        _winget,
     ):
         agents.append({"id": "opencode", "name": "OpenCode", "command": ["opencode", "acp"]})
 
     # codex — CLI + ACP adapter
-    if _find_exe("codex", _localbin, _npm, _cargo, _bun):
-        if _find_exe("codex-acp", _npm, _localbin):
+    if _find_exe("codex", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget):
+        if _find_exe("codex-acp", _npm, _localbin, _scoop, _choco, _winget):
             agents.append({"id": "codex", "name": "Codex", "command": ["codex-acp"]})
         elif shutil.which("npx"):
             agents.append({"id": "codex", "name": "Codex", "command": ["npx", "-y", "@agentclientprotocol/codex-acp"]})
 
     # claude — CLI + ACP adapter
-    if _find_exe("claude", _localbin, _npm, _cargo, _bun) or _find_exe("claude-code", _localbin, _npm, _cargo, _bun):
-        if _find_exe("claude-agent-acp", _npm, _localbin):
+    if _find_exe("claude", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget) or _find_exe(
+        "claude-code", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget
+    ):
+        if _find_exe("claude-agent-acp", _npm, _localbin, _scoop, _choco, _winget):
             agents.append({"id": "claude", "name": "Claude Code", "command": ["claude-agent-acp"]})
         elif shutil.which("npx"):
             agents.append(
@@ -79,7 +99,7 @@ def _detect_acp_agents() -> list[dict]:
             )
 
     # gemini — native ACP mode
-    if _find_exe("gemini", _localbin, _npm):
+    if _find_exe("gemini", _localbin, _npm, _scoop, _choco, _winget):
         agents.append({"id": "gemini", "name": "Gemini", "command": ["gemini", "--acp"]})
 
     # cursor — native ACP mode
@@ -87,7 +107,12 @@ def _detect_acp_agents() -> list[dict]:
         "cursor-agent",
         os.path.join(_local, "Programs", "Cursor") if _local else "",
         os.path.join(_pf, "Cursor") if _pf else "",
+        os.path.join(_pf86, "Cursor") if _pf86 else "",
         _localbin,
+        _npm,
+        _scoop,
+        _choco,
+        _winget,
     ):
         agents.append({"id": "cursor", "name": "Cursor", "command": ["cursor-agent", "acp"]})
 
@@ -96,8 +121,12 @@ def _detect_acp_agents() -> list[dict]:
         "copilot",
         os.path.join(_local, "GitHubCLI") if _local else "",
         os.path.join(_pf, "GitHub CLI") if _pf else "",
+        os.path.join(_pf86, "GitHub CLI") if _pf86 else "",
         _localbin,
         _npm,
+        _scoop,
+        _choco,
+        _winget,
     ):
         agents.append({"id": "copilot", "name": "Copilot", "command": ["copilot", "--acp", "--stdio"]})
 

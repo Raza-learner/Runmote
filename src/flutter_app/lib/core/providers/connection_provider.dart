@@ -762,7 +762,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       state.agents,
       (agent) => agent.id == agentId,
     );
-    if (selectedAgent == null) return;
+    if (selectedAgent == null) {
+      debugPrint('[connection] selectAgent: agent $agentId not found');
+      return;
+    }
+    debugPrint('[connection] selectAgent: $agentId (was ${state.selectedAgentId})');
     state = state.copyWith(
       selectedAgentId: agentId,
       agentInfo: _agentInfos[agentId] ?? selectedAgent.toAgentInfo(),

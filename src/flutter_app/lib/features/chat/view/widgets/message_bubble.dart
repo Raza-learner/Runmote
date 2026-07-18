@@ -90,10 +90,7 @@ class MessageBubble extends StatelessWidget {
                           ),
                         ),
                       if (message.isStreaming && !isUser)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 8, bottom: 2),
-                          child: _StreamingIndicator(),
-                        ),
+                        const SizedBox(height: 28),
                     ],
                   ),
                 ),
@@ -444,36 +441,6 @@ class _MessageAvatar extends StatelessWidget {
             ? theme.colorScheme.onSecondaryContainer
             : theme.colorScheme.onTertiaryContainer,
       ),
-    );
-  }
-}
-
-class _StreamingIndicator extends StatelessWidget {
-  const _StreamingIndicator();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 12,
-          height: 12,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: theme.colorScheme.primary.withValues(alpha: 0.5),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          'Agent is typing...',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            fontSize: 10,
-          ),
-        ),
-      ],
     );
   }
 }

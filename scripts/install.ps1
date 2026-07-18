@@ -1,78 +1,10 @@
 ﻿$ErrorActionPreference = "Continue"
 
-# ── Bootstrap: if running via irm | iex, download the repo first ────
-$hasLocalFiles = [bool]$PSScriptRoot -and (Test-Path "$PSScriptRoot\..\pyproject.toml" -ErrorAction SilentlyContinue)
-if (-not $hasLocalFiles -and -not $env:ACP_BOOTSTRAPPED) {
-    $remote  = if ($env:ACP_REMOTE) { $env:ACP_REMOTE } else { "https://github.com/Raza-learner/Runmote.git" }
-    $branch  = if ($env:ACP_BRANCH) { $env:ACP_BRANCH } else { "dev" }
-    $tmpDir  = "$env:TEMP\runmote-install"
-    $extract = "$tmpDir\repo"
-
-    Write-Host "Downloading Runmote installer ($branch branch)..." -ForegroundColor Cyan
-
-    Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue | Out-Null
-    New-Item -ItemType Directory -Force -Path $extract | Out-Null
-
-    # Try archive download (fast)
-    try {
-        $zipUrl = "https://github.com/Raza-learner/Runmote/archive/refs/heads/$branch.zip"
-        $zipFile = "$tmpDir\repo.zip"
-        Invoke-WebRequest -UseBasicParsing -Uri $zipUrl -OutFile $zipFile -ErrorAction Stop
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile, $tmpDir)
-        # GitHub archives extract to "Runmote-$branch" folder
-        $extracted = Get-ChildItem "$tmpDir\Runmote-*" -Directory | Select-Object -First 1
-        if ($extracted) {
-            Move-Item "$($extracted.FullName)\*" $extract -Force -ErrorAction SilentlyContinue
-        }
-    } catch {
-        # Fallback: shallow git clone
-        if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-            Write-Host "Error: git or internet connection required." -ForegroundColor Red
-            exit 1
-        }
-        git clone --depth 1 --branch "$branch" "$remote" $extract 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            git clone --depth 1 --branch "$branch" "git@github.com:Raza-learner/Runmote.git" $extract 2>$null
-        }
-    }
-
-    if (-not (Test-Path "$extract\scripts\install.ps1")) {
-        Write-Host "Error: failed to download installer." -ForegroundColor Red
-        exit 1
-    }
-
-    $env:ACP_BOOTSTRAPPED = "1"
-    $env:ACP_BOOTSTRAP_DIR = "$extract"
-
-    # Inject relay config from Worker (replaces placeholders at serve time)
-    # These values persist as env vars for the re-invoked script
-    if (-not $env:ACP_RELAY_URL)    { $env:ACP_RELAY_URL = "__ACP_RELAY_URL__" }
-    if (-not $env:ACP_DAEMON_TOKEN) { $env:ACP_DAEMON_TOKEN = "__ACP_DAEMON_TOKEN__" }
-    # Check if placeholders weren't replaced (local run / git fallback) — use
-    # concatenation so Worker replaceAll doesn't also change the check string.
-    $phr = "__ACP_RELAY" + "_URL__"
-    $pht = "__ACP_DAEMON" + "_TOKEN__"
-    if ($env:ACP_RELAY_URL -eq $phr -or $env:ACP_DAEMON_TOKEN -eq $pht) {
-        try {
-            $cu = if ($branch -eq "dev") { "https://runmote.dev/config/dev" } else { "https://runmote.dev/config" }
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            $r = Invoke-WebRequest -UseBasicParsing -Uri $cu -ErrorAction Stop
-            $c = $r.Content | ConvertFrom-Json
-            if ($env:ACP_RELAY_URL -eq $phr)    { $env:ACP_RELAY_URL = $c.relayUrl }
-            if ($env:ACP_DAEMON_TOKEN -eq $pht)  { $env:ACP_DAEMON_TOKEN = $c.token }
-        } catch { Write-Host "  Warning: could not fetch relay config" -ForegroundColor DarkGray }
-    }
-
-    Get-Content "$extract\scripts\install.ps1" -Raw -Encoding UTF8 | Invoke-Expression
-    exit $LASTEXITCODE
-}
-
 # ── Bypass execution policy for this process (uv installer needs it) ─
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
 
 # ── Color setup ──────────────────────────────────────────────────────
-$interactive = [Environment]::UserInteractive -and -not $PSCommandPath.StartsWith("-")
+$interactive = [Environment]::UserInteractive -and $PSScriptRoot
 
 # Defaults
 $remote     = if ($env:ACP_REMOTE)    { $env:ACP_REMOTE }    else { "https://github.com/Raza-learner/Runmote.git" }
@@ -81,7 +13,7 @@ $installDir = if ($env:ACP_DIR)       { $env:ACP_DIR }       else { "$env:USERPR
 $mode       = "install"
 $skipAutostart = $false
 
-# Parse $args for flags
+# Parse $args for flags (works both locally and piped via irm | iex)
 for ($i = 0; $i -lt $args.Count; $i++) {
     switch ($args[$i]) {
         "-Dir"    { $installDir = $args[++$i] }
@@ -108,17 +40,42 @@ Environment variables:
     }
 }
 
-$hasGit = Get-Command git -ErrorAction SilentlyContinue
+# ── Download source if not local ──────────────────────────────────────
+# PSScriptRoot is empty when piped via irm | iex; set when running from file.
+$hasLocalFiles = [bool]$PSScriptRoot -and (Test-Path "$PSScriptRoot\..\pyproject.toml" -ErrorAction SilentlyContinue)
+if (-not $hasLocalFiles -and -not $env:ACP_BOOTSTRAP_DIR) {
+    Write-Host "Downloading Runmote installer ($branch branch)..." -ForegroundColor Cyan
+    $tmpDir  = "$env:TEMP\runmote-install"
+    $extract = "$tmpDir\repo"
+    Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue | Out-Null
+    New-Item -ItemType Directory -Force -Path $extract | Out-Null
 
-# Ensure uv
-if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-    Write-Host "Installing uv (Python package manager)..."
-    iex ((New-Object Net.WebClient).DownloadString('https://astral.sh/uv/install.ps1'))
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","User") + ";" + $env:Path
-    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-        Write-Host "Error: uv installation failed. Install manually: https://docs.astral.sh/uv"
-        return
+    try {
+        $zipUrl = "https://github.com/Raza-learner/Runmote/archive/refs/heads/$branch.zip"
+        $zipFile = "$tmpDir\repo.zip"
+        Invoke-WebRequest -UseBasicParsing -Uri $zipUrl -OutFile $zipFile -ErrorAction Stop
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile, $tmpDir)
+        $extracted = Get-ChildItem "$tmpDir\Runmote-*" -Directory | Select-Object -First 1
+        if ($extracted) {
+            Move-Item "$($extracted.FullName)\*" $extract -Force -ErrorAction SilentlyContinue
+        }
+    } catch {
+        if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+            Write-Host "Error: git or internet connection required." -ForegroundColor Red
+            exit 1
+        }
+        git clone --depth 1 --branch "$branch" "$remote" $extract 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            git clone --depth 1 --branch "$branch" "git@github.com:Raza-learner/Runmote.git" $extract 2>$null
+        }
     }
+
+    if (-not (Test-Path "$extract\scripts\install.ps1")) {
+        Write-Host "Error: failed to download installer." -ForegroundColor Red
+        exit 1
+    }
+    $env:ACP_BOOTSTRAP_DIR = "$extract"
 }
 
 # ── Remove mode ──────────────────────────────────────────────────────
@@ -131,7 +88,7 @@ if ($mode -eq "remove") {
     return
 }
 
-# ── Interactive prompts ──────────────────────────────────────────────
+# ── Interactive prompts (only when running from a local file) ─────────
 if ($interactive) {
     Write-Host ""
     Write-Host "   ██████╗ ██╗   ██╗███╗   ██╗███╗   ███╗ ██████╗ ████████╗███████╗" -ForegroundColor Cyan
@@ -160,13 +117,40 @@ if ($interactive) {
     Write-Host ""
 }
 
-# ── Relay config (set by bootstrap block for irm | iex; for local runs set env vars) ──
+# ── Relay config (Worker replaces placeholders at serve time) ────────
+if (-not $env:ACP_RELAY_URL)    { $env:ACP_RELAY_URL = "__ACP_RELAY_URL__" }
+if (-not $env:ACP_DAEMON_TOKEN) { $env:ACP_DAEMON_TOKEN = "__ACP_DAEMON_TOKEN__" }
+# Check if placeholders weren't replaced (local / git clone paths) — use
+# concatenation so Worker replaceAll doesn't touch the check string.
+$phr = "__ACP_RELAY" + "_URL__"
+$pht = "__ACP_DAEMON" + "_TOKEN__"
+if ($env:ACP_RELAY_URL -eq $phr -or $env:ACP_DAEMON_TOKEN -eq $pht) {
+    try {
+        $cu = if ($branch -eq "dev") { "https://runmote.dev/config/dev" } else { "https://runmote.dev/config" }
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $r = Invoke-WebRequest -UseBasicParsing -Uri $cu -ErrorAction Stop
+        $c = $r.Content | ConvertFrom-Json
+        if ($env:ACP_RELAY_URL -eq $phr)    { $env:ACP_RELAY_URL = $c.relayUrl }
+        if ($env:ACP_DAEMON_TOKEN -eq $pht)  { $env:ACP_DAEMON_TOKEN = $c.token }
+    } catch { Write-Host "  Warning: could not fetch relay config" -ForegroundColor DarkGray }
+}
 # Derive public URL from relay URL
 if ($env:ACP_RELAY_URL -and -not $env:ACP_RELAY_PUBLIC_URL) {
     $base = $env:ACP_RELAY_URL -replace '/daemon$', ''
     $base = $base -replace '^wss:', 'https:'
     $base = $base -replace '^ws:', 'http:'
     $env:ACP_RELAY_PUBLIC_URL = $base
+}
+
+# ── Ensure uv ────────────────────────────────────────────────────────
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    Write-Host "Installing uv (Python package manager)..."
+    iex ((New-Object Net.WebClient).DownloadString('https://astral.sh/uv/install.ps1'))
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","User") + ";" + $env:Path
+    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+        Write-Host "Error: uv installation failed. Install manually: https://docs.astral.sh/uv"
+        return
+    }
 }
 
 # ── Install ──────────────────────────────────────────────────────────
@@ -176,11 +160,11 @@ Write-Host "  Runmote Daemon Installer" -ForegroundColor Cyan
 Write-Host "  Daemon: $daemonName  |  Install: $installDir" -ForegroundColor DarkGray
 Write-Host ""
 
-Write-Host "[1/3] Installing dependencies..."
+Write-Host "[1/4] Installing dependencies..."
 if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 }
-# Copy project files to install dir (bootstrap dir set by irm | iex flow)
+# Copy project files to install dir (downloaded ZIP or local clone)
 $srcDir = if ($env:ACP_BOOTSTRAP_DIR) { $env:ACP_BOOTSTRAP_DIR } elseif ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot } else { "" }
 if ($srcDir -and (Test-Path "$srcDir\pyproject.toml")) {
     Copy-Item "$srcDir\*" $installDir -Recurse -Force -Exclude ".git",".venv","__pycache__",".pytest_cache","*.db","logs"
@@ -191,7 +175,7 @@ Remove-Item ".venv" -Recurse -Force -ErrorAction SilentlyContinue
 uv sync
 Write-Host "  Done."
 
-Write-Host "[2/3] Setting up files..."
+Write-Host "[2/4] Setting up files..."
 # Always install runmote launcher, even if auto-start skipped
 & "$installDir\scripts\setup-autostart.ps1" -InstallCmd
 Write-Host "  Done."
@@ -200,7 +184,7 @@ if ($skipAutostart) {
     Write-Host ""
     Write-Host "  Auto-start skipped (use runmote start to start manually)" -ForegroundColor DarkGray
 } else {
-    Write-Host "[3/3] Configuring auto-start..."
+    Write-Host "[3/4] Configuring auto-start..."
     & "$installDir\scripts\setup-autostart.ps1" -Install
     Write-Host "  Done."
 }
@@ -258,7 +242,6 @@ for ($i = 0; $i -lt 20; $i++) {
     }
 }
 if ($pairingCode) {
-    # Try QR banner first (removed from daemon output since redirect goes to log file)
     if (Test-Path $python) {
         & $python -c @"
 import sys
@@ -279,7 +262,6 @@ print(_pairing_banner('$pairingCode'))
     }
 } else {
     Write-Host "  Run 'runmote code' after daemon connects to get pairing code."
-    # DEBUG: check what's happening
     Write-Host "  [D] codeFile=$codeFile exists=$(Test-Path $codeFile)" -ForegroundColor DarkGray
     Write-Host "  [D] logFile=$logFile size=$((Get-Item $logFile -ErrorAction SilentlyContinue).Length) bytes" -ForegroundColor DarkGray
     Write-Host "  [D] errFile=$errFile size=$((Get-Item $errFile -ErrorAction SilentlyContinue).Length) bytes" -ForegroundColor DarkGray
