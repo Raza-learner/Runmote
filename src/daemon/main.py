@@ -4,7 +4,9 @@ import os
 import signal
 import stat
 import sys
+import time
 from copy import deepcopy
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -23,13 +25,15 @@ class DaemonUnpaired(Exception):
     after having been paired previously — indicates the mobile app unpaired."""
 
 
-def log(msg: str):
+def log(msg: str, *args):
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:23]
+    if args:
+        msg = msg % args
     try:
-        print(msg, flush=True)
+        print(f"[{ts}] {msg}", flush=True)
     except Exception:
-        # Windows console can't handle some Unicode — fall back to stderr
         try:
-            print(msg, file=sys.stderr, flush=True)
+            print(f"[{ts}] {msg}", file=sys.stderr, flush=True)
         except Exception:
             pass
 
@@ -292,12 +296,22 @@ async def run_daemon():
         config["id"]: AgentProcess(config) for config in AGENT_CONFIGS if config.get("id") and config.get("command")
     }
     if not agents:
-        raise RuntimeError("no ACP agents configured")
+        log("WARNING: no ACP agents detected — daemon will start with no agents")
+        log("  Set ACP_AGENT_COMMANDS env var or check agent installation")
+        log("  The app will see the daemon as online with no agents")
 
     while True:
+        log("Connecting to relay: %s ...", RELAY_URL)
+        ping_tag = id(RELAY_URL) & 0xFFFF  # don't leak address
         try:
-            async with connect(RELAY_URL, additional_headers={"Origin": "https://runmote.dev"}) as websocket:
-                log("Connected to relay!")
+            async with connect(
+                RELAY_URL,
+                additional_headers={"Origin": "https://runmote.dev"},
+                ping_interval=30,
+                ping_timeout=15,
+                close_timeout=10,
+            ) as websocket:
+                log("Connected to relay!  (socket %#x)", ping_tag)
 
                 identify_id = "daemon_ident"
                 await _send_json(
@@ -318,9 +332,13 @@ async def run_daemon():
                             pairing_code = result.get("pairingCode", "")
                             paired_count = result.get("pairedAppCount", 0)
                             ever_paired = result.get("everPaired", False)
+                            public_url = result.get("publicUrl", "")
+                            log(
+                                "identify response: pairedAppCount=%d everPaired=%s publicUrl=%s",
+                                paired_count, ever_paired, public_url or "(none)",
+                            )
                             if pairing_code:
-                                public_url = result.get("publicUrl", "")
-                                log(f"pairing code: {pairing_code}")
+                                log("pairing code: %s", pairing_code)
                                 try:
                                     print(_pairing_banner(pairing_code, public_url), flush=True)
                                 except Exception:
@@ -342,15 +360,18 @@ async def run_daemon():
                                 log("No paired mobile apps — daemon was unpaired, shutting down")
                                 raise DaemonUnpaired()
                             break
+                        else:
+                            log("Ignoring non-identify message during handshake: %s", msg[:200])
                     except json.JSONDecodeError:
-                        log(f"Invalid JSON from relay during identify: {msg[:200]}")
+                        log("Invalid JSON from relay during identify: %s", msg[:200])
 
+                log("Starting %d agent(s)...", len(agents))
                 for agent in agents.values():
                     try:
                         await agent.start()
                     except Exception as e:
                         agent.online = False
-                        log(f"Failed to start {agent.id}: {e}")
+                        log("Failed to start %s: %s", agent.id, e)
 
                 await _send_json(websocket, _agent_list_message(agents))
 
@@ -358,28 +379,33 @@ async def run_daemon():
                 # `agents` defined later in this function scope. This works because
                 # the closure doesn't execute until the event loop yields.
                 async def relay_to_agents():
-                    async for message in websocket:
-                        try:
-                            data = json.loads(message)
-                        except json.JSONDecodeError:
-                            log(f"Invalid JSON from relay: {message[:200]}")
-                            continue
+                    log("relay_to_agents: started")
+                    try:
+                        async for message in websocket:
+                            try:
+                                data = json.loads(message)
+                            except json.JSONDecodeError:
+                                log("Invalid JSON from relay: %s", message[:200])
+                                continue
 
-                        method = data.get("method")
-                        msg_id = data.get("id")
-                        if method == "pairing/complete":
-                            from pathlib import Path
+                            method = data.get("method")
+                            msg_id = data.get("id")
+                            # log("relay msg: method=%s id=%s", method, str(msg_id)[:20])
+                            if method == "pairing/complete":
+                                from pathlib import Path
 
-                            Path("/tmp/acp-paired").write_text("paired")
-                            continue
+                                Path("/tmp/acp-paired").write_text("paired")
+                                log("pairing/complete received")
+                                continue
 
-                        if method == "agent/list":
+                            if method == "agent/list":
+                            log("agent/list requested by relay")
                             # Use initial configs (AGENT_CONFIGS) for re-detection instead of
                             # live system detection, so explicit ACP_AGENT_COMMANDS is respected.
                             detected = {a["id"]: a for a in AGENT_CONFIGS if a.get("id") and a.get("command")}
                             for aid in list(agents.keys()):
                                 if aid not in detected:
-                                    log(f"Agent '{aid}' no longer configured, stopping...")
+                                    log("Agent '%s' no longer configured, stopping...", aid)
                                     if aid in agent_tasks:
                                         at = agent_tasks.pop(aid)
                                         for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
@@ -389,7 +415,7 @@ async def run_daemon():
                                     await agents[aid].stop()
                                     del agents[aid]
                                 elif not agents[aid].online:
-                                    log(f"Agent '{aid}' was offline, restarting...")
+                                    log("Agent '%s' was offline, restarting...", aid)
                                     if aid in agent_tasks:
                                         at = agent_tasks.pop(aid)
                                         for t in [at["relay"], at["stderr"], at.get("watch"), at.get("sender")]:
@@ -400,13 +426,13 @@ async def run_daemon():
                                     del agents[aid]
                             for aid, cfg in detected.items():
                                 if aid not in agents:
-                                    log(f"Agent '{aid}' newly configured, starting...")
+                                    log("Agent '%s' newly configured, starting...", aid)
                                     agents[aid] = AgentProcess(cfg)
                                     try:
                                         await agents[aid].start()
                                     except Exception as e:
                                         agents[aid].online = False
-                                        log(f"Failed to start new agent {aid}: {e}")
+                                        log("Failed to start new agent %s: %s", aid, e)
                                     if agents[aid].online:
                                         send_q = asyncio.Queue()
                                         send_queues[aid] = send_q
@@ -610,7 +636,15 @@ async def run_daemon():
                         if agent.id in send_queues:
                             await send_queues[agent.id].put(_message_for_agent(data))
                         else:
-                            log(f"No send queue for {agent.id}, dropping message")
+                            log("No send queue for %s, dropping message", agent.id)
+                    except asyncio.CancelledError:
+                        log("relay_to_agents: cancelled")
+                        raise
+                    except Exception as exc:
+                        log("relay_to_agents: error %s", exc)
+                        import traceback
+                        log(traceback.format_exc().rstrip())
+                    log("relay_to_agents: websocket loop ended")
 
                 async def agent_to_relay(agent: AgentProcess):
                     if not agent.proc or not agent.proc.stdout:
@@ -641,7 +675,7 @@ async def run_daemon():
                             except json.JSONDecodeError:
                                 await websocket.send(raw)
                         if len(buf) > 1_048_576:
-                            log(f"{agent.id} stdout: discarding oversized buffer ({len(buf)} bytes without newline)")
+                            log("%s stdout: discarding oversized buffer (%d bytes without newline)", agent.id, len(buf))
                             buf = b""
                     if buf:
                         raw = buf.decode(errors="replace").strip()
@@ -657,24 +691,29 @@ async def run_daemon():
                                 await _send_json(websocket, tagged)
                             except json.JSONDecodeError:
                                 await websocket.send(raw)
+                    log("%s agent_to_relay: stdout pipe closed", agent.id)
 
                 async def log_stderr(agent: AgentProcess):
                     if not agent.proc or not agent.proc.stderr:
                         return
                     async for line in agent.proc.stderr:
                         if line:
-                            print(
-                                f"{agent.id} stderr: {line.decode().strip()}",
-                                file=sys.stderr,
-                                flush=True,
-                            )
+                            try:
+                                print(
+                                    f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')[:23]}] {agent.id} stderr: {line.decode().strip()}",
+                                    file=sys.stderr,
+                                    flush=True,
+                                )
+                            except Exception:
+                                pass
+                    log("%s stderr pipe closed", agent.id)
 
                 async def watch_agent(agent: AgentProcess):
                     if not agent.proc:
                         return
                     await agent.proc.wait()
                     agent.online = False
-                    log(f"Agent {agent.id} exited with code {agent.proc.returncode}")
+                    log("Agent %s exited with code %s", agent.id, agent.proc.returncode)
                     await _send_json(websocket, _agent_list_message(agents))
 
                 async def agent_sender(agent: AgentProcess, queue: asyncio.Queue):
@@ -700,6 +739,7 @@ async def run_daemon():
                             "sender": asyncio.create_task(agent_sender(agent, send_q)),
                         }
 
+                log("Starting %d agent task(s)", len(agent_tasks))
                 if agent_tasks:
                     while agent_tasks:
                         # Wait for any agent to fail
@@ -714,7 +754,7 @@ async def run_daemon():
                         # Check which agent's watch task completed
                         for aid, at in list(agent_tasks.items()):
                             if at["watch"].done():
-                                log(f"Agent {aid} stopped, continuing others...")
+                                log("Agent %s stopped, continuing others...", aid)
                                 for t in [at["relay"], at["stderr"], at.get("sender")]:
                                     if t and not t.done():
                                         t.cancel()
@@ -726,7 +766,7 @@ async def run_daemon():
                             if relay_task.done():
                                 exc = relay_task.exception()
                                 if exc:
-                                    log(f"Relay task exception: {exc}")
+                                    log("Relay task exception: %s", exc)
                             break
 
                 # Cancel remaining agent tasks, but keep relay_task alive
@@ -736,18 +776,22 @@ async def run_daemon():
 
                 # Stay connected after agents exit so pairing/mobile app works
                 if not relay_task.done():
+                    log("Waiting for relay task to finish...")
                     await relay_task
+                    log("Relay task finished")
 
         except asyncio.CancelledError:
+            log("run_daemon: cancelled")
             raise
         except DaemonUnpaired:
+            log("run_daemon: daemon was unpaired, raising")
             raise
         except Exception as e:
-            log(f"Connection error: {e}")
+            log("Connection error: %s", e)
             try:
                 import traceback
 
-                log(traceback.format_exc())
+                log(traceback.format_exc().rstrip())
             except Exception:
                 pass
 
@@ -757,7 +801,7 @@ async def run_daemon():
             except Exception:
                 pass
 
-        log(f"Reconnecting in {RECONNECT_DELAY}s...")
+        log("Reconnecting in %ss...", RECONNECT_DELAY)
         await asyncio.sleep(RECONNECT_DELAY)
 
 
@@ -794,7 +838,7 @@ async def main():
                         raise exc
                     # Daemon exited normally
                     if sys.platform == "win32":
-                        log("Daemon exited, restarting...")
+                        log("Daemon exited, restarting in 5s...")
                         await asyncio.sleep(5)
                         continue
                     else:
