@@ -15,6 +15,17 @@ if (-not $Dir) {
 
 $binDir = Join-Path (Join-Path $env:USERPROFILE ".local") "bin"
 
+function Add-ToUserPath {
+    param([string]$Dir)
+    if (-not $Dir -or -not (Test-Path $Dir)) { return }
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $dirs = $userPath.Split(';', [StringSplitOptions]::RemoveEmptyEntries)
+    if ($Dir -in $dirs) { return }
+    [Environment]::SetEnvironmentVariable("Path", ($userPath.TrimEnd(';') + ";$Dir"), "User")
+    $env:Path = "$Dir;$env:Path"
+    Write-Host "  Added $Dir to PATH" -ForegroundColor Green
+}
+
 # ── Utility functions ──────────────────────────────────────
 
 function Test-NpmInstalled {
@@ -383,6 +394,9 @@ function Install-Agents {
     Write-Host ""
     Write-Host "  Agents are auto-detected when the daemon starts." -ForegroundColor DarkGray
     Write-Host "  Restart the daemon to pick up new agents: runmote restart" -ForegroundColor DarkGray
+
+    # Ensure binDir is on PATH so bundled/npm agents are accessible
+    Add-ToUserPath $binDir
 }
 
 # ── Remove ─────────────────────────────────────────────────

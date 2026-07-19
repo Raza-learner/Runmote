@@ -78,12 +78,85 @@ if (-not $hasLocalFiles -and -not $env:ACP_BOOTSTRAP_DIR) {
     $env:ACP_BOOTSTRAP_DIR = "$extract"
 }
 
+# ── PATH & registry helpers ──────────────────────────────────────────
+
+function Add-ToUserPath {
+    param([string]$Dir)
+    if (-not $Dir -or -not (Test-Path $Dir)) { return }
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $dirs = $userPath.Split(';', [StringSplitOptions]::RemoveEmptyEntries)
+    if ($Dir -in $dirs) { return }
+    [Environment]::SetEnvironmentVariable("Path", ($userPath.TrimEnd(';') + ";$Dir"), "User")
+    $env:Path = "$Dir;$env:Path"
+    Write-Host "  Added $Dir to PATH" -ForegroundColor Green
+}
+
+function Remove-FromUserPath {
+    param([string]$Dir)
+    if (-not $Dir) { return }
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $dirs = $userPath.Split(';', [StringSplitOptions]::RemoveEmptyEntries) | Where-Object { $_ -ne $Dir }
+    [Environment]::SetEnvironmentVariable("Path", ($dirs -join ';'), "User")
+    Write-Host "  Removed $Dir from PATH" -ForegroundColor DarkGray
+}
+
+function Register-UninstallEntry {
+    param([string]$InstallDir)
+    $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Runmote"
+    $versionFile = Join-Path $InstallDir "VERSION"
+    $version = if (Test-Path $versionFile) { Get-Content $versionFile -Raw -ErrorAction SilentlyContinue | ForEach-Object { $_.Trim() } } else { "0.0.0" }
+    $uninstallScript = Join-Path $InstallDir "scripts\install.ps1"
+    New-Item -Path $uninstallKey -Force -ErrorAction SilentlyContinue | Out-Null
+    Set-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "Runmote Daemon" -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value $version -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "Runmote" -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path $uninstallKey -Name "UninstallString" -Value "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$uninstallScript`" -Remove" -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $InstallDir -ErrorAction SilentlyContinue
+    Write-Host "  Registered in Add/Remove Programs" -ForegroundColor Green
+}
+
+function Install-StartMenuShortcut {
+    param([string]$InstallDir)
+    $startMenu = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Runmote"
+    New-Item -ItemType Directory -Force -Path $startMenu -ErrorAction SilentlyContinue | Out-Null
+    $wshell = New-Object -ComObject WScript.Shell
+    $runmoteScript = Join-Path $InstallDir "scripts\runmote.ps1"
+    if (Test-Path $runmoteScript) {
+        $shortcut = $wshell.CreateShortcut("$startMenu\Runmote.lnk")
+        $shortcut.TargetPath = "powershell.exe"
+        $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$runmoteScript`""
+        $shortcut.WorkingDirectory = $InstallDir
+        $shortcut.Description = "Runmote daemon manager"
+        $shortcut.Save()
+    }
+    $shortcut = $wshell.CreateShortcut("$startMenu\Pairing Code.lnk")
+    $shortcut.TargetPath = "powershell.exe"
+    $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"& `'$runmoteScript`' -Code`""
+    $shortcut.WorkingDirectory = $InstallDir
+    $shortcut.Description = "Show Runmote pairing QR code"
+    $shortcut.Save()
+    Write-Host "  Added Start Menu shortcuts" -ForegroundColor Green
+}
+
+function Remove-UninstallEntry {
+    $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Runmote"
+    if (Test-Path $uninstallKey) {
+        Remove-Item -Path $uninstallKey -Force -Recurse -ErrorAction SilentlyContinue
+    }
+    Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Runmote" -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # ── Remove mode ──────────────────────────────────────────────────────
 if ($mode -eq "remove") {
     Write-Host "Removing Runmote daemon..."
     $setupScript = Join-Path $installDir "scripts" "setup-autostart.ps1"
     if (Test-Path $setupScript) { & $setupScript -Remove }
+    # Remove bundled agent and npm packages
+    $agentsScript = Join-Path $installDir "scripts" "setup-agents.ps1"
+    if (Test-Path $agentsScript) { & $agentsScript -Remove }
     if (Test-Path $installDir)  { Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue }
+    Remove-FromUserPath "$env:USERPROFILE\.local\bin"
+    Remove-UninstallEntry
     Write-Host "Runmote daemon uninstalled."
     return
 }
@@ -202,6 +275,15 @@ if ($env:ACP_ENABLE_AGENTS -ne "false") {
     Write-Host "  Agent tools skipped (ACP_ENABLE_AGENTS=false)" -ForegroundColor DarkGray
 }
 
+# ── PATH & registry (after all install steps) ───────────────────────
+$localBin = "$env:USERPROFILE\.local\bin"
+if (Test-Path "$localBin\opencode.exe") {
+    Add-ToUserPath $localBin
+}
+Register-UninstallEntry -InstallDir $installDir
+Install-StartMenuShortcut -InstallDir $installDir
+
+Write-Host ""
 Write-Host "  Installation Complete" -ForegroundColor Green
 Write-Host ""
 
