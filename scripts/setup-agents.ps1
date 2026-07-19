@@ -121,13 +121,81 @@ function Install-NodeJs {
     return $false
 }
 
+# ── Bundled agent (standalone .exe fallback) ──────────────
+
+function Install-BundledAgent {
+    $exeName = "opencode.exe"
+    $exePath = Join-Path $binDir $exeName
+
+    if (Test-Path $exePath) {
+        try {
+            $ver = & $exePath --version 2>$null
+            Write-Done "Bundled opencode $ver already at $exePath"
+        } catch {
+            Write-Done "Bundled opencode already at $exePath"
+        }
+        return $true
+    }
+
+    Write-Step "Downloading opencode.exe (fallback agent)..."
+
+    # Detect Windows architecture
+    $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
+        "AMD64"   { "x64" }
+        "ARM64"   { "arm64" }
+        "x86"     { "x64-baseline" }
+        default   { "x64" }
+    }
+
+    $repo = "anomalyco/opencode"
+    $apiUrl = "https://api.github.com/repos/$repo/releases/latest"
+
+    try {
+        $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing -ErrorAction Stop
+        $zipName = "opencode-windows-$arch.zip"
+        $asset = $release.assets | Where-Object { $_.name -eq $zipName }
+        if (-not $asset) {
+            Write-Host "    Asset $zipName not found in latest opencode release" -ForegroundColor Yellow
+            return $false
+        }
+
+        $zipPath = "$env:TEMP\opencode.zip"
+        Write-Host "    Downloading $zipName..."
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath -UseBasicParsing
+
+        New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $binDir, $true)
+        Remove-Item $zipPath -Force
+
+        if (Test-Path $exePath) {
+            try {
+                $ver = & $exePath --version 2>$null
+                Write-Done "opencode.exe $ver downloaded to $exePath"
+            } catch {
+                Write-Done "opencode.exe downloaded to $exePath"
+            }
+            return $true
+        }
+    } catch {
+        Write-Host "    Download failed: $_" -ForegroundColor Yellow
+    }
+    return $false
+}
+
 # ── Agent tool installers ──────────────────────────────────
 
 function Install-Opencode {
     $name = "opencode"
+    $bundledExe = Join-Path $binDir "opencode.exe"
+
     if (Test-CliFound $name) {
         $ver = & $name --version 2>$null
         Write-Done "$name $ver already installed"
+        return $true
+    }
+    if (Test-Path $bundledExe) {
+        Write-Done "Bundled $name already at $bundledExe"
         return $true
     }
     if (-not (Confirm-Install $name "(native ACP, lightweight)")) {
@@ -248,28 +316,37 @@ function Install-Agents {
     Write-Host "  Agent Setup" -ForegroundColor Cyan
     Write-Host "  ────────────────────────────────────────────"
 
-    # Step 1: Ensure Node.js + npm
+    # Step 1: Bundled agent (standalone .exe fallback)
     Write-Host ""
-    Write-Step "[1/3] Checking Node.js..."
-    if (-not (Install-NodeJs)) {
-        Write-Host "  Without Node.js, agents cannot be installed." -ForegroundColor Yellow
-        Write-Host "  Install from https://nodejs.org then re-run: runmote setup-agents" -ForegroundColor Yellow
-        return
-    }
-    if (-not (Test-NpmInstalled)) {
-        Write-Host "  npm not found after Node.js install." -ForegroundColor Yellow
-        Write-Host "  Restart your terminal and re-run: runmote setup-agents" -ForegroundColor Yellow
-        return
+    Write-Step "[1/4] Downloading bundled opencode.exe..."
+    $bundledOk = Install-BundledAgent
+    $hasNpm = $false
+
+    # Step 2: Ensure Node.js + npm
+    Write-Host ""
+    Write-Step "[2/4] Checking Node.js..."
+    if (Install-NodeJs) {
+        $hasNpm = Test-NpmInstalled
+        if (-not $hasNpm) {
+            Write-Host "  npm not found after Node.js install." -ForegroundColor Yellow
+            Write-Host "  Restart your terminal and re-run: runmote setup-agents" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "  npm not available — skipping npm-based agent installs." -ForegroundColor Yellow
+        Write-Host "  Only the bundled opencode.exe will be available." -ForegroundColor Yellow
     }
 
-    # Step 2: Install CLI tools
+    # Step 3: Install CLI tools via npm (if available)
     Write-Host ""
-    Write-Step "[2/3] Installing agent CLI tools..."
-    $installedAny = $false
-
-    if (Install-Opencode) { $installedAny = $true }
-    if (Install-ClaudeCode) { $installedAny = $true }
-    if (Install-Codex) { $installedAny = $true }
+    $installedAny = $bundledOk
+    if ($hasNpm) {
+        Write-Step "[3/4] Installing agent CLI tools..."
+        if (Install-Opencode) { $installedAny = $true }
+        if (Install-ClaudeCode) { $installedAny = $true }
+        if (Install-Codex) { $installedAny = $true }
+    } else {
+        Write-Step "[3/4] Skipping npm-based agents (npm not available)"
+    }
 
     if (-not $installedAny) {
         Write-Host ""
@@ -277,9 +354,9 @@ function Install-Agents {
         Write-Host "  You can install them later: runmote setup-agents" -ForegroundColor Yellow
     }
 
-    # Step 3: Link cmd wrappers
+    # Step 4: Link cmd wrappers
     Write-Host ""
-    Write-Step "[3/3] Setting up PATH wrappers..."
+    Write-Step "[4/4] Setting up PATH wrappers..."
     Install-CmdWrapper "opencode"
     Install-CmdWrapper "codex"
     Install-CmdWrapper "claude"
@@ -298,6 +375,11 @@ function Install-Agents {
             Write-Host "    $($cli): $($found.Source)" -ForegroundColor Green
         }
     }
+    # Also check bundled exe
+    $bundledExe = Join-Path $binDir "opencode.exe"
+    if ((Test-Path $bundledExe) -and -not (Get-Command opencode -ErrorAction SilentlyContinue)) {
+        Write-Host "    opencode (bundled): $bundledExe" -ForegroundColor Green
+    }
     Write-Host ""
     Write-Host "  Agents are auto-detected when the daemon starts." -ForegroundColor DarkGray
     Write-Host "  Restart the daemon to pick up new agents: runmote restart" -ForegroundColor DarkGray
@@ -309,26 +391,26 @@ function Remove-Agents {
     Write-Host "Removing Runmote agent tools..."
     Write-Host ""
 
-    if (-not (Test-NpmInstalled)) {
-        Write-Host "  npm not found -- skipping"
-        exit 0
-    }
+    # Remove npm packages (if npm available)
+    if (Test-NpmInstalled) {
+        $packages = @(
+            "opencode",
+            "@openai/codex",
+            "@anthropic-ai/claude-code",
+            "@agentclientprotocol/codex-acp",
+            "@agentclientprotocol/claude-agent-acp"
+        )
 
-    $packages = @(
-        "opencode",
-        "@openai/codex",
-        "@anthropic-ai/claude-code",
-        "@agentclientprotocol/codex-acp",
-        "@agentclientprotocol/claude-agent-acp"
-    )
-
-    foreach ($pkg in $packages) {
-        if (Test-PackageInstalled $pkg) {
-            Write-Host "  Removing $pkg..."
-            npm uninstall -g $pkg 2>$null
-        } else {
-            Write-Host "  $pkg not installed -- skipping"
+        foreach ($pkg in $packages) {
+            if (Test-PackageInstalled $pkg) {
+                Write-Host "  Removing $pkg..."
+                npm uninstall -g $pkg 2>$null
+            } else {
+                Write-Host "  $pkg not installed -- skipping"
+            }
         }
+    } else {
+        Write-Host "  npm not found -- skipping npm packages"
     }
 
     Remove-CmdWrapper "opencode"
@@ -337,6 +419,13 @@ function Remove-Agents {
     Remove-CmdWrapper "claude-code"
     Remove-CmdWrapper "codex-acp"
     Remove-CmdWrapper "claude-agent-acp"
+
+    # Remove bundled opencode.exe
+    $bundledExe = Join-Path $binDir "opencode.exe"
+    if (Test-Path $bundledExe) {
+        Remove-Item $bundledExe -Force
+        Write-Host "  Removed bundled opencode.exe"
+    }
 
     Write-Host ""
     Write-Host "Done."
