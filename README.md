@@ -1,124 +1,140 @@
-<p align="center">
-  <img src="https://via.placeholder.com/160x160/0d1117/58a6ff?text=RM" alt="Runmote logo" width="160" />
+<div align="center">
+  <br />
+  <img src="https://via.placeholder.com/120x120/0d1117/58a6ff?text=RM" alt="Runmote" width="120" />
   <!-- [LOGO HERE] -->
-</p>
 
-<p align="center">
-  <a href="https://github.com/Raza-learner/Runmote/actions"><img src="https://img.shields.io/github/actions/workflow/status/Raza-learner/Runmote/ci-python.yml?branch=main&label=build" alt="Build status" /></a>
-  <a href="https://github.com/Raza-learner/Runmote/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License MIT" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/Flutter-3.x-blue?logo=flutter" alt="Flutter" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/Python-3.13+-green?logo=python" alt="Python" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/platform-iOS%20%7C%20Android-lightgrey" alt="Platform" /></a>
-  <a href="https://github.com/Raza-learner/Runmote/stargazers"><img src="https://img.shields.io/github/stars/Raza-learner/Runmote?style=social" alt="GitHub stars" /></a>
-</p>
+  <h1>Runmote</h1>
 
-<br />
+  <h3>Your PC's AI agents. In your pocket. Anywhere.</h3>
 
-<h3 align="center">Run any AI agent on your PC from your phone.</h3>
+  <p>
+    Start an <code>opencode</code> session from the bus. Resume <code>claude code</code> from bed.<br />
+    Fix a bug with <code>codex</code> while waiting for coffee.
+    <br /><br />
+    <b>No SSH. No VPN. No port forwarding.</b>
+  </p>
 
-<p align="center">
-Runmote connects your phone to the AI coding agents running on your computer —
-no SSH, no VPN, no port forwarding. Just a 6-digit code and you're in.
-Fire up <code>opencode</code>, <code>claude code</code>, <code>codex</code>, or any ACP agent
-from anywhere — commute, coffee shop, couch. Your sessions, your tools, your machine.
-</p>
+  <p>
+    <a href="https://github.com/Raza-learner/Runmote/actions"><img src="https://img.shields.io/github/actions/workflow/status/Raza-learner/Runmote/ci-python.yml?branch=main&label=build" alt="Build" /></a>
+    <a href="https://github.com/Raza-learner/Runmote/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" /></a>
+    <a href="#"><img src="https://img.shields.io/badge/Flutter-3.x-blue?logo=flutter" alt="Flutter" /></a>
+    <a href="#"><img src="https://img.shields.io/badge/Python-3.13+-green?logo=python" alt="Python" /></a>
+    <a href="#"><img src="https://img.shields.io/badge/platform-iOS%20%7C%20Android-lightgrey" alt="iOS Android" /></a>
+    <a href="https://github.com/Raza-learner/Runmote/stargazers"><img src="https://img.shields.io/github/stars/Raza-learner/Runmote?style=social" alt="Stars" /></a>
+  </p>
 
-<br />
-
-<p align="center">
-  <img src="https://via.placeholder.com/800x420/0d1117/58a6ff?text=Runmote+Demo" alt="Runmote demo" width="800" />
+  <br />
+  <img src="https://via.placeholder.com/800x420/0d1117/58a6ff?text=Runmote+Demo" alt="Demo" width="800" />
   <!-- [DEMO GIF HERE] -->
-</p>
-
-<br />
+  <br />
+  <br />
+</div>
 
 ---
 
-## Features
+## Install
 
-- **Zero config** — installs in one command, detects your agents automatically
-- **Pairing code** — type a 6-digit code in the app, done
-- **Persistent sessions** — resume any session from where you left off
-- **Real-time streaming** — see the agent think, tool calls, and diffs live on your phone
-- **Works everywhere** — home WiFi, office network, 4G, airplane hotspot
-- **Cross-platform daemon** — Linux, macOS, Windows
-- **Self-hostable relay** — the relay server is open source, run your own
+<table>
+<tr>
+<td width="50%">
 
-<br />
-
-## How it works
-
-```
-  ┌──────────────────────┐          ┌──────────────────┐          ┌─────────────────────┐
-  │  Install daemon      │   ──►    │  Open Runmote    │   ──►    │  Start coding       │
-  │  on your PC          │          │  app on phone    │          │  from anywhere       │
-  │                      │          │                  │          │                      │
-  │  curl runmote.dev/   │          │  Enter pairing   │          │  Full chat + toolkit │
-  │  install.sh | bash   │          │  code from       │          │  across any network  │
-  │                      │          │  terminal        │          │                      │
-  └──────────────────────┘          └──────────────────┘          └─────────────────────┘
-```
-
-<br />
-
-## Supported agents
-
-Runmote works with any agent that speaks the [Agent Client Protocol](https://agentclientprotocol.com) (JSON-RPC 2.0 over stdin/stdout).
-
-| Agent | Status | Link |
-|-------|--------|------|
-| OpenCode | ✅ Tested | [opencode.ai](https://opencode.ai) |
-| Claude Code | ✅ Tested | [claude.ai/code](https://claude.ai/code) |
-| Codex | ✅ Tested | [openai.com](https://openai.com) |
-| Gemini CLI | ✅ Tested | [gemini.google.com](https://gemini.google.com) |
-| Cursor | ✅ Tested | [cursor.sh](https://cursor.sh) |
-| Copilot | ✅ Tested | [github.com/copilot](https://github.com/copilot) |
-
-<br />
-
-## Quick install
-
-<details open>
-<summary><b>Linux / macOS</b></summary>
+### Linux / macOS
 
 ```bash
 curl -fsSL https://runmote.dev/install.sh | bash
 ```
 
-</details>
+</td>
+<td width="50%">
 
-<details>
-<summary><b>Windows</b></summary>
+### Windows
 
 ```powershell
 powershell -c "irm https://runmote.dev/install.ps1 | iex"
 ```
 
-</details>
+</td>
+</tr>
+</table>
 
-After install:
+That's it. Two minutes. After install:
 
 ```bash
-runmote              # start daemon → shows pairing code
-runmote start        # restart daemon
-runmote stop         # stop daemon
-runmote status       # check if daemon is running
-runmote code         # show pairing code
-runmote --uninstall  # remove everything
+runmote start          # daemon starts -> shows pairing code in terminal
+runmote code           # re-display pairing code anytime
+runmote status         # check if daemon is running
+runmote stop           # stop the daemon
+runmote --uninstall    # clean removal
 ```
 
-<br />
+---
+
+## Why Runmote?
+
+You *could* SSH tunnel into your PC. If you like typing firewall rules at 11pm.
+
+| | SSH | Runmote |
+|---|---|---|
+| **Setup time** | 30 minutes of iptables hell | One curl command |
+| **Port forwarding** | Yes, on every network | Never |
+| **Works on 4G** | Only if you port-forwarded | Yes -- it's just the internet |
+| **Mobile app** | Termius + tmux + prayer | Native Flutter app |
+| **Session persistence** | tmux resurrection scripts | Built-in, automatic |
+| **Keep your sessions** | Hope screen didn't die | Resumes from last message |
+
+---
+
+## Features
+
+- **One command install** -- auto-detects your agents, no config files
+- **6-digit pairing** -- open app, type code, connected
+- **Persistent sessions** -- switch apps, phone dies, you're right where you left off
+- **Streaming responses** -- watch the agent think, run tools, apply diffs live
+- **Works on any network** -- home, office, 4G, coffee shop WiFi
+- **Cross-platform** -- daemon runs on Linux, macOS, Windows
+- **Self-hostable relay** -- everything is open source, run your own server
+
+---
+
+## How it works
+
+```
+  ┌─────────────────────────┐               ┌─────────────────────────┐               ┌──────────────────────────┐
+  │    1. Install daemon    │               │  2. Open Runmote app    │               │  3. Code from anywhere   │
+  │        on your PC       │      -->      │      on your phone      │      -->      │                           │
+  │                         │               │                         │               │                           │
+  │  curl runmote.dev/      │               │  Enter 6-digit code     │               │  Full chat + toolkit     │
+  │  install.sh | bash      │               │  from terminal          │               │  any network, no config  │
+  └─────────────────────────┘               └─────────────────────────┘               └──────────────────────────┘
+```
+
+---
+
+## Supported agents
+
+| Agent | Status | Get it |
+|-------|--------|--------|
+| **OpenCode** | Tested | [opencode.ai](https://opencode.ai) |
+| **Claude Code** | Tested | [claude.ai/code](https://claude.ai/code) |
+| **Codex** | Tested | [openai.com](https://openai.com) |
+| **Gemini CLI** | Tested | [gemini.google.com](https://gemini.google.com) |
+| **Cursor** | Tested | [cursor.sh](https://cursor.sh) |
+| **Copilot** | Tested | [github.com/copilot](https://github.com/copilot) |
+
+Any agent that speaks [ACP](https://agentclientprotocol.com) works. Got one not listed? Open an issue.
+
+---
 
 ## Architecture
 
 ```
   ┌─────────────┐     WebSocket (WSS)     ┌──────────────┐     WebSocket (WSS)     ┌─────────────────┐
-  │ Runmote App │ ◄─────────────────────► │ Relay Server │ ◄─────────────────────► │ Daemon (your PC)│
+  │ Runmote App │ <---------------------> │ Relay Server │ <---------------------> │ Daemon (your PC)│
   │  (Flutter)  │                         │  (FastAPI)   │                         │    (Python)     │
   └─────────────┘                         └──────────────┘                         └────────┬────────┘
                                                                                              │
-                                                                                     stdin / stdout
-                                                                                    (JSON-RPC 2.0)
+                                                                                   stdin / stdout
+                                                                                   (JSON-RPC 2.0)
                                                                                              │
                                                                                      ┌───────▼────────┐
                                                                                      │   ACP Agent    │
@@ -127,64 +143,100 @@ runmote --uninstall  # remove everything
                                                                                      └────────────────┘
 ```
 
-The Flutter app and daemon never talk directly. The relay sits in the middle, routing every message over secure WebSocket. The daemon pipes JSON-RPC to the agent process on your machine — exactly like a local terminal.
+No hacks. Phone talks to relay, relay talks to daemon, daemon pipes to agent. All WSS encrypted.
 
-<br />
+---
 
-## Why Runmote?
+## FAQ
 
-| | SSH tunnel | VPN | Runmote |
-|---|---|---|---|
-| Setup time | 30+ min | 1 hour | 2 minutes |
-| Port forwarding | Required | Required | None |
-| Works on 4G | Sometimes | Yes | Yes |
-| Mobile app | No | No | Yes |
-| Session history | No | No | Yes |
-| Self-hostable | — | — | Yes |
-| Open source | — | — | MIT |
+<details>
+<summary><b>Does my PC need to stay on?</b></summary>
 
-<br />
+Yes -- the daemon runs as a background process on your machine. It won't use resources when idle.
+
+</details>
+
+<details>
+<summary><b>Is this secure?</b></summary>
+
+Every connection is encrypted with WSS (WebSocket over TLS). Session data lives on your machine, not the relay. Self-host the relay if you want full control -- it's a single Docker container.
+
+</details>
+
+<details>
+<summary><b>How does pairing work -- can anyone connect?</b></summary>
+
+The daemon generates a fresh 6-digit code each time it starts. Only someone who can see your terminal (or the log file) can get that code. Codes rotate on daemon restart.
+
+</details>
+
+<details>
+<summary><b>What agents are supported?</b></summary>
+
+Any agent that implements the [Agent Client Protocol](https://agentclientprotocol.com) -- OpenCode, Claude Code, Codex, Gemini CLI, Cursor, Copilot, and others. The daemon auto-detects what's installed.
+
+</details>
+
+<details>
+<summary><b>Does this work on iPhone AND Android?</b></summary>
+
+Yes. The app is built with Flutter and compiled natively for both platforms. APK available in releases. iOS TestFlight coming soon.
+
+</details>
+
+<details>
+<summary><b>Can I run my own relay instead of the public one?</b></summary>
+
+Absolutely. The relay is 100% open source. Build it with Docker:
+
+```bash
+docker compose up -d
+```
+
+Then set `ACP_RELAY_URL` in your daemon environment to point to your server.
+
+</details>
+
+---
 
 ## Project structure
 
 <details>
-<summary>Expand tree</summary>
+<summary><b>Expand tree</b></summary>
 
 ```
 runmote/
 ├── src/
 │   ├── daemon/              # Python daemon (runs on your PC)
-│   │   ├── main.py          # core bridge — relay ↔ agent
+│   │   ├── main.py          # core bridge -- relay <-> agent
 │   │   └── config.py        # agent auto-detection
 │   ├── relay/               # FastAPI relay server
-│   │   ├── main.py          # server entry point
-│   │   ├── pairing.py       # 6-digit pairing codes
-│   │   ├── database.py      # SQLite via Drift
-│   │   ├── session_store.py # session persistence
-│   │   ├── state.py         # WebSocket connection state
+│   │   ├── main.py          # entry point
+│   │   ├── pairing.py       # 6-digit codes
+│   │   ├── database.py      # SQLite
+│   │   ├── session_store.py # persistence
+│   │   ├── state.py         # WebSocket state
 │   │   ├── discovery.py     # LAN discovery (mDNS)
 │   │   └── handlers/
-│   │       ├── app.py       # mobile app WebSocket handler
-│   │       └── daemon.py    # daemon WebSocket handler
-│   ├── common/              # shared utilities
-│   │   └── logger.py        # structured logging
+│   │       ├── app.py       # mobile app handler
+│   │       └── daemon.py    # daemon handler
+│   ├── common/              # shared utils
+│   │   └── logger.py
 │   └── flutter_app/         # Mobile app
 │       └── lib/
-│           ├── main.dart
-│           ├── app.dart
 │           ├── features/
 │           │   ├── pair/        # pairing screen
 │           │   ├── agents/      # agent list
 │           │   ├── sessions/    # session list
-│           │   ├── chat/        # chat UI + streaming
-│           │   └── settings/    # MCP servers, preferences
+│           │   ├── chat/        # chat + streaming + diffs
+│           │   └── settings/    # MCP servers, prefs
 │           ├── core/
 │           │   ├── providers/   # Riverpod state
-│           │   ├── models/      # Freezed data models
+│           │   ├── models/      # Freezed models
 │           │   ├── database/    # Drift (local SQLite)
-│           │   ├── router/      # GoRouter config
+│           │   ├── router/      # GoRouter
 │           │   ├── services/    # prefs, env
-│           │   └── theme/       # app colors, spacing
+│           │   └── theme/       # colors, spacing
 │           └── shared/
 │               └── widgets/     # diff viewer, terminal,
 │                                # status badges, animated bg
@@ -192,10 +244,10 @@ runmote/
 │   ├── install.sh              # Linux/macOS one-liner
 │   ├── install.ps1             # Windows one-liner
 │   ├── runmote                 # CLI launcher
-│   ├── setup-autostart.sh      # systemd / launchd config
-│   ├── setup-autostart.ps1     # Windows task scheduler
+│   ├── setup-autostart.sh      # systemd / launchd
+│   ├── setup-autostart.ps1     # Windows autostart
 │   ├── set-version.sh          # version bumper
-│   └── lib/                    # shared installer helpers
+│   └── lib/                    # shared helpers
 ├── tests/                      # Python test suite
 ├── Dockerfile.relay            # relay Docker image
 ├── docker-compose.yml
@@ -205,40 +257,7 @@ runmote/
 
 </details>
 
-<br />
-
-## FAQ
-
-<details>
-<summary><b>Does my PC need to be on?</b></summary>
-Yes — the daemon runs on your machine and must be online for you to connect.
-</details>
-
-<details>
-<summary><b>Is it secure?</b></summary>
-All traffic is encrypted over WSS (WebSocket over TLS). Session data lives on your machine,
-not on the relay. You can also self-host the relay for complete control.
-</details>
-
-<details>
-<summary><b>Which agents work with Runmote?</b></summary>
-Any agent implementing the ACP specification — OpenCode, Claude Code, Codex, Gemini CLI,
-Cursor, Copilot, and others.
-</details>
-
-<details>
-<summary><b>Does it work on iOS and Android?</b></summary>
-Yes — the Runmote app is built with Flutter and runs on both platforms.
-APK is available in releases; iOS TestFlight coming soon.
-</details>
-
-<details>
-<summary><b>Can I host my own relay server?</b></summary>
-Yes. The relay is fully open source. Run it with Docker or deploy to Render in minutes.
-See the <code>Dockerfile.relay</code> and <code>docker-compose.yml</code>.
-</details>
-
-<br />
+---
 
 ## Contributing
 
@@ -247,16 +266,16 @@ Pull requests are welcome. For major changes, open an issue first to discuss.
 ```bash
 git clone https://github.com/Raza-learner/Runmote.git
 cd Runmote
-uv sync                     # install Python deps
-cd src/flutter_app && flutter pub get   # install Flutter deps
+uv sync                          # install Python deps
+cd src/flutter_app && flutter pub get  # install Flutter deps
 ```
 
-<br />
+---
 
 ## Author
 
 <p align="left">
-Built by <b>Raza</b> — a CS student who learned Flutter and Python simultaneously
+Built by <b>Raza</b> -- a CS student who learned Flutter and Python simultaneously
 while building something real. If Runmote saved you time, consider buying me a coffee.
 </p>
 
@@ -265,7 +284,7 @@ while building something real. If Runmote saved you time, consider buying me a c
   <a href="https://github.com/sponsors/Raza-learner"><img src="https://img.shields.io/badge/sponsor-30363D?logo=github-sponsors&logoColor=#EA4AAA" alt="GitHub Sponsor" /></a>
 </p>
 
-<br />
+---
 
 ## License
 
@@ -281,4 +300,4 @@ MIT © [Raza](https://github.com/Raza-learner)
 
 <br />
 
-<p align="center">Made with ❤️ by a student developer</p>
+<p align="center">Made with love by a student developer</p>
