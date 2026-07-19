@@ -81,3 +81,114 @@ class TestDetectAcpAgents:
         import daemon.config
 
         assert daemon.config.RECONNECT_DELAY == 5
+
+    def test_find_exe_returns_path_when_on_path(self):
+        with mock.patch("daemon.config.shutil.which", return_value="/usr/bin/opencode"):
+            from daemon.config import _find_exe
+
+            result = _find_exe("opencode")
+            assert result == "/usr/bin/opencode"
+
+    def test_find_exe_returns_none_when_not_found_on_linux(self):
+        with mock.patch("daemon.config.shutil.which", return_value=None):
+            from daemon.config import _find_exe
+
+            result = _find_exe("opencode")
+            assert result is None
+
+    def test_find_exe_finds_cmd_on_windows(self):
+        with (
+            mock.patch("daemon.config.sys.platform", "win32"),
+            mock.patch("daemon.config.shutil.which", return_value=None),
+            mock.patch("daemon.config.os.path.isdir", return_value=True),
+            mock.patch("daemon.config.os.scandir") as mock_scandir,
+        ):
+            mock_entry = mock.MagicMock()
+            mock_entry.name = "opencode.cmd"
+            mock_entry.is_file.return_value = True
+            mock_scandir.return_value = [mock_entry]
+
+            from daemon.config import _find_exe
+
+            result = _find_exe("opencode", r"C:\npm")
+            assert result == os.path.join(r"C:\npm", "opencode.cmd")
+
+    def test_find_exe_finds_bat_on_windows(self):
+        with (
+            mock.patch("daemon.config.sys.platform", "win32"),
+            mock.patch("daemon.config.shutil.which", return_value=None),
+            mock.patch("daemon.config.os.path.isdir", return_value=True),
+            mock.patch("daemon.config.os.scandir") as mock_scandir,
+        ):
+            mock_entry = mock.MagicMock()
+            mock_entry.name = "opencode.bat"
+            mock_entry.is_file.return_value = True
+            mock_scandir.return_value = [mock_entry]
+
+            from daemon.config import _find_exe
+
+            result = _find_exe("opencode", r"C:\npm")
+            assert result == os.path.join(r"C:\npm", "opencode.bat")
+
+    def test_find_exe_finds_exe_on_windows(self):
+        with (
+            mock.patch("daemon.config.sys.platform", "win32"),
+            mock.patch("daemon.config.shutil.which", return_value=None),
+            mock.patch("daemon.config.os.path.isdir", return_value=True),
+            mock.patch("daemon.config.os.scandir") as mock_scandir,
+        ):
+            mock_entry = mock.MagicMock()
+            mock_entry.name = "opencode.exe"
+            mock_entry.is_file.return_value = True
+            mock_scandir.return_value = [mock_entry]
+
+            from daemon.config import _find_exe
+
+            result = _find_exe("opencode", r"C:\npm")
+            assert result == os.path.join(r"C:\npm", "opencode.exe")
+
+    def test_find_exe_prefers_shutil_which_over_scandir(self):
+        with (
+            mock.patch("daemon.config.sys.platform", "win32"),
+            mock.patch("daemon.config.shutil.which", return_value=r"C:\Windows\opencode.exe"),
+            mock.patch("daemon.config.os.path.isdir", return_value=True),
+            mock.patch("daemon.config.os.scandir") as mock_scandir,
+        ):
+            mock_entry = mock.MagicMock()
+            mock_entry.name = "opencode.cmd"
+            mock_entry.is_file.return_value = True
+            mock_scandir.return_value = [mock_entry]
+
+            from daemon.config import _find_exe
+
+            result = _find_exe("opencode", r"C:\npm")
+            assert result == r"C:\Windows\opencode.exe"
+
+    def test_find_exe_ignores_non_matching_names_on_windows(self):
+        with (
+            mock.patch("daemon.config.sys.platform", "win32"),
+            mock.patch("daemon.config.shutil.which", return_value=None),
+            mock.patch("daemon.config.os.path.isdir", return_value=True),
+            mock.patch("daemon.config.os.scandir") as mock_scandir,
+        ):
+            mock_entry = mock.MagicMock()
+            mock_entry.name = "other-tool.exe"
+            mock_entry.is_file.return_value = True
+            mock_scandir.return_value = [mock_entry]
+
+            from daemon.config import _find_exe
+
+            result = _find_exe("opencode", r"C:\npm")
+            assert result is None
+
+    def test_detected_opencode_uses_resolved_path(self):
+        def which_side_effect(cmd: str):
+            return "/usr/bin/" + cmd if cmd == "opencode" else None
+
+        with mock.patch("daemon.config.shutil.which", side_effect=which_side_effect):
+            from daemon.config import _detect_acp_agents
+
+            agents = _detect_acp_agents()
+            opencode_cfg = next(a for a in agents if a["id"] == "opencode")
+            assert opencode_cfg["command"][0] == "/usr/bin/opencode"
+            assert opencode_cfg["command"][1] == "acp"

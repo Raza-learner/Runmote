@@ -123,11 +123,19 @@ class AgentProcess:
         if self.proc and self.proc.returncode is None:
             return
 
+        kwargs = {}
+        cmd = list(self.command)
+        if sys.platform == "win32":
+            kwargs["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
+            if cmd[0].endswith((".cmd", ".bat")):
+                cmd = ["cmd.exe", "/c"] + cmd
+
         self.proc = await asyncio.create_subprocess_exec(
-            *self.command,
+            *cmd,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            **kwargs,
         )
         self.online = True
         await self.send(

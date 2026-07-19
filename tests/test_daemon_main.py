@@ -302,6 +302,19 @@ class TestAgentProcess:
         a = AgentProcess(config)
         assert a.info == {"name": "Agent One", "version": ""}
 
+    def test_cmd_wrapping_logic_on_windows(self):
+        """cmd.exe /c wrapping logic (matching AgentProcess.start())."""
+        import sys
+        cmd = [r"C:\npm\opencode.cmd", "acp"]
+        if sys.platform == "win32" and cmd[0].endswith((".cmd", ".bat")):
+            cmd = ["cmd.exe", "/c"] + cmd
+            assert cmd == ["cmd.exe", "/c", r"C:\npm\opencode.cmd", "acp"]
+        else:
+            cmd_no_wrap = [r"C:\bin\opencode", "acp"]
+            if sys.platform == "win32" and cmd_no_wrap[0].endswith((".cmd", ".bat")):
+                cmd_no_wrap = ["cmd.exe", "/c"] + cmd_no_wrap
+            assert cmd_no_wrap == [r"C:\bin\opencode", "acp"]
+
 
 class TestIsHidden:
     def test_dot_prefix_is_hidden(self):

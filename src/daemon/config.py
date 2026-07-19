@@ -20,25 +20,31 @@ AGENT_COMMAND = json.loads(_raw_agent_command)
 
 
 def _find_exe(name, *win_dirs):
-    """Find executable on PATH. On Windows also check known install dirs."""
+    """Find executable on PATH, returning full path or None.
+    On Windows also check known install dirs with .cmd/.bat/.exe extensions."""
     path_hit = shutil.which(name)
     if path_hit:
         print(f"[ACP-DETECT] {name}: found on PATH at {path_hit}", flush=True)
-        return True
+        return path_hit
     if sys.platform != "win32":
-        return False
+        return None
+    extensions = (".cmd", ".bat", ".exe", "")
     for directory in win_dirs:
         if not directory:
             continue
         if os.path.isdir(directory):
             for entry in os.scandir(directory):
-                if entry.name.lower().startswith(name.lower()) and entry.is_file():
-                    print(
-                        f"[ACP-DETECT] {name}: found in {directory} ({entry.name})",
-                        flush=True,
-                    )
-                    return True
-    return False
+                if entry.is_file():
+                    lower_name = entry.name.lower()
+                    for ext in extensions:
+                        if lower_name == (name + ext).lower():
+                            full = os.path.join(directory, entry.name)
+                            print(
+                                f"[ACP-DETECT] {name}: found in {directory} ({entry.name})",
+                                flush=True,
+                            )
+                            return full
+    return None
 
 
 def _detect_acp_agents() -> list[dict]:
@@ -58,9 +64,11 @@ def _detect_acp_agents() -> list[dict]:
     _scoop = os.path.join(_home, "scoop", "shims") if _home else ""
     _choco = os.path.join(_programdata, "chocolatey", "bin") if _programdata else ""
     _winget = os.path.join(_local, "Microsoft", "WinGet", "Links") if _local else ""
+    _pythonscripts = os.path.join(_appdata, "Python", "Scripts") if _appdata else ""
+    _dotnet = os.path.join(_home, ".dotnet", "tools") if _home else ""
 
     # opencode — native ACP mode
-    if _find_exe(
+    found = _find_exe(
         "opencode",
         os.path.join(_local, "Programs", "opencode") if _local else "",
         os.path.join(_pf, "OpenCode") if _pf else "",
@@ -73,22 +81,32 @@ def _detect_acp_agents() -> list[dict]:
         _scoop,
         _choco,
         _winget,
-    ):
-        agents.append({"id": "opencode", "name": "OpenCode", "command": ["opencode", "acp"]})
+        _pythonscripts,
+        _dotnet,
+    )
+    if found:
+        agents.append({"id": "opencode", "name": "OpenCode", "command": [found, "acp"]})
 
     # codex — CLI + ACP adapter
-    if _find_exe("codex", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget):
-        if _find_exe("codex-acp", _npm, _localbin, _scoop, _choco, _winget):
-            agents.append({"id": "codex", "name": "Codex", "command": ["codex-acp"]})
+    codex_cli = _find_exe("codex", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+    if codex_cli:
+        codex_acp = _find_exe("codex-acp", _npm, _localbin, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+        if codex_acp:
+            agents.append({"id": "codex", "name": "Codex", "command": [codex_acp]})
         elif shutil.which("npx"):
             agents.append({"id": "codex", "name": "Codex", "command": ["npx", "-y", "@agentclientprotocol/codex-acp"]})
 
     # claude — CLI + ACP adapter
-    if _find_exe("claude", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget) or _find_exe(
-        "claude-code", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget
-    ):
-        if _find_exe("claude-agent-acp", _npm, _localbin, _scoop, _choco, _winget):
-            agents.append({"id": "claude", "name": "Claude Code", "command": ["claude-agent-acp"]})
+    claude_cli = (
+        _find_exe("claude", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+        or _find_exe("claude-code", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+    )
+    if claude_cli:
+        claude_acp = _find_exe(
+            "claude-agent-acp", _npm, _localbin, _scoop, _choco, _winget, _pythonscripts, _dotnet
+        )
+        if claude_acp:
+            agents.append({"id": "claude", "name": "Claude Code", "command": [claude_acp]})
         elif shutil.which("npx"):
             agents.append(
                 {
@@ -99,11 +117,12 @@ def _detect_acp_agents() -> list[dict]:
             )
 
     # gemini — native ACP mode
-    if _find_exe("gemini", _localbin, _npm, _scoop, _choco, _winget):
-        agents.append({"id": "gemini", "name": "Gemini", "command": ["gemini", "--acp"]})
+    found = _find_exe("gemini", _localbin, _npm, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+    if found:
+        agents.append({"id": "gemini", "name": "Gemini", "command": [found, "--acp"]})
 
     # cursor — native ACP mode
-    if _find_exe(
+    found = _find_exe(
         "cursor-agent",
         os.path.join(_local, "Programs", "Cursor") if _local else "",
         os.path.join(_pf, "Cursor") if _pf else "",
@@ -113,11 +132,14 @@ def _detect_acp_agents() -> list[dict]:
         _scoop,
         _choco,
         _winget,
-    ):
-        agents.append({"id": "cursor", "name": "Cursor", "command": ["cursor-agent", "acp"]})
+        _pythonscripts,
+        _dotnet,
+    )
+    if found:
+        agents.append({"id": "cursor", "name": "Cursor", "command": [found, "acp"]})
 
     # copilot — native ACP mode
-    if _find_exe(
+    found = _find_exe(
         "copilot",
         os.path.join(_local, "GitHubCLI") if _local else "",
         os.path.join(_pf, "GitHub CLI") if _pf else "",
@@ -127,8 +149,11 @@ def _detect_acp_agents() -> list[dict]:
         _scoop,
         _choco,
         _winget,
-    ):
-        agents.append({"id": "copilot", "name": "Copilot", "command": ["copilot", "--acp", "--stdio"]})
+        _pythonscripts,
+        _dotnet,
+    )
+    if found:
+        agents.append({"id": "copilot", "name": "Copilot", "command": [found, "--acp", "--stdio"]})
 
     return agents if agents else [{"id": "default", "name": "Agent", "command": AGENT_COMMAND}]
 
