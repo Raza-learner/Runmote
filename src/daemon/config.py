@@ -116,16 +116,36 @@ def _detect_acp_agents() -> list[dict]:
                 }
             )
 
-    # gemini — native ACP mode
+    # gemini — native ACP mode (deprecated June 18 2026, replaced by agy)
     found = _find_exe("gemini", _localbin, _npm, _scoop, _choco, _winget, _pythonscripts, _dotnet)
     if found:
         agents.append({"id": "gemini", "name": "Gemini", "command": [found, "--acp"]})
 
-    # cursor — native ACP mode
+    # agy (Antigravity CLI) — ACP via agy-acp bridge
+    agy_cli = _find_exe("agy", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+    if agy_cli:
+        agy_acp = _find_exe("agy-acp", _npm, _localbin, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+        if agy_acp:
+            agents.append({"id": "antigravity", "name": "Antigravity", "command": [agy_acp]})
+        elif shutil.which("npx"):
+            agents.append(
+                {
+                    "id": "antigravity",
+                    "name": "Antigravity",
+                    "command": ["npx", "-y", "agy-acp"],
+                }
+            )
+
+    # cursor — native ACP mode (binary: agent or cursor-agent)
     found = _find_exe(
         "cursor-agent",
+        os.path.join(_local, "Programs", "cursor") if _local else "",
         os.path.join(_local, "Programs", "Cursor") if _local else "",
+        os.path.join(_local, "Programs", "cursor", "resources", "app") if _local else "",
+        os.path.join(_local, "Programs", "Cursor", "resources", "app") if _local else "",
+        os.path.join(_pf, "cursor") if _pf else "",
         os.path.join(_pf, "Cursor") if _pf else "",
+        os.path.join(_pf86, "cursor") if _pf86 else "",
         os.path.join(_pf86, "Cursor") if _pf86 else "",
         _localbin,
         _npm,
@@ -135,6 +155,13 @@ def _detect_acp_agents() -> list[dict]:
         _pythonscripts,
         _dotnet,
     )
+    if not found:
+        found = _find_exe(
+            "agent",
+            os.path.join(_local, "Programs", "cursor", "resources", "app") if _local else "",
+            os.path.join(_local, "Programs", "Cursor", "resources", "app") if _local else "",
+            _localbin,
+        )
     if found:
         agents.append({"id": "cursor", "name": "Cursor", "command": [found, "acp"]})
 

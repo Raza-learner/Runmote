@@ -9,6 +9,33 @@
 
 $ErrorActionPreference = "Continue"
 
+# ── Bootstrap: when piped via irm | iex, download and re-run locally ──
+if (-not $PSScriptRoot) {
+    $branch = if ($env:ACP_BRANCH) { $env:ACP_BRANCH } else { "dev" }
+    $tmpDir = "$env:TEMP\runmote-agents"
+    Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue | Out-Null
+    New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
+    try {
+        $zipUrl = "https://github.com/Raza-learner/Runmote/archive/refs/heads/$branch.zip"
+        $zipFile = "$tmpDir\repo.zip"
+        Invoke-WebRequest -UseBasicParsing -Uri $zipUrl -OutFile $zipFile -ErrorAction Stop
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile, $tmpDir)
+        $extracted = Get-ChildItem "$tmpDir\Runmote-*" -Directory | Select-Object -First 1
+        $localScript = Join-Path $extracted.FullName "scripts\setup-agents.ps1"
+        if (Test-Path $localScript) {
+            $args = @PSBoundParameters
+            if (-not $args.Keys.Count) { $args = @{All = $true} }
+            & $localScript @args
+            exit $LASTEXITCODE
+        }
+    } catch {
+        Write-Host "Error: could not download agent setup script." -ForegroundColor Red
+        Write-Host "Run locally: git clone https://github.com/Raza-learner/Runmote.git && cd Runmote && scripts\setup-agents.ps1 -All" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
 if (-not $Dir) {
     $Dir = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 }
@@ -202,47 +229,46 @@ function Install-Opencode {
 
     if (Test-CliFound $name) {
         $ver = & $name --version 2>$null
-        Write-Done "$name $ver already installed"
+        Write-Done "$name $ver detected (native ACP)"
         return $true
     }
     if (Test-Path $bundledExe) {
-        Write-Done "Bundled $name already at $bundledExe"
+        Write-Done "Bundled $name at $bundledExe (native ACP)"
         return $true
     }
-    if (-not (Confirm-Install $name "(native ACP, lightweight)")) {
+    if (-not (Confirm-Install $name "(download opencode.exe)")) {
         Write-Skip "  Skipped $name"
         return $false
     }
-    Write-Step "Installing opencode..."
+    Write-Step "Downloading opencode (bundled fallback)..."
     npm install -g opencode 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0 -and (Test-CliFound $name)) {
         $ver = & $name --version 2>$null
         Write-Done "$name $ver installed"
         return $true
     }
-    Write-Host "  opencode installation failed." -ForegroundColor Yellow
+    Write-Host "  opencode install/download failed." -ForegroundColor Yellow
     return $false
 }
 
-function Install-ClaudeCode {
+function Install-ClaudeAdapter {
     $name = "claude"
-    if (Test-CliFound $name) {
-        Write-Done "Claude Code CLI already found"
-    } else {
-        if (-not (Confirm-Install "Claude Code" "(@anthropic-ai/claude-code + ACP adapter)")) {
-            Write-Skip "  Skipped Claude Code"
+    $cliFound = $false
+    foreach ($cli in @("claude", "claude-code")) {
+        if (Test-CliFound $cli) {
+            Write-Done "Claude Code ($cli) detected"
+            $cliFound = $true
+            break
+        }
+    }
+    if (-not $cliFound) {
+        Write-Host "  Claude Code CLI not found — install from https://claude.ai/code" -ForegroundColor Yellow
+        if (-not (Confirm-Install "Claude ACP adapter" "(@agentclientprotocol/claude-agent-acp)")) {
+            Write-Skip "  Skipped Claude ACP adapter"
             return $false
         }
-        Write-Step "Installing @anthropic-ai/claude-code..."
-        npm install -g @anthropic-ai/claude-code 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "  claude-code installation failed." -ForegroundColor Yellow
-            return $false
-        }
-        Write-Done "Claude Code CLI installed"
     }
 
-    # Install ACP adapter for claude
     $adapter = "@agentclientprotocol/claude-agent-acp"
     if (Test-PackageInstalled $adapter) {
         $ver = Get-PackageVersion $adapter
@@ -260,25 +286,79 @@ function Install-ClaudeCode {
     return $true
 }
 
-function Install-Codex {
-    $name = "codex"
+function Install-AntigravityAdapter {
+    $name = "agy"
     if (Test-CliFound $name) {
-        Write-Done "Codex CLI already found"
+        $ver = & $name --version 2>$null
+        Write-Done "Antigravity CLI $ver detected"
     } else {
-        if (-not (Confirm-Install "Codex CLI" "(@openai/codex + ACP adapter)")) {
-            Write-Skip "  Skipped Codex CLI"
+        Write-Host "  agy (Antigravity CLI) not found — install from https://antigravity.google/cli" -ForegroundColor Yellow
+        if (-not (Confirm-Install "Antigravity ACP adapter" "(agy-acp)")) {
+            Write-Skip "  Skipped Antigravity ACP adapter"
             return $false
         }
-        Write-Step "Installing @openai/codex..."
-        npm install -g @openai/codex 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "  codex installation failed." -ForegroundColor Yellow
-            return $false
-        }
-        Write-Done "Codex CLI installed"
     }
 
-    # Install ACP adapter for codex
+    $adapter = "agy-acp"
+    if (Test-PackageInstalled $adapter) {
+        $ver = Get-PackageVersion $adapter
+        Write-Done "$adapter v$ver already installed"
+    } else {
+        Write-Step "Installing $adapter (ACP bridge for agy)..."
+        npm install -g $adapter 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            $ver = Get-PackageVersion $adapter
+            Write-Done "$adapter v$ver installed"
+        } else {
+            Write-Host "  $adapter installation failed." -ForegroundColor Yellow
+            return $false
+        }
+    }
+    return $true
+}
+
+function Test-CursorAgent {
+    $paths = @(
+        "$env:LOCALAPPDATA\Programs\cursor\resources\app",
+        "$env:LOCALAPPDATA\Programs\Cursor\resources\app",
+        "$env:ProgramFiles\cursor\resources\app",
+        "$env:ProgramFiles\Cursor\resources\app",
+        "$env:USERPROFILE\.local\bin"
+    )
+    foreach ($name in @("agent", "cursor-agent")) {
+        $inPath = Get-Command $name -ErrorAction SilentlyContinue
+        if ($inPath) { return $inPath.Source }
+        foreach ($p in $paths) {
+            $full = Join-Path $p "$name.exe"
+            if (Test-Path $full) { return $full }
+        }
+    }
+    return $null
+}
+
+function Install-Copilot {
+    $name = "copilot"
+    if (Test-CliFound $name) {
+        $ver = & $name --version 2>$null
+        Write-Done "GitHub Copilot CLI $ver detected (native ACP)"
+    } else {
+        Write-Host "  copilot not found — install from 'npm install -g @github/copilot' then 'copilot login'" -ForegroundColor Yellow
+    }
+    return $true
+}
+
+function Install-CodexAdapter {
+    $name = "codex"
+    if (Test-CliFound $name) {
+        Write-Done "Codex CLI detected"
+    } else {
+        Write-Host "  codex not found — install from 'npm install -g @openai/codex'" -ForegroundColor Yellow
+        if (-not (Confirm-Install "Codex ACP adapter" "(@agentclientprotocol/codex-acp)")) {
+            Write-Skip "  Skipped Codex ACP adapter"
+            return $false
+        }
+    }
+
     $adapter = "@agentclientprotocol/codex-acp"
     if (Test-PackageInstalled $adapter) {
         $ver = Get-PackageVersion $adapter
@@ -347,16 +427,26 @@ function Install-Agents {
         Write-Host "  Only the bundled opencode.exe will be available." -ForegroundColor Yellow
     }
 
-    # Step 3: Install CLI tools via npm (if available)
+    # Step 3: Detect agents and install ACP adapters
     Write-Host ""
     $installedAny = $bundledOk
     if ($hasNpm) {
-        Write-Step "[3/4] Installing agent CLI tools..."
+        Write-Step "[3/4] Detecting agents and installing ACP adapters..."
         if (Install-Opencode) { $installedAny = $true }
-        if (Install-ClaudeCode) { $installedAny = $true }
-        if (Install-Codex) { $installedAny = $true }
+        if (Install-ClaudeAdapter) { $installedAny = $true }
+        if (Install-AntigravityAdapter) { $installedAny = $true }
+        if (Install-Copilot) { $installedAny = $true }
+        if (Install-CodexAdapter) { $installedAny = $true }
     } else {
         Write-Step "[3/4] Skipping npm-based agents (npm not available)"
+    }
+
+    # Cursor agent (from desktop app or standalone CLI install)
+    $cursorAgent = Test-CursorAgent
+    if ($cursorAgent) {
+        Write-Done "Cursor agent (ACP) detected at $cursorAgent"
+    } else {
+        Write-Host "  Cursor agent not found — install via 'irm https://cursor.com/install?win32=true | iex'" -ForegroundColor Yellow
     }
 
     if (-not $installedAny) {
@@ -369,6 +459,8 @@ function Install-Agents {
     Write-Host ""
     Write-Step "[4/4] Setting up PATH wrappers..."
     Install-CmdWrapper "opencode"
+    Install-CmdWrapper "agy-acp"
+    Install-CmdWrapper "copilot"
     Install-CmdWrapper "codex"
     Install-CmdWrapper "claude"
     Install-CmdWrapper "claude-code"
@@ -379,7 +471,7 @@ function Install-Agents {
     Write-Done "Agent setup complete!"
     Write-Host ""
     Write-Host "  Detected agents:" -ForegroundColor White
-    $allClis = @("opencode", "codex", "claude", "claude-code", "codex-acp", "claude-agent-acp")
+    $allClis = @("opencode", "agy", "agy-acp", "copilot", "codex", "claude", "claude-code", "codex-acp", "claude-agent-acp", "agent", "cursor-agent")
     foreach ($cli in $allClis) {
         $found = Get-Command $cli -ErrorAction SilentlyContinue
         if ($found) {
@@ -409,6 +501,8 @@ function Remove-Agents {
     if (Test-NpmInstalled) {
         $packages = @(
             "opencode",
+            "agy-acp",
+            "@github/copilot",
             "@openai/codex",
             "@anthropic-ai/claude-code",
             "@agentclientprotocol/codex-acp",
@@ -428,6 +522,8 @@ function Remove-Agents {
     }
 
     Remove-CmdWrapper "opencode"
+    Remove-CmdWrapper "agy-acp"
+    Remove-CmdWrapper "copilot"
     Remove-CmdWrapper "codex"
     Remove-CmdWrapper "claude"
     Remove-CmdWrapper "claude-code"
@@ -448,7 +544,7 @@ function Remove-Agents {
 # ── Status ─────────────────────────────────────────────────
 
 function Get-AllCliStatus {
-    $allClis = @("opencode", "codex", "claude", "claude-code", "codex-acp", "claude-agent-acp", "node", "npm")
+    $allClis = @("opencode", "agy", "agy-acp", "copilot", "codex", "claude", "claude-code", "codex-acp", "claude-agent-acp", "node", "npm")
     foreach ($cli in $allClis) {
         $found = Get-Command $cli -ErrorAction SilentlyContinue
         if ($found) {
@@ -463,6 +559,8 @@ function Get-AllPackageStatus {
     Write-Host ""
     $packages = @(
         "opencode",
+        "agy-acp",
+        "@github/copilot",
         "@openai/codex",
         "@anthropic-ai/claude-code",
         "@agentclientprotocol/codex-acp",
@@ -486,7 +584,7 @@ function Get-AllPackageStatus {
 
 function Get-AllWrapperStatus {
     Write-Host ""
-    @("opencode", "codex", "claude", "claude-code", "codex-acp", "claude-agent-acp") | ForEach-Object {
+    @("opencode", "agy-acp", "copilot", "codex", "claude", "claude-code", "codex-acp", "claude-agent-acp") | ForEach-Object {
         $bin = $_
         $cmdPath = Join-Path $binDir "${bin}.cmd"
         if (Test-Path $cmdPath) {
