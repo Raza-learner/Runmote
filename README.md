@@ -275,12 +275,13 @@ cd src/flutter_app && flutter pub get  # install Flutter deps
 ## Author
 
 <p align="left">
-Built by <b>Raza</b> -- a CS student who learned Flutter and Python simultaneously
-while building something real. If Runmote saved you time, consider buying me a coffee.
+Built by <b>Raza</b>, an independent developer who shipped Runmote from scratch
+across three platforms — Python daemon, Flutter mobile app, and a real-time relay server.
+If this project saved you time or made your workflow better, consider supporting it.
 </p>
 
 <p align="left">
-  <a href="https://www.buymeacoffee.com/raza"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee" /></a>
+  <a href="https://buymeacoffee.com/raza"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee" /></a>
   <a href="https://github.com/sponsors/Raza-learner"><img src="https://img.shields.io/badge/sponsor-30363D?logo=github-sponsors&logoColor=#EA4AAA" alt="GitHub Sponsor" /></a>
 </p>
 
@@ -300,4 +301,4 @@ MIT © [Raza](https://github.com/Raza-learner)
 
 <br />
 
-<p align="center">Made with love by a student developer</p>
+<p align="center">Made with love</p>
