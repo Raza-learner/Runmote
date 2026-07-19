@@ -60,13 +60,16 @@ def get_daemon_for_app(client_id: str) -> DaemonSession | None:
 
 
 def get_daemon_id_by_token(token: str) -> str | None:
-    """Look up a daemon_id by auth token.
+    """Look up a daemon_id by app auth token.
 
-    Works for both *active* daemons (in ``daemons``) and *offline* daemons
-    (only in ``known_tokens``), so mobile apps can auto-reconnect even when
-    the daemon is temporarily disconnected.
+    ``known_tokens`` holds app-specific tokens generated during pairing.
+    These survive daemon disconnects, so mobile apps can auto-reconnect
+    even when the daemon is temporarily offline.  We also fall back to
+    matching an active daemon's relay token for backward compatibility.
     """
+    if token in known_tokens:
+        return known_tokens[token]
     for did, session in daemons.items():
         if session.token == token:
             return did
-    return known_tokens.get(token)
+    return None

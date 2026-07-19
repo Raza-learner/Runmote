@@ -117,8 +117,6 @@ async def daemon_endpoint(websocket: WebSocket):
                         paired_apps=paired_apps,
                     )
                     state.daemons[daemon_id] = session
-                    if token:
-                        state.known_tokens[token] = daemon_id
                     state.store.set_daemon_id(daemon_id)
                     print(
                         f"  → daemon {daemon_id} identified (paired_apps={len(session.paired_apps)}, ever_paired={ever_paired})"

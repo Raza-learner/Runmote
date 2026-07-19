@@ -1,4 +1,5 @@
 import json
+import secrets
 import time
 import uuid
 from collections import defaultdict
@@ -87,6 +88,10 @@ async def app_endpoint(websocket: WebSocket):
                         state.app_to_daemon[client_id] = daemon_session.daemon_id
                         daemon_session.paired_apps.add(client_id)
                         state.claimed_codes.add(code)
+                        # Generate an app-specific token so multiple daemons can
+                        # coexist without clobbering each other's reconnect token.
+                        app_token = secrets.token_urlsafe(24)
+                        state.known_tokens[app_token] = daemon_session.daemon_id
                         await websocket.send_text(
                             json.dumps(
                                 {
@@ -95,7 +100,7 @@ async def app_endpoint(websocket: WebSocket):
                                     "result": {
                                         "paired": True,
                                         "daemonId": daemon_session.daemon_id,
-                                        "token": daemon_session.token,
+                                        "token": app_token,
                                     },
                                 }
                             )
