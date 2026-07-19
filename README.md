@@ -277,11 +277,11 @@ cd src/flutter_app && flutter pub get  # install Flutter deps
 <p align="left">
 Built by <b>Raza</b>, an independent developer who shipped Runmote from scratch
 across three platforms — Python daemon, Flutter mobile app, and a real-time relay server.
-If this project saved you time or made your workflow better, consider supporting it.
+If this project saved you time or made your workflow better, consider supporting it on Ko-fi.
 </p>
 
 <p align="left">
-  <a href="https://buymeacoffee.com/raza"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee" /></a>
+  <a href="https://ko-fi.com/razalearner"><img src="https://img.shields.io/badge/Ko--fi-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi" /></a>
   <a href="https://github.com/sponsors/Raza-learner"><img src="https://img.shields.io/badge/sponsor-30363D?logo=github-sponsors&logoColor=#EA4AAA" alt="GitHub Sponsor" /></a>
 </p>
 
