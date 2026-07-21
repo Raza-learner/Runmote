@@ -5,6 +5,45 @@ use std::{fs, thread, time::Duration};
 
 use serde::Serialize;
 
+fn ensure_relay_env() {
+    // If the daemon token is already set, nothing to do.
+    if std::env::var("ACP_DAEMON_TOKEN").is_ok() {
+        return;
+    }
+
+    // Fetch the public relay config via PowerShell so the user
+    // doesn't need to set ACP_DAEMON_TOKEN / ACP_RELAY_URL manually.
+    let output = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "irm https://runmote.dev/config | ConvertTo-Json -Compress",
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok();
+    let json = output.and_then(|o| {
+        if o.status.success() {
+            String::from_utf8(o.stdout).ok()
+        } else {
+            None
+        }
+    });
+    if let Some(ref raw) = json {
+        if let Ok(cfg) = serde_json::from_str::<serde_json::Value>(raw) {
+            if let Some(url) = cfg.get("relayUrl").and_then(|v| v.as_str()) {
+                if std::env::var("ACP_RELAY_URL").is_err() {
+                    std::env::set_var("ACP_RELAY_URL", url);
+                }
+            }
+            if let Some(token) = cfg.get("token").and_then(|v| v.as_str()) {
+                std::env::set_var("ACP_DAEMON_TOKEN", token);
+            }
+        }
+    }
+}
+
 const PID_FILE: &str = "runmote-daemon.pid";
 const LOG_FILE: &str = "runmote-daemon.log";
 const ERR_FILE: &str = "runmote-daemon.err";
@@ -49,16 +88,42 @@ impl DaemonManager {
         Self::temp_dir().join(CODE_FILE)
     }
 
-    fn find_python(&self) -> PathBuf {
+    fn find_python(&self) -> Result<PathBuf, String> {
         #[cfg(target_os = "windows")]
         let venv_python = self.acp_path.join(".venv").join("Scripts").join("python.exe");
         #[cfg(not(target_os = "windows"))]
         let venv_python = self.acp_path.join(".venv").join("bin").join("python");
 
         if venv_python.exists() {
-            return venv_python;
+            return Ok(venv_python);
         }
-        PathBuf::from("python")
+
+        // No .venv — run uv sync to create it and install deps.
+        eprintln!("No .venv found at {:?}. Running uv sync...", self.acp_path);
+        let uv = if cfg!(target_os = "windows") { "uv.exe" } else { "uv" };
+        let status = std::process::Command::new(uv)
+            .args(["sync", "--directory", &self.acp_path.to_string_lossy()])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
+            .status()
+            .map_err(|e| format!("uv not found on PATH (install from https://docs.astral.sh/uv): {}", e))?;
+
+        if !status.success() {
+            return Err(format!(
+                "uv sync failed. Run 'cd {} && uv sync' manually and retry.",
+                self.acp_path.display()
+            ));
+        }
+
+        if venv_python.exists() {
+            Ok(venv_python)
+        } else {
+            Err(format!(
+                ".venv still missing after uv sync. Run 'cd {} && uv sync' manually.",
+                self.acp_path.display()
+            ))
+        }
     }
 
     fn kill_pid(pid: u32) {
@@ -162,6 +227,9 @@ impl DaemonManager {
             return Ok(self.status());
         }
 
+        // Auto-configure relay URL + token from the public config endpoint.
+        ensure_relay_env();
+
         let _ = fs::remove_file(self.pid_file());
 
         let log_file = self.log_file();
@@ -172,7 +240,7 @@ impl DaemonManager {
         let err = fs::File::create(&err_file)
             .map_err(|e| format!("Failed to create err file: {}", e))?;
 
-        let python = self.find_python();
+        let python = self.find_python()?;
 
         #[cfg(target_os = "windows")]
         let child = {
@@ -284,8 +352,37 @@ fn user_bin_dir() -> PathBuf {
     home_dir().join(".local").join("bin")
 }
 
+fn disable_windows_autostart() {
+    // Disable the scheduled task that auto-starts the daemon.
+    // Without this, Task Scheduler's "restart on failure" policy
+    // re-launches the daemon within 1 minute of stopping it.
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("schtasks")
+            .args(["/Change", "/TN", "Runmote Daemon", "/DISABLE"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+        // Also remove the Run registry key so it doesn't start at next login.
+        let _ = std::process::Command::new("reg")
+            .args([
+                "delete",
+                "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                "/v",
+                "Runmote Daemon",
+                "/f",
+            ])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+    }
+}
+
 #[tauri::command]
 pub fn daemon_stop(state: tauri::State<'_, DaemonManager>) -> Result<DaemonStatus, String> {
+    disable_windows_autostart();
     state.stop()
 }
 

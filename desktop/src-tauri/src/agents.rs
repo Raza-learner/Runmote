@@ -13,22 +13,8 @@ pub struct AgentInfo {
 }
 
 fn find_exe(name: &str, extra_dirs: &[PathBuf]) -> Option<PathBuf> {
-    if let Ok(path) = env::var("PATH") {
-        for dir in env::split_paths(&path) {
-            let full = dir.join(name);
-            if full.is_file() {
-                return Some(full);
-            }
-            #[cfg(target_os = "windows")]
-            {
-                for ext in [".cmd", ".bat", ".exe"] {
-                    let with_ext = dir.join(format!("{}{}", name, ext));
-                    if with_ext.is_file() {
-                        return Some(with_ext);
-                    }
-                }
-            }
-        }
+    if let Some(path) = find_exe_in_path(name) {
+        return Some(path);
     }
 
     for dir in extra_dirs {
@@ -58,7 +44,82 @@ fn find_exe(name: &str, extra_dirs: &[PathBuf]) -> Option<PathBuf> {
         }
     }
 
+    // Final fallback: ask the shell where the executable is.
+    find_exe_via_shell(name)
+}
+
+fn find_exe_in_path(name: &str) -> Option<PathBuf> {
+    if let Ok(path) = env::var("PATH") {
+        for dir in env::split_paths(&path) {
+            let full = dir.join(name);
+            if full.is_file() {
+                return Some(full);
+            }
+            #[cfg(target_os = "windows")]
+            {
+                for ext in [".cmd", ".bat", ".exe"] {
+                    let with_ext = dir.join(format!("{}{}", name, ext));
+                    if with_ext.is_file() {
+                        return Some(with_ext);
+                    }
+                }
+            }
+        }
+    }
     None
+}
+
+fn find_exe_via_shell(name: &str) -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = std::process::Command::new("where")
+            .arg(name)
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            let path = PathBuf::from(line.trim());
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let output = std::process::Command::new("which")
+            .arg(name)
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let path = PathBuf::from(stdout.trim());
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    None
+}
+
+fn npm_global_prefix() -> PathBuf {
+    // npm root -g works even when npm is on PATH.
+    if let Ok(output) = std::process::Command::new("npm")
+        .args(["root", "-g"])
+        .output()
+    {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let p = PathBuf::from(stdout.trim());
+            if p.is_dir() {
+                return p;
+            }
+        }
+    }
+    PathBuf::new()
 }
 
 fn has_npx() -> bool {
@@ -154,6 +215,14 @@ pub fn detect_agents() -> Vec<AgentInfo> {
     };
     let dotnet = join_home(".dotnet/tools");
 
+    // Windows app aliases (stores agent .exe shortcuts from some installers)
+    let windows_apps = {
+        let p = local.join("Microsoft/WindowsApps");
+        if p.is_dir() { p } else { PathBuf::new() }
+    };
+    // npm global prefix (more reliable than hardcoded AppData/npm)
+    let npm_prefix = npm_global_prefix();
+
     let common_dirs: Vec<PathBuf> = vec![
         localbin.clone(),
         npm.clone(),
@@ -164,6 +233,8 @@ pub fn detect_agents() -> Vec<AgentInfo> {
         winget.clone(),
         pythonscripts.clone(),
         dotnet.clone(),
+        windows_apps.clone(),
+        npm_prefix.clone(),
     ];
 
     let mut agents: Vec<AgentInfo> = Vec::new();
@@ -177,6 +248,8 @@ pub fn detect_agents() -> Vec<AgentInfo> {
                 [
                     local.join("Programs/opencode"),
                     local.join("Programs/OpenCode"),
+                    local.join("Programs/opencode/resources"), // Electron-style
+                    local.join("opencode"),
                     join_home(".opencode/bin"),
                 ]
                 .into_iter(),
@@ -200,7 +273,13 @@ pub fn detect_agents() -> Vec<AgentInfo> {
 
     // codex
     {
-        let codex_cli = find_exe("codex", &common_dirs);
+        let mut codex_dirs = common_dirs.clone();
+        codex_dirs.extend([
+            local.join("Programs/codex-cli"),
+            local.join("Programs/Codex CLI"),
+            local.join("codex-cli"),
+        ]);
+        let codex_cli = find_exe("codex", &codex_dirs);
         if codex_cli.is_some() {
             let codex_acp = find_exe("codex-acp", &common_dirs);
             if let Some(path) = codex_acp {
@@ -231,10 +310,17 @@ pub fn detect_agents() -> Vec<AgentInfo> {
 
     // claude
     {
-        let claude_cli = find_exe("claude", &common_dirs)
-            .or_else(|| find_exe("claude-code", &common_dirs));
+        let mut claude_dirs = common_dirs.clone();
+        claude_dirs.extend([
+            local.join("Programs/claude-code"),
+            local.join("Programs/Claude Code"),
+            local.join("claude-code"),
+            join_home(".claude/bin"),
+        ]);
+        let claude_cli = find_exe("claude", &claude_dirs)
+            .or_else(|| find_exe("claude-code", &claude_dirs));
         if claude_cli.is_some() {
-            let claude_acp = find_exe("claude-agent-acp", &common_dirs);
+            let claude_acp = find_exe("claude-agent-acp", &claude_dirs);
             if let Some(path) = claude_acp {
                 add_agent(
                     &mut agents,
@@ -279,9 +365,15 @@ pub fn detect_agents() -> Vec<AgentInfo> {
 
     // agy
     {
-        let agy_cli = find_exe("agy", &common_dirs);
+        let mut agy_dirs = common_dirs.clone();
+        agy_dirs.extend([
+            local.join("Programs/antigravity"),
+            local.join("Programs/Antigravity"),
+            local.join("antigravity"),
+        ]);
+        let agy_cli = find_exe("agy", &agy_dirs);
         if agy_cli.is_some() {
-            let agy_acp = find_exe("agy-acp", &common_dirs);
+            let agy_acp = find_exe("agy-acp", &agy_dirs);
             if let Some(path) = agy_acp {
                 add_agent(
                     &mut agents,

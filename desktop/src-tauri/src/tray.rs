@@ -21,6 +21,7 @@ fn load_tray_icon() -> Image<'static> {
 }
 
 pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
+    let show = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
     let start = MenuItem::with_id(app, "start", "Start Daemon", true, None::<&str>)?;
     let stop = MenuItem::with_id(app, "stop", "Stop Daemon", true, None::<&str>)?;
     let sep1 = PredefinedMenuItem::separator(app)?;
@@ -37,6 +38,7 @@ pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
     let menu = tauri::menu::Menu::new(app)?;
+    menu.append(&show)?;
     menu.append(&start)?;
     menu.append(&stop)?;
     menu.append(&sep1)?;
@@ -60,6 +62,12 @@ pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
         .on_menu_event(|app, event| {
             let daemon = app.state::<DaemonManager>();
             match event.id().as_ref() {
+                "show" => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
                 "start" => {
                     if let Err(e) = daemon.start() {
                         eprintln!("Failed to start daemon: {}", e);
@@ -101,6 +109,15 @@ pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
                 _ => {}
             }
         })
+        .on_tray_icon_event(|tray, event| {
+            if let tauri::tray::TrayIconEvent::Click { .. } = event {
+                let app = tray.app_handle();
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        })
         .build(app)?;
 
     let app_handle = app.handle().clone();
@@ -117,6 +134,7 @@ pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
             let _ = tray.set_tooltip(Some(tooltip));
         }
 
+        // "Show Window" is always enabled.
         let _ = start_arc.set_enabled(!status.running);
         let _ = stop_arc.set_enabled(status.running);
         let _ = qr_arc.set_enabled(status.running);
