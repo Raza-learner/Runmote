@@ -3,6 +3,19 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
+#[cfg(target_os = "windows")]
+fn silent_cmd(name: &str) -> std::process::Command {
+    use std::os::windows::process::CommandExt;
+    let mut c = std::process::Command::new(name);
+    c.creation_flags(0x08000000);
+    c
+}
+
+#[cfg(not(target_os = "windows"))]
+fn silent_cmd(name: &str) -> std::process::Command {
+    std::process::Command::new(name)
+}
+
 #[derive(Clone, Serialize)]
 pub struct AgentInfo {
     pub id: String,
@@ -72,7 +85,7 @@ fn find_exe_in_path(name: &str) -> Option<PathBuf> {
 fn find_exe_via_shell(name: &str) -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
-        let output = std::process::Command::new("where")
+        let output = silent_cmd("where")
             .arg(name)
             .output()
             .ok()?;
@@ -89,7 +102,7 @@ fn find_exe_via_shell(name: &str) -> Option<PathBuf> {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let output = std::process::Command::new("which")
+        let output = silent_cmd("which")
             .arg(name)
             .output()
             .ok()?;
@@ -107,7 +120,7 @@ fn find_exe_via_shell(name: &str) -> Option<PathBuf> {
 
 fn npm_global_prefix() -> PathBuf {
     // npm root -g works even when npm is on PATH.
-    if let Ok(output) = std::process::Command::new("npm")
+    if let Ok(output) = silent_cmd("npm")
         .args(["root", "-g"])
         .output()
     {
@@ -128,7 +141,7 @@ fn has_npx() -> bool {
     } else {
         "which"
     };
-    std::process::Command::new(cmd)
+    silent_cmd(cmd)
         .arg("npx")
         .output()
         .ok()

@@ -15,29 +15,38 @@ def _clear_env():
 
 class TestDetectAcpAgents:
     def test_fallback_to_default_when_no_agents_found(self):
-        with mock.patch("daemon.config.shutil.which", return_value=None):
+        with (
+            mock.patch("daemon.config.shutil.which", return_value=None),
+            mock.patch("daemon.config.os.scandir", return_value=[]),
+        ):
             from daemon.config import _detect_acp_agents
 
             agents = _detect_acp_agents()
             assert len(agents) == 1
             assert agents[0]["id"] == "default"
 
-    def test_detects_opencode(self):
+    def test_detects_claude(self):
         def which_side_effect(cmd: str):
-            return "/usr/bin/" + cmd if cmd == "opencode" else None
+            return "/usr/bin/" + cmd if cmd in ("claude", "claude-agent-acp") else None
 
-        with mock.patch("daemon.config.shutil.which", side_effect=which_side_effect):
+        with (
+            mock.patch("daemon.config.shutil.which", side_effect=which_side_effect),
+            mock.patch("daemon.config.os.scandir", return_value=[]),
+        ):
             from daemon.config import _detect_acp_agents
 
             agents = _detect_acp_agents()
             ids = {a["id"] for a in agents}
-            assert "opencode" in ids
+            assert "claude" in ids
 
     def test_detects_codex_binary(self):
         def which_side_effect(cmd: str):
             return "/usr/bin/" + cmd if cmd in ("codex", "codex-acp") else None
 
-        with mock.patch("daemon.config.shutil.which", side_effect=which_side_effect):
+        with (
+            mock.patch("daemon.config.shutil.which", side_effect=which_side_effect),
+            mock.patch("daemon.config.os.scandir", return_value=[]),
+        ):
             from daemon.config import _detect_acp_agents
 
             agents = _detect_acp_agents()
@@ -48,7 +57,10 @@ class TestDetectAcpAgents:
         def which_side_effect(cmd: str):
             return "/usr/bin/" + cmd if cmd in ("codex", "npx") else None
 
-        with mock.patch("daemon.config.shutil.which", side_effect=which_side_effect):
+        with (
+            mock.patch("daemon.config.shutil.which", side_effect=which_side_effect),
+            mock.patch("daemon.config.os.scandir", return_value=[]),
+        ):
             from daemon.config import _detect_acp_agents
 
             agents = _detect_acp_agents()
@@ -59,15 +71,18 @@ class TestDetectAcpAgents:
 
     def test_detects_multiple_agents(self):
         def which_side_effect(cmd: str):
-            found = {"opencode", "gemini", "claude", "claude-agent-acp"}
+            found = {"codex", "codex-acp", "claude", "claude-agent-acp"}
             return "/usr/bin/" + cmd if cmd in found else None
 
-        with mock.patch("daemon.config.shutil.which", side_effect=which_side_effect):
+        with (
+            mock.patch("daemon.config.shutil.which", side_effect=which_side_effect),
+            mock.patch("daemon.config.os.scandir", return_value=[]),
+        ):
             from daemon.config import _detect_acp_agents
 
             agents = _detect_acp_agents()
             ids = {a["id"] for a in agents}
-            assert ids >= {"opencode", "gemini", "claude"}
+            assert ids >= {"codex", "claude"}
 
     def test_daemon_id_defaults_to_hostname(self):
         with mock.patch("daemon.config.socket.gethostname", return_value="myhost"):
@@ -181,14 +196,16 @@ class TestDetectAcpAgents:
             result = _find_exe("opencode", r"C:\npm")
             assert result is None
 
-    def test_detected_opencode_uses_resolved_path(self):
+    def test_detected_codex_uses_resolved_path(self):
         def which_side_effect(cmd: str):
-            return "/usr/bin/" + cmd if cmd == "opencode" else None
+            return "/usr/bin/" + cmd if cmd in ("codex", "codex-acp") else None
 
-        with mock.patch("daemon.config.shutil.which", side_effect=which_side_effect):
+        with (
+            mock.patch("daemon.config.shutil.which", side_effect=which_side_effect),
+            mock.patch("daemon.config.os.scandir", return_value=[]),
+        ):
             from daemon.config import _detect_acp_agents
 
             agents = _detect_acp_agents()
-            opencode_cfg = next(a for a in agents if a["id"] == "opencode")
-            assert opencode_cfg["command"][0] == "/usr/bin/opencode"
-            assert opencode_cfg["command"][1] == "acp"
+            codex_cfg = next(a for a in agents if a["id"] == "codex")
+            assert codex_cfg["command"][0] == "/usr/bin/codex-acp"

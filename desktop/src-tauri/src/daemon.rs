@@ -5,6 +5,19 @@ use std::{fs, thread, time::Duration};
 
 use serde::Serialize;
 
+#[cfg(target_os = "windows")]
+fn cmd(name: &str) -> Command {
+    use std::os::windows::process::CommandExt;
+    let mut c = Command::new(name);
+    c.creation_flags(0x08000000);
+    c
+}
+
+#[cfg(not(target_os = "windows"))]
+fn cmd(name: &str) -> Command {
+    Command::new(name)
+}
+
 fn ensure_relay_env() {
     // If the daemon token is already set, nothing to do.
     if std::env::var("ACP_DAEMON_TOKEN").is_ok() {
@@ -22,7 +35,7 @@ foreach ($line in $r -split "`n") {
   if ($line -match 'ACP_RELAY_URL = "(.+)"')   { Write-Output ("RELAY=" + $matches[1]) }
 }
 "#);
-    let output = std::process::Command::new("powershell")
+    let output = cmd("powershell")
         .args(["-ExecutionPolicy", "Bypass", "-File", &tmp.to_string_lossy()])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
@@ -108,7 +121,7 @@ impl DaemonManager {
         // No .venv — run uv sync to create it and install deps.
         eprintln!("No .venv found at {:?}. Running uv sync...", self.acp_path);
         let uv = if cfg!(target_os = "windows") { "uv.exe" } else { "uv" };
-        let status = std::process::Command::new(uv)
+            let status = cmd(uv)
             .args(["sync", "--directory", &self.acp_path.to_string_lossy()])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
@@ -136,7 +149,7 @@ impl DaemonManager {
     fn kill_pid(pid: u32) {
         #[cfg(target_os = "windows")]
         {
-            let _ = Command::new("taskkill")
+            let _ = cmd("taskkill")
                 .args(["/PID", &pid.to_string(), "/F"])
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
@@ -145,7 +158,7 @@ impl DaemonManager {
         }
         #[cfg(not(target_os = "windows"))]
         {
-            let _ = Command::new("kill")
+            let _ = cmd("kill")
                 .args(["-9", &pid.to_string()])
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
@@ -157,7 +170,7 @@ impl DaemonManager {
     fn process_alive(pid: u32) -> bool {
         #[cfg(target_os = "windows")]
         {
-            let output = Command::new("tasklist")
+            let output = cmd("tasklist")
                 .args(["/FI", &format!("PID eq {}", pid), "/NH"])
                 .stdout(Stdio::piped())
                 .stderr(Stdio::null())
@@ -366,14 +379,14 @@ fn disable_windows_autostart() {
     // re-launches the daemon within 1 minute of stopping it.
     #[cfg(target_os = "windows")]
     {
-        let _ = std::process::Command::new("schtasks")
+        let _ = cmd("schtasks")
             .args(["/Change", "/TN", "Runmote Daemon", "/DISABLE"])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .spawn();
         // Also remove the Run registry key so it doesn't start at next login.
-        let _ = std::process::Command::new("reg")
+        let _ = cmd("reg")
             .args([
                 "delete",
                 "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
@@ -403,7 +416,7 @@ pub fn daemon_uninstall(
     let autostart_removed;
     #[cfg(target_os = "windows")]
     {
-        let _ = std::process::Command::new("schtasks")
+        let _ = cmd("schtasks")
             .args(["/Delete", "/TN", "Runmote Daemon", "/F"])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
@@ -413,7 +426,7 @@ pub fn daemon_uninstall(
     }
     #[cfg(target_os = "linux")]
     {
-        let _ = std::process::Command::new("systemctl")
+        let _ = cmd("systemctl")
             .args(["--user", "disable", "--now", "runmote.service"])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
@@ -426,7 +439,7 @@ pub fn daemon_uninstall(
     #[cfg(target_os = "macos")]
     {
         let plist = home_dir().join("Library/LaunchAgents/com.runmote.daemon.plist");
-        let _ = std::process::Command::new("launchctl")
+        let _ = cmd("launchctl")
             .args(["unload", "-w", &plist.to_string_lossy()])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
@@ -468,7 +481,7 @@ pub fn daemon_uninstall(
     {
         let agents_script = state.acp_path.join("scripts").join("setup-agents.ps1");
         if agents_script.exists() {
-            let result = std::process::Command::new("powershell")
+            let result = cmd("powershell")
                 .args([
                     "-ExecutionPolicy",
                     "Bypass",
