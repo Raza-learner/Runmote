@@ -11,34 +11,41 @@ fn ensure_relay_env() {
         return;
     }
 
-    // Fetch the public relay config via PowerShell so the user
-    // doesn't need to set ACP_DAEMON_TOKEN / ACP_RELAY_URL manually.
+    // The relay URL and token are injected into the install script by
+    // the Cloudflare Worker. We download it and parse the values.
+    // Writing to a tmp file avoids PowerShell inline quoting issues.
+    let tmp = std::env::temp_dir().join("runmote-getcfg.ps1");
+    let _ = fs::write(&tmp, br#"
+$r = irm https://runmote.dev/install.ps1/dev -UseBasicParsing
+foreach ($line in $r -split "`n") {
+  if ($line -match 'ACP_DAEMON_TOKEN = "(.+)"') { Write-Output ("TOKEN=" + $matches[1]) }
+  if ($line -match 'ACP_RELAY_URL = "(.+)"')   { Write-Output ("RELAY=" + $matches[1]) }
+}
+"#);
     let output = std::process::Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "irm https://runmote.dev/config | ConvertTo-Json -Compress",
-        ])
+        .args(["-ExecutionPolicy", "Bypass", "-File", &tmp.to_string_lossy()])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .output()
         .ok();
-    let json = output.and_then(|o| {
+    let _ = fs::remove_file(&tmp);
+
+    if let Some(o) = output {
         if o.status.success() {
-            String::from_utf8(o.stdout).ok()
-        } else {
-            None
-        }
-    });
-    if let Some(ref raw) = json {
-        if let Ok(cfg) = serde_json::from_str::<serde_json::Value>(raw) {
-            if let Some(url) = cfg.get("relayUrl").and_then(|v| v.as_str()) {
-                if std::env::var("ACP_RELAY_URL").is_err() {
-                    std::env::set_var("ACP_RELAY_URL", url);
+            let stdout = String::from_utf8_lossy(&o.stdout);
+            for line in stdout.lines() {
+                if let Some(val) = line.strip_prefix("TOKEN=") {
+                    let val = val.trim();
+                    if !val.is_empty() {
+                        std::env::set_var("ACP_DAEMON_TOKEN", val);
+                    }
                 }
-            }
-            if let Some(token) = cfg.get("token").and_then(|v| v.as_str()) {
-                std::env::set_var("ACP_DAEMON_TOKEN", token);
+                if let Some(val) = line.strip_prefix("RELAY=") {
+                    let val = val.trim();
+                    if !val.is_empty() && std::env::var("ACP_RELAY_URL").is_err() {
+                        std::env::set_var("ACP_RELAY_URL", val);
+                    }
+                }
             }
         }
     }
