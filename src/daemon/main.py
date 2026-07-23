@@ -98,6 +98,27 @@ def _normalize_path(path: str) -> str:
     return path.replace("\\", "/")
 
 
+def _resolve_path(path: str) -> str:
+    """Translate a path into a native OS path. Handles Unix-style paths
+    sent from a mobile client when the daemon is running on Windows."""
+    if not path:
+        return path
+    path = os.path.expanduser(path)
+    if sys.platform == "win32" and path.startswith("/"):
+        home = os.path.expanduser("~")
+        # /home/<user>/... -> C:\Users\<current user>\...
+        if path.startswith("/home/"):
+            rest = "/".join(path.split("/")[3:])
+            return os.path.join(home, rest) if rest else home
+        # /root -> user home
+        if path == "/root" or path.startswith("/root/"):
+            return home + path[5:]
+        # Bare / on Windows -> user home
+        if path == "/":
+            return home
+    return path
+
+
 def _is_hidden(entry: os.DirEntry) -> bool:
     if entry.name.startswith("."):
         return True
@@ -363,10 +384,10 @@ async def run_daemon():
                                     config_dir.mkdir(parents=True, exist_ok=True)
                                     (config_dir / "public_url").write_text(public_url)
                             # If daemon was previously paired (ever_paired) but has
-                            # no paired apps now, the mobile app unpaired — stop.
+                            # no paired apps now, the mobile app may have unpaired.
+                            # Log a warning but keep running so the user can re-pair.
                             if paired_count == 0 and ever_paired:
-                                log("No paired mobile apps — daemon was unpaired, shutting down")
-                                raise DaemonUnpaired()
+                                log("No paired mobile apps — daemon was unpaired, waiting for re-pair")
                             break
                         else:
                             log("Ignoring non-identify message during handshake: %s", msg[:200])
@@ -401,8 +422,9 @@ async def run_daemon():
                             # log("relay msg: method=%s id=%s", method, str(msg_id)[:20])
                             if method == "pairing/complete":
                                 from pathlib import Path
+                                import tempfile
 
-                                Path("/tmp/acp-paired").write_text("paired")
+                                Path(tempfile.gettempdir()).joinpath("acp-paired").write_text("paired")
                                 log("pairing/complete received")
                                 continue
 
@@ -514,8 +536,12 @@ async def run_daemon():
     
                             if method == "filesystem/list_directory":
                                 params = data.get("params") or {}
-                                path = os.path.expanduser(params.get("path", ".") or ".")
+                                path = _resolve_path(params.get("path", ".") or ".")
                                 show_hidden = params.get("showHidden", False)
+                                if not os.path.isdir(path):
+                                    # Directory doesn't exist (e.g., stale path from a different machine).
+                                    # Fall back to the daemon's home directory so the user can navigate.
+                                    path = os.path.expanduser("~")
                                 try:
                                     entries = []
                                     for entry in os.scandir(path):
@@ -562,7 +588,7 @@ async def run_daemon():
     
                             if method == "fs/read_text_file":
                                 params = data.get("params") or {}
-                                path = os.path.expanduser(params.get("path", ""))
+                                path = _resolve_path(params.get("path", ""))
                                 try:
                                     with open(path, "r") as f:
                                         content = f.read()
@@ -588,7 +614,7 @@ async def run_daemon():
     
                             if method == "fs/write_text_file":
                                 params = data.get("params") or {}
-                                path = os.path.expanduser(params.get("path", ""))
+                                path = _resolve_path(params.get("path", ""))
                                 content = params.get("content", "")
                                 try:
                                     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -636,7 +662,7 @@ async def run_daemon():
                                 info: dict[str, str] = {"method": method or ""}
                                 if method in ("session/new", "session/resume"):
                                     params = data.get("params") or {}
-                                    cwd = params.get("cwd", "")
+                                    cwd = _resolve_path(params.get("cwd", ""))
                                     if cwd:
                                         info["cwd"] = cwd
                                 _request_info[str(msg_id)] = info

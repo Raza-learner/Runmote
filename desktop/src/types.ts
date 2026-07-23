@@ -24,4 +24,5 @@ export interface UninstallResult {
   wrapper_removed: boolean;
   config_cleaned: boolean;
   temp_cleaned: boolean;
+  agents_removed: boolean;
 }

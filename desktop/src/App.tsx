@@ -352,6 +352,10 @@ function App() {
                 label="Temp files cleaned"
                 ok={uninstallResult.temp_cleaned}
               />
+              <ResultRow
+                label="Agent CLIs removed"
+                ok={uninstallResult.agents_removed}
+              />
             </div>
           )}
         </DialogContent>

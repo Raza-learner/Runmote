@@ -239,38 +239,6 @@ pub fn detect_agents() -> Vec<AgentInfo> {
 
     let mut agents: Vec<AgentInfo> = Vec::new();
 
-    // opencode
-    {
-        let mut opencode_dirs: Vec<PathBuf> = pf_dirs
-            .iter()
-            .flat_map(|p| [p.join("OpenCode"), p.join("opencode")])
-            .chain(
-                [
-                    local.join("Programs/opencode"),
-                    local.join("Programs/OpenCode"),
-                    local.join("Programs/opencode/resources"), // Electron-style
-                    local.join("opencode"),
-                    join_home(".opencode/bin"),
-                ]
-                .into_iter(),
-            )
-            .collect();
-        opencode_dirs.extend(common_dirs.clone());
-
-        if let Some(path) = find_exe("opencode", &opencode_dirs) {
-            add_agent(
-                &mut agents,
-                "opencode",
-                "OpenCode",
-                vec![path.to_string_lossy().into_owned(), "acp".into()],
-                true,
-                Some(path.to_string_lossy().into_owned()),
-            );
-        } else {
-            add_agent(&mut agents, "opencode", "OpenCode", vec![], false, None);
-        }
-    }
-
     // codex
     {
         let mut codex_dirs = common_dirs.clone();
@@ -347,59 +315,6 @@ pub fn detect_agents() -> Vec<AgentInfo> {
         }
     }
 
-    // gemini (deprecated)
-    {
-        if let Some(path) = find_exe("gemini", &common_dirs) {
-            add_agent(
-                &mut agents,
-                "gemini",
-                "Gemini",
-                vec![path.to_string_lossy().into_owned(), "--acp".into()],
-                true,
-                Some(path.to_string_lossy().into_owned()),
-            );
-        } else {
-            add_agent(&mut agents, "gemini", "Gemini", vec![], false, None);
-        }
-    }
-
-    // agy
-    {
-        let mut agy_dirs = common_dirs.clone();
-        agy_dirs.extend([
-            local.join("Programs/antigravity"),
-            local.join("Programs/Antigravity"),
-            local.join("antigravity"),
-        ]);
-        let agy_cli = find_exe("agy", &agy_dirs);
-        if agy_cli.is_some() {
-            let agy_acp = find_exe("agy-acp", &agy_dirs);
-            if let Some(path) = agy_acp {
-                add_agent(
-                    &mut agents,
-                    "antigravity",
-                    "Antigravity",
-                    vec![path.to_string_lossy().into_owned()],
-                    true,
-                    Some(path.to_string_lossy().into_owned()),
-                );
-            } else if has_npx() {
-                add_agent(
-                    &mut agents,
-                    "antigravity",
-                    "Antigravity",
-                    vec!["npx".into(), "-y".into(), "agy-acp".into()],
-                    true,
-                    None,
-                );
-            } else {
-                add_agent(&mut agents, "antigravity", "Antigravity", vec![], false, None);
-            }
-        } else {
-            add_agent(&mut agents, "antigravity", "Antigravity", vec![], false, None);
-        }
-    }
-
     // cursor
     {
         let mut cursor_dirs: Vec<PathBuf> = pf_dirs
@@ -434,39 +349,6 @@ pub fn detect_agents() -> Vec<AgentInfo> {
             );
         } else {
             add_agent(&mut agents, "cursor", "Cursor", vec![], false, None);
-        }
-    }
-
-    // copilot
-    {
-        let mut copilot_dirs: Vec<PathBuf> = pf_dirs
-            .iter()
-            .flat_map(|p| [p.join("GitHub CLI"), p.join("GitHubCLI")])
-            .chain(
-                [
-                    local.join("GitHubCLI"),
-                    local.join("GitHub CLI"),
-                ]
-                .into_iter(),
-            )
-            .collect();
-        copilot_dirs.extend(common_dirs.clone());
-
-        if let Some(path) = find_exe("copilot", &copilot_dirs) {
-            add_agent(
-                &mut agents,
-                "copilot",
-                "Copilot",
-                vec![
-                    path.to_string_lossy().into_owned(),
-                    "--acp".into(),
-                    "--stdio".into(),
-                ],
-                true,
-                Some(path.to_string_lossy().into_owned()),
-            );
-        } else {
-            add_agent(&mut agents, "copilot", "Copilot", vec![], false, None);
         }
     }
 

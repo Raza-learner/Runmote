@@ -185,6 +185,11 @@ function Uninstall-Daemon {
     Write-Host "  Removing wrapper script..."
     Remove-Item -Force (Join-Path $scriptDir "run-daemon.ps1") -ErrorAction SilentlyContinue
     Write-Host "  Removing install directory: $installDir"
+    Write-Host "  Removing agent CLIs..."
+    $agentsScript = Join-Path $scriptDir "setup-agents.ps1"
+    if (Test-Path $agentsScript) {
+        & powershell -ExecutionPolicy Bypass -File $agentsScript -Remove 2>$null
+    }
     Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
     Write-Host ""
     Write-Host "  Runmote daemon uninstalled." -ForegroundColor Green

@@ -67,26 +67,6 @@ def _detect_acp_agents() -> list[dict]:
     _pythonscripts = os.path.join(_appdata, "Python", "Scripts") if _appdata else ""
     _dotnet = os.path.join(_home, ".dotnet", "tools") if _home else ""
 
-    # opencode — native ACP mode
-    found = _find_exe(
-        "opencode",
-        os.path.join(_local, "Programs", "opencode") if _local else "",
-        os.path.join(_pf, "OpenCode") if _pf else "",
-        os.path.join(_pf86, "OpenCode") if _pf86 else "",
-        os.path.join(_home, ".opencode", "bin") if _home else "",
-        _localbin,
-        _npm,
-        _cargo,
-        _bun,
-        _scoop,
-        _choco,
-        _winget,
-        _pythonscripts,
-        _dotnet,
-    )
-    if found:
-        agents.append({"id": "opencode", "name": "OpenCode", "command": [found, "acp"]})
-
     # codex — CLI + ACP adapter
     codex_cli = _find_exe("codex", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget, _pythonscripts, _dotnet)
     if codex_cli:
@@ -113,26 +93,6 @@ def _detect_acp_agents() -> list[dict]:
                     "id": "claude",
                     "name": "Claude Code",
                     "command": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"],
-                }
-            )
-
-    # gemini — native ACP mode (deprecated June 18 2026, replaced by agy)
-    found = _find_exe("gemini", _localbin, _npm, _scoop, _choco, _winget, _pythonscripts, _dotnet)
-    if found:
-        agents.append({"id": "gemini", "name": "Gemini", "command": [found, "--acp"]})
-
-    # agy (Antigravity CLI) — ACP via agy-acp bridge
-    agy_cli = _find_exe("agy", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget, _pythonscripts, _dotnet)
-    if agy_cli:
-        agy_acp = _find_exe("agy-acp", _npm, _localbin, _scoop, _choco, _winget, _pythonscripts, _dotnet)
-        if agy_acp:
-            agents.append({"id": "antigravity", "name": "Antigravity", "command": [agy_acp]})
-        elif shutil.which("npx"):
-            agents.append(
-                {
-                    "id": "antigravity",
-                    "name": "Antigravity",
-                    "command": ["npx", "-y", "agy-acp"],
                 }
             )
 
@@ -164,23 +124,6 @@ def _detect_acp_agents() -> list[dict]:
         )
     if found:
         agents.append({"id": "cursor", "name": "Cursor", "command": [found, "acp"]})
-
-    # copilot — native ACP mode
-    found = _find_exe(
-        "copilot",
-        os.path.join(_local, "GitHubCLI") if _local else "",
-        os.path.join(_pf, "GitHub CLI") if _pf else "",
-        os.path.join(_pf86, "GitHub CLI") if _pf86 else "",
-        _localbin,
-        _npm,
-        _scoop,
-        _choco,
-        _winget,
-        _pythonscripts,
-        _dotnet,
-    )
-    if found:
-        agents.append({"id": "copilot", "name": "Copilot", "command": [found, "--acp", "--stdio"]})
 
     return agents if agents else [{"id": "default", "name": "Agent", "command": AGENT_COMMAND}]
 

@@ -334,6 +334,7 @@ pub struct UninstallResult {
     pub wrapper_removed: bool,
     pub config_cleaned: bool,
     pub temp_cleaned: bool,
+    pub agents_removed: bool,
 }
 
 fn home_dir() -> PathBuf {
@@ -463,11 +464,35 @@ pub fn daemon_uninstall(
 
     let temp_cleaned = true;
 
+    let agents_removed;
+    {
+        let agents_script = state.acp_path.join("scripts").join("setup-agents.ps1");
+        if agents_script.exists() {
+            let result = std::process::Command::new("powershell")
+                .args([
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    &agents_script.to_string_lossy(),
+                    "-Remove",
+                ])
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .and_then(|mut c| c.wait());
+            agents_removed = result.is_ok();
+        } else {
+            agents_removed = true;
+        }
+    }
+
     Ok(UninstallResult {
         daemon_stopped,
         autostart_removed,
         wrapper_removed,
         config_cleaned,
         temp_cleaned,
+        agents_removed,
     })
 }
