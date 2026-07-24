@@ -187,8 +187,10 @@
   "@settingsSchemeMaterial3": {},
   "settingsSchemeClassic": "Classic",
   "@settingsSchemeClassic": {},
-  "settingsWorkingDirHint": "/home/user",
+  "settingsWorkingDirHint": "/home/user or C:\\Users\\Name or /Users/name",
   "@settingsWorkingDirHint": {},
+  "settingsDefaultCwdNotSet": "Not set",
+  "@settingsDefaultCwdNotSet": {},
 
   "chatTitle": "Chat",
   "@chatTitle": {},

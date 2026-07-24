@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
@@ -198,7 +197,7 @@ class SettingsScreen extends ConsumerWidget {
                   leading: const Icon(Icons.folder_outlined),
                   title: Text(AppLocalizations.of(context)!.settingsDefaultWorkingDir),
                   subtitle: Text(
-                    ref.watch(defaultCwdProvider).valueOrNull ?? _defaultHomeDir(),
+                    _cwdLabel(context, ref.watch(defaultCwdProvider).valueOrNull),
                     style: const TextStyle(fontFamily: 'monospace'),
                   ),
                   trailing: const Icon(Icons.edit, size: 20),
@@ -266,11 +265,11 @@ class SettingsScreen extends ConsumerWidget {
         .replaceFirst(scheme.name[0], scheme.name[0].toUpperCase());
   }
 
-  static String _defaultHomeDir() {
-    if (Platform.isWindows) {
-      return Platform.environment['USERPROFILE'] ?? 'C:\\';
+  static String _cwdLabel(BuildContext context, String? cwd) {
+    if (cwd == null || cwd.isEmpty) {
+      return AppLocalizations.of(context)!.settingsDefaultCwdNotSet;
     }
-    return Platform.environment['HOME'] ?? '/home';
+    return cwd;
   }
 
   static const _schemeGroups = [
@@ -434,7 +433,7 @@ class SettingsScreen extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final db = ref.read(databaseProvider);
     final controller = TextEditingController(
-      text: ref.read(defaultCwdProvider).valueOrNull ?? _defaultHomeDir(),
+      text: ref.read(defaultCwdProvider).valueOrNull ?? '',
     );
     showDialog(
       context: context,

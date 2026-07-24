@@ -607,8 +607,14 @@ abstract class AppLocalizations {
   /// No description provided for @settingsWorkingDirHint.
   ///
   /// In en, this message translates to:
-  /// **'/home/user'**
+  /// **'/home/user or C:\\Users\\Name or /Users/name'**
   String get settingsWorkingDirHint;
+
+  /// No description provided for @settingsDefaultCwdNotSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get settingsDefaultCwdNotSet;
 
   /// No description provided for @chatTitle.
   ///

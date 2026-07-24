@@ -283,7 +283,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSchemeClassic => 'Classic';
 
   @override
-  String get settingsWorkingDirHint => '/home/user';
+  String get settingsWorkingDirHint =>
+      '/home/user or C:\\Users\\Name or /Users/name';
+
+  @override
+  String get settingsDefaultCwdNotSet => 'Not set';
 
   @override
   String get chatTitle => 'Chat';

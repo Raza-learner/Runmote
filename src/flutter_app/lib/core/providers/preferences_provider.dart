@@ -7,8 +7,8 @@ import '../services/preferences_service.dart';
 import 'database_provider.dart';
 
 final defaultCwdProvider = FutureProvider<String?>((ref) async {
-  final prefs = await ref.watch(preferencesServiceProvider.future);
-  return prefs.getDefaultCwd();
+  final db = ref.watch(databaseProvider);
+  return db.getDefaultCwd();
 });
 
 final themeModeProvider = FutureProvider<String>((ref) async {
