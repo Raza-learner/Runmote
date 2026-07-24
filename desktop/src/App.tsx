@@ -36,7 +36,7 @@ import type {
   AgentInfo,
   UninstallResult,
 } from "./types";
-import Logo from "./assets/logo.svg";
+import Logo from "./assets/logo.png";
 
 function App() {
   const [status, setStatus] = useState<DaemonStatus>({

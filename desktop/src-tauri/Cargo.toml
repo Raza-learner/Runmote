@@ -19,3 +19,6 @@ serde_json = "1"
 qrcode = { version = "0.14", features = ["image"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 base64 = "0.22"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_Security"] }

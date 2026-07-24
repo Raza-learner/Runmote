@@ -21,7 +21,7 @@ fn load_tray_icon() -> Image<'static> {
 }
 
 pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
-    let show = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "Open Runmote", true, None::<&str>)?;
     let start = MenuItem::with_id(app, "start", "Start Daemon", true, None::<&str>)?;
     let stop = MenuItem::with_id(app, "stop", "Stop Daemon", true, None::<&str>)?;
     let sep1 = PredefinedMenuItem::separator(app)?;
@@ -35,7 +35,8 @@ pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
     )?;
     let sep2 = PredefinedMenuItem::separator(app)?;
     let uninstall = MenuItem::with_id(app, "uninstall", "Uninstall Daemon", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let sep3 = PredefinedMenuItem::separator(app)?;
+    let quit = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
 
     let menu = tauri::menu::Menu::new(app)?;
     menu.append(&show)?;
@@ -46,6 +47,7 @@ pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
     menu.append(&text)?;
     menu.append(&sep2)?;
     menu.append(&uninstall)?;
+    menu.append(&sep3)?;
     menu.append(&quit)?;
 
     let icon = load_tray_icon();
@@ -104,13 +106,18 @@ pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
                     let _ = app.emit("tray:uninstall", ());
                 }
                 "quit" => {
+                    let _ = daemon.stop();
                     app.exit(0);
                 }
                 _ => {}
             }
         })
         .on_tray_icon_event(|tray, event| {
-            if let tauri::tray::TrayIconEvent::Click { .. } = event {
+            if let tauri::tray::TrayIconEvent::Click {
+                button: tauri::tray::MouseButton::Left,
+                ..
+            } = event
+            {
                 let app = tray.app_handle();
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.show();
