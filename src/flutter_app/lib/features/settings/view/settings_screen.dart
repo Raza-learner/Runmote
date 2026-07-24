@@ -194,17 +194,6 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.folder_outlined),
-                  title: Text(AppLocalizations.of(context)!.settingsDefaultWorkingDir),
-                  subtitle: Text(
-                    _cwdLabel(context, ref.watch(defaultCwdProvider).valueOrNull),
-                    style: const TextStyle(fontFamily: 'monospace'),
-                  ),
-                  trailing: const Icon(Icons.edit, size: 20),
-                  onTap: () => _editDefaultCwd(context, ref),
-                ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                ListTile(
                   leading: Icon(Icons.delete_outline, color: theme.colorScheme.error),
                   title: Text(AppLocalizations.of(context)!.settingsClearLocalData),
                   subtitle: Text(AppLocalizations.of(context)!.settingsClearLocalDataSubtitle),
@@ -263,13 +252,6 @@ class SettingsScreen extends ConsumerWidget {
         .replaceAllMapped(RegExp(r'[A-Z]'), (m) => ' ${m.group(0)}')
         .trim()
         .replaceFirst(scheme.name[0], scheme.name[0].toUpperCase());
-  }
-
-  static String _cwdLabel(BuildContext context, String? cwd) {
-    if (cwd == null || cwd.isEmpty) {
-      return AppLocalizations.of(context)!.settingsDefaultCwdNotSet;
-    }
-    return cwd;
   }
 
   static const _schemeGroups = [
@@ -425,40 +407,6 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _editDefaultCwd(BuildContext context, WidgetRef ref) {
-    final l = AppLocalizations.of(context);
-    final db = ref.read(databaseProvider);
-    final controller = TextEditingController(
-      text: ref.read(defaultCwdProvider).valueOrNull ?? '',
-    );
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l!.settingsDefaultWorkingDir),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: l.settingsWorkingDirHint,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(l.settingsCancel),
-          ),
-          FilledButton(
-            onPressed: () async {
-              await db.setDefaultCwd(controller.text);
-              if (ctx.mounted) Navigator.of(ctx).pop();
-            },
-            child: Text(l.settingsSave),
-          ),
-        ],
       ),
     );
   }

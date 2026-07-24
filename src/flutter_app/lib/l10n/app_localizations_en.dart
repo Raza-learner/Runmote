@@ -176,9 +176,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsThemeDark => 'Dark';
 
   @override
-  String get settingsDefaultWorkingDir => 'Default Working Directory';
-
-  @override
   String get settingsClearLocalData => 'Clear Local Data';
 
   @override
@@ -281,13 +278,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSchemeClassic => 'Classic';
-
-  @override
-  String get settingsWorkingDirHint =>
-      '/home/user or C:\\Users\\Name or /Users/name';
-
-  @override
-  String get settingsDefaultCwdNotSet => 'Not set';
 
   @override
   String get chatTitle => 'Chat';

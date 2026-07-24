@@ -400,12 +400,6 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get settingsThemeDark;
 
-  /// No description provided for @settingsDefaultWorkingDir.
-  ///
-  /// In en, this message translates to:
-  /// **'Default Working Directory'**
-  String get settingsDefaultWorkingDir;
-
   /// No description provided for @settingsClearLocalData.
   ///
   /// In en, this message translates to:
@@ -603,18 +597,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Classic'**
   String get settingsSchemeClassic;
-
-  /// No description provided for @settingsWorkingDirHint.
-  ///
-  /// In en, this message translates to:
-  /// **'/home/user or C:\\Users\\Name or /Users/name'**
-  String get settingsWorkingDirHint;
-
-  /// No description provided for @settingsDefaultCwdNotSet.
-  ///
-  /// In en, this message translates to:
-  /// **'Not set'**
-  String get settingsDefaultCwdNotSet;
 
   /// No description provided for @chatTitle.
   ///
