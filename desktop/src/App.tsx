@@ -19,12 +19,24 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
+import {
+  Play,
+  Square,
+  QrCode,
+  Trash2,
+  Bot,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+} from "lucide-react";
 import type {
   DaemonStatus,
   PairingInfo,
   AgentInfo,
   UninstallResult,
 } from "./types";
+import Logo from "./assets/logo.svg";
 
 function App() {
   const [status, setStatus] = useState<DaemonStatus>({
@@ -153,79 +165,109 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-8">
-      <div className="max-w-sm w-full space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Runmote</h1>
-          <p className="text-muted-foreground text-sm">
-            ACP Remote Daemon Controller
-          </p>
+      <div className="max-w-sm w-full space-y-8">
+        <div className="text-center space-y-4">
+          <div className="flex justify-center">
+            <img
+              src={Logo}
+              alt="Runmote logo"
+              className="w-20 h-20 drop-shadow-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight">Runmote</h1>
+            <p className="text-muted-foreground text-sm">
+              Remote control for your coding agents
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center justify-center gap-2 text-sm">
-          <span
-            className={`inline-block w-2 h-2 rounded-full ${
-              status.running ? "bg-green-500" : "bg-red-500"
-            }`}
-          />
-          <span className="text-muted-foreground">
-            {status.running
-              ? `Running${status.pid ? ` (PID ${status.pid})` : ""}`
-              : "Stopped"}
-          </span>
+        <div className="flex items-center justify-center gap-2.5 rounded-full border bg-card px-4 py-2 text-sm shadow-sm">
+          {status.running ? (
+            <>
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+              </span>
+              <span className="text-foreground font-medium">
+                Daemon running
+                {status.pid ? ` · PID ${status.pid}` : ""}
+              </span>
+            </>
+          ) : (
+            <>
+              <XCircle className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Daemon stopped</span>
+            </>
+          )}
         </div>
 
         {error && (
-          <p className="text-destructive text-sm text-center">{error}</p>
+          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span className="break-words">{error}</span>
+          </div>
         )}
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2.5">
           {status.running ? (
             <>
               <Button
                 variant="destructive"
-                className="w-full"
+                className="w-full h-11"
                 onClick={handleStop}
                 disabled={loading === "stopping"}
               >
+                {loading === "stopping" ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Square className="mr-2 h-4 w-4" />
+                )}
                 {loading === "stopping" ? "Stopping..." : "Stop Daemon"}
               </Button>
               <Button
                 variant="outline"
-                className="w-full"
+                className="w-full h-11"
                 onClick={handleShowQR}
                 disabled={pairingLoading}
               >
-                {pairingLoading ? "Loading..." : "Show Pairing QR Code"}
+                {pairingLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <QrCode className="mr-2 h-4 w-4" />
+                )}
+                {pairingLoading ? "Loading..." : "Show Pairing Code"}
               </Button>
             </>
           ) : (
             <Button
               variant="default"
-              className="w-full"
+              className="w-full h-11"
               onClick={handleStart}
               disabled={loading === "starting"}
             >
+              {loading === "starting" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-2 h-4 w-4" />
+              )}
               {loading === "starting" ? "Starting..." : "Start Daemon"}
             </Button>
           )}
         </div>
 
         {agents.length > 0 && (
-          <div className="space-y-2">
-            <h2 className="text-sm font-medium text-muted-foreground">
+          <div className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Detected Agents
             </h2>
-            <div className="space-y-1">
+            <div className="space-y-2">
               {agents.map((agent) => (
                 <div
                   key={agent.id}
-                  className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                  className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 text-sm shadow-sm"
                 >
-                  <span
-                    className={`inline-block w-2 h-2 rounded-full shrink-0 ${
-                      agent.found ? "bg-green-500" : "bg-muted-foreground/30"
-                    }`}
-                  />
+                  <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{agent.name}</p>
                     <p className="text-xs text-muted-foreground truncate">
@@ -234,6 +276,12 @@ function App() {
                         : "Not detected"}
                     </p>
                   </div>
+                  <span
+                    className={`inline-flex h-2.5 w-2.5 rounded-full shrink-0 ${
+                      agent.found ? "bg-emerald-500" : "bg-muted-foreground/30"
+                    }`}
+                    title={agent.found ? "Available" : "Unavailable"}
+                  />
                 </div>
               ))}
             </div>
@@ -312,7 +360,13 @@ function App() {
             <AlertDialogAction
               onClick={handleUninstall}
               disabled={uninstalling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
+              {uninstalling ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
               {uninstalling ? "Uninstalling..." : "Uninstall"}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -370,12 +424,12 @@ function App() {
 
 function ResultRow({ label, ok }: { label: string; ok: boolean }) {
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <span
-        className={`inline-block w-2 h-2 rounded-full shrink-0 ${
-          ok ? "bg-green-500" : "bg-destructive"
-        }`}
-      />
+    <div className="flex items-center gap-3 text-sm">
+      {ok ? (
+        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+      ) : (
+        <XCircle className="h-4 w-4 text-destructive shrink-0" />
+      )}
       <span className={ok ? "" : "text-muted-foreground"}>{label}</span>
     </div>
   );
