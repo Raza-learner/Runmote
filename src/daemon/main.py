@@ -367,15 +367,17 @@ async def run_daemon():
                                 paired_count, ever_paired, public_url or "(none)",
                             )
                             if pairing_code:
-                                log("pairing code: %s", pairing_code)
+                                log("pairing code: %s-%s", pairing_code[:3], pairing_code[-3:])
                                 try:
                                     print(_pairing_banner(pairing_code, public_url), flush=True)
                                 except Exception:
                                     pass
                                 # Write pairing code to temp file so installer can read it
                                 try:
-                                    with open(os.environ.get("TEMP", "/tmp") + "/runmote-pairing-code.txt", "w") as f:
+                                    temp_path = os.environ.get("TEMP", "/tmp") + "/runmote-pairing-code.txt"
+                                    with open(temp_path, "w") as f:
                                         f.write(pairing_code)
+                                    os.chmod(temp_path, 0o600)
                                 except Exception:
                                     pass
                                 # Persist public URL for runmote script

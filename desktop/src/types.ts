@@ -25,4 +25,5 @@ export interface UninstallResult {
   config_cleaned: boolean;
   temp_cleaned: boolean;
   agents_removed: boolean;
+  app_data_cleaned: boolean;
 }

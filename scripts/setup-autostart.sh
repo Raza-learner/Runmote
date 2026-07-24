@@ -69,19 +69,29 @@ detect_os() {
 
 OS="$(detect_os)"
 
-# Build env var directives for each platform
+# Write sensitive env vars to a restricted-permissions file instead of
+# inlining them in service configs (prevents token leakage via ps / procfs).
+_write_env_file() {
+    local config_dir="$HOME/.config/runmote"
+    mkdir -p "$config_dir"
+    local env_file="$config_dir/environment"
+    : > "$env_file"
+    [[ -n "${ACP_DAEMON_TOKEN:-}" ]]    && echo "ACP_DAEMON_TOKEN=$ACP_DAEMON_TOKEN" >> "$env_file"
+    [[ -n "${ACP_DAEMON_ID:-}" ]]       && echo "ACP_DAEMON_ID=$ACP_DAEMON_ID" >> "$env_file"
+    [[ -n "${ACP_RELAY_URL:-}" ]]       && echo "ACP_RELAY_URL=$ACP_RELAY_URL" >> "$env_file"
+    [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]] && echo "ACP_RELAY_PUBLIC_URL=$ACP_RELAY_PUBLIC_URL" >> "$env_file"
+    chmod 600 "$env_file"
+    echo "environment written: $env_file"
+}
+
 _build_env_systemd() {
-    local out="Environment=PATH=%h/.npm-global/bin:%h/.local/bin:%h/.opencode/bin:%h/.cargo/bin:%h/.bun/bin:%h/go/bin:/usr/local/bin:/usr/bin:/bin"
-    [[ -n "${ACP_DAEMON_TOKEN:-}" ]]    && out="$out${out:+$'\n'}Environment=ACP_DAEMON_TOKEN=$ACP_DAEMON_TOKEN"
-    [[ -n "${ACP_DAEMON_ID:-}" ]]       && out="$out${out:+$'\n'}Environment=ACP_DAEMON_ID=$ACP_DAEMON_ID"
-    [[ -n "${ACP_RELAY_URL:-}" ]]       && out="$out${out:+$'\n'}Environment=ACP_RELAY_URL=$ACP_RELAY_URL"
-    [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]] && out="$out${out:+$'\n'}Environment=ACP_RELAY_PUBLIC_URL=$ACP_RELAY_PUBLIC_URL"
-    echo "$out"
+    echo "EnvironmentFile=%h/.config/runmote/environment
+Environment=PATH=%h/.npm-global/bin:%h/.local/bin:%h/.opencode/bin:%h/.cargo/bin:%h/.bun/bin:%h/go/bin:/usr/local/bin:/usr/bin:/bin"
 }
 
 _build_env_launchd() {
+    # Token is omitted — daemon reads it from ~/.config/runmote/daemon-token at startup.
     local out=""
-    [[ -n "${ACP_DAEMON_TOKEN:-}" ]]    && out="$out        <key>ACP_DAEMON_TOKEN</key><string>$ACP_DAEMON_TOKEN</string>"$'\n'
     [[ -n "${ACP_DAEMON_ID:-}" ]]       && out="$out        <key>ACP_DAEMON_ID</key><string>$ACP_DAEMON_ID</string>"$'\n'
     [[ -n "${ACP_RELAY_URL:-}" ]]       && out="$out        <key>ACP_RELAY_URL</key><string>$ACP_RELAY_URL</string>"$'\n'
     [[ -n "${ACP_RELAY_PUBLIC_URL:-}" ]] && out="$out        <key>ACP_RELAY_PUBLIC_URL</key><string>$ACP_RELAY_PUBLIC_URL</string>"$'\n'
@@ -102,6 +112,7 @@ _remove_symlink() {
 
 # --- Linux: systemd user service ---
 linux_install() {
+    _write_env_file
     local unit_dir="$HOME/.config/systemd/user"
     local unit_file="$unit_dir/runmote.service"
     local env_block
@@ -150,6 +161,7 @@ linux_status() {
 
 # --- macOS: launchd agent ---
 darwin_install() {
+    _write_env_file
     local plist_dir="$HOME/Library/LaunchAgents"
     local plist_file="$plist_dir/com.runmote.daemon.plist"
     local log_file="$HOME/Library/Logs/runmote-daemon.log"

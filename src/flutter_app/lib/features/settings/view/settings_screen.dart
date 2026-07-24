@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/preferences_provider.dart';
 import '../../../core/providers/database_provider.dart';
@@ -32,7 +35,7 @@ class SettingsScreen extends ConsumerWidget {
             child: Container(color: Colors.transparent),
           ),
         ),
-        title: const Text('Settings'),
+        title: Text(AppLocalizations.of(context)!.settingsTitle),
       ),
       body: AnimatedBackground(
         showGrid: false,
@@ -44,14 +47,14 @@ class SettingsScreen extends ConsumerWidget {
             AppSpacing.md,
           ),
           children: [
-          const _SectionHeader(title: 'Connection'),
+          _SectionHeader(title: AppLocalizations.of(context)!.settingsConnection),
           const SizedBox(height: AppSpacing.sm),
           Card(
             child: Column(
               children: [
                 ListTile(
                   leading: const Icon(Icons.wifi_rounded),
-                  title: const Text('Connection Status'),
+                  title: Text(AppLocalizations.of(context)!.settingsConnectionStatus),
                   subtitle: Row(
                     children: [
                       Container(
@@ -63,7 +66,7 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(connection.daemonConnected ? 'Connected to Relay' : 'Connecting to Relay...'),
+                      Text(connection.daemonConnected ? AppLocalizations.of(context)!.settingsConnectedToRelay : AppLocalizations.of(context)!.settingsConnectingToRelay),
                     ],
                   ),
                   trailing: connection.relayUrl != null ? IconButton(
@@ -72,12 +75,12 @@ class SettingsScreen extends ConsumerWidget {
                       showDialog(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('Relay Details'),
+                          title: Text(AppLocalizations.of(context)!.settingsRelayDetails),
                           content: SelectableText(connection.relayUrl!),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Close'),
+                              child: Text(AppLocalizations.of(context)!.settingsClose),
                             ),
                           ],
                         ),
@@ -91,36 +94,36 @@ class SettingsScreen extends ConsumerWidget {
                     Icons.link,
                     color: theme.colorScheme.primary,
                   ),
-                  title: const Text('Pairing Code'),
+                  title: Text(AppLocalizations.of(context)!.settingsPairingCode),
                   subtitle: Text(
                     connection.pairingCode != null
                         ? '${connection.pairingCode!.substring(0, 3)}-${connection.pairingCode!.substring(3)}'
-                        : 'Not paired',
+                        : AppLocalizations.of(context)!.settingsNotPaired,
                   ),
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: Icon(Icons.link_off, color: theme.colorScheme.error),
-                  title: const Text('Unpair Device'),
-                  subtitle: const Text('Disconnect and return to pair screen'),
+                  title: Text(AppLocalizations.of(context)!.settingsUnpairDevice),
+                  subtitle: Text(AppLocalizations.of(context)!.settingsUnpairSubtitle),
                   onTap: () => _confirmUnpair(context, ref),
                 ),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          const _SectionHeader(title: 'MCP Servers'),
+          _SectionHeader(title: AppLocalizations.of(context)!.settingsMcpServers),
           const SizedBox(height: AppSpacing.sm),
           _McpServersSection(),
           const SizedBox(height: AppSpacing.lg),
-          const _SectionHeader(title: 'Appearance'),
+          _SectionHeader(title: AppLocalizations.of(context)!.settingsAppearance),
           const SizedBox(height: AppSpacing.sm),
           Card(
             child: Column(
               children: [
                 ListTile(
                   leading: const Icon(Icons.palette_outlined),
-                  title: const Text('Color Scheme'),
+                  title: Text(AppLocalizations.of(context)!.settingsColorScheme),
                   subtitle: Text(
                     _schemeName(ref.watch(flexSchemeProvider)),
                   ),
@@ -145,27 +148,27 @@ class SettingsScreen extends ConsumerWidget {
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 16),
-                          Text('Theme Mode', style: theme.textTheme.titleMedium),
+                          Text(AppLocalizations.of(context)!.settingsThemeMode),
                         ],
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
                         child: SegmentedButton<ThemeMode>(
-                          segments: const [
+                          segments: [
                             ButtonSegment(
                               value: ThemeMode.system,
-                              label: Text('System'),
+                              label: Text(AppLocalizations.of(context)!.settingsThemeSystem),
                               icon: Icon(Icons.brightness_auto, size: 18),
                             ),
                             ButtonSegment(
                               value: ThemeMode.light,
-                              label: Text('Light'),
+                              label: Text(AppLocalizations.of(context)!.settingsThemeLight),
                               icon: Icon(Icons.light_mode, size: 18),
                             ),
                             ButtonSegment(
                               value: ThemeMode.dark,
-                              label: Text('Dark'),
+                              label: Text(AppLocalizations.of(context)!.settingsThemeDark),
                               icon: Icon(Icons.dark_mode, size: 18),
                             ),
                           ],
@@ -186,16 +189,16 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          const _SectionHeader(title: 'Data'),
+          _SectionHeader(title: AppLocalizations.of(context)!.settingsData),
           const SizedBox(height: AppSpacing.sm),
           Card(
             child: Column(
               children: [
                 ListTile(
                   leading: const Icon(Icons.folder_outlined),
-                  title: const Text('Default Working Directory'),
+                  title: Text(AppLocalizations.of(context)!.settingsDefaultWorkingDir),
                   subtitle: Text(
-                    ref.watch(defaultCwdProvider).valueOrNull ?? '/home',
+                    ref.watch(defaultCwdProvider).valueOrNull ?? _defaultHomeDir(),
                     style: const TextStyle(fontFamily: 'monospace'),
                   ),
                   trailing: const Icon(Icons.edit, size: 20),
@@ -204,34 +207,25 @@ class SettingsScreen extends ConsumerWidget {
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: Icon(Icons.delete_outline, color: theme.colorScheme.error),
-                  title: const Text('Clear Local Data'),
-                  subtitle: const Text('Remove all cached messages and sessions'),
+                  title: Text(AppLocalizations.of(context)!.settingsClearLocalData),
+                  subtitle: Text(AppLocalizations.of(context)!.settingsClearLocalDataSubtitle),
                   onTap: () => _confirmClearData(context, ref),
                 ),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          const _SectionHeader(title: 'About'),
+          _SectionHeader(title: AppLocalizations.of(context)!.settingsAbout),
           const SizedBox(height: AppSpacing.sm),
           Card(
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.description_outlined),
-                  title: const Text('Documentation'),
-                  trailing: const Icon(Icons.open_in_new_rounded, size: 18),
-                  onTap: () {
-                    // Open docs URL
-                  },
-                ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                ListTile(
                   leading: const Icon(Icons.bug_report_outlined),
-                  title: const Text('Report an Issue'),
+                  title: Text(AppLocalizations.of(context)!.settingsReportIssue),
                   trailing: const Icon(Icons.open_in_new_rounded, size: 18),
                   onTap: () {
-                    // Open GitHub issues
+                    launchUrl(Uri.parse('https://github.com/Raza-learner/Runmote/pulls'));
                   },
                 ),
               ],
@@ -242,14 +236,14 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               children: [
                 Text(
-                  'Runmote v2.0.0',
+                  AppLocalizations.of(context)!.settingsVersion,
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Crafted with ❤️ for Developers',
+                  AppLocalizations.of(context)!.settingsFooter,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                     fontStyle: FontStyle.italic,
@@ -270,6 +264,13 @@ class SettingsScreen extends ConsumerWidget {
         .replaceAllMapped(RegExp(r'[A-Z]'), (m) => ' ${m.group(0)}')
         .trim()
         .replaceFirst(scheme.name[0], scheme.name[0].toUpperCase());
+  }
+
+  static String _defaultHomeDir() {
+    if (Platform.isWindows) {
+      return Platform.environment['USERPROFILE'] ?? 'C:\\';
+    }
+    return Platform.environment['HOME'] ?? '/home';
   }
 
   static const _schemeGroups = [
@@ -430,32 +431,33 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   void _editDefaultCwd(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final db = ref.read(databaseProvider);
     final controller = TextEditingController(
-      text: ref.read(defaultCwdProvider).valueOrNull ?? '/home',
+      text: ref.read(defaultCwdProvider).valueOrNull ?? _defaultHomeDir(),
     );
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Default working directory'),
+        title: Text(l!.settingsDefaultWorkingDir),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
-            hintText: '/home/user',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: l.settingsWorkingDirHint,
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(l.settingsCancel),
           ),
           FilledButton(
             onPressed: () async {
               await db.setDefaultCwd(controller.text);
               if (ctx.mounted) Navigator.of(ctx).pop();
             },
-            child: const Text('Save'),
+            child: Text(l.settingsSave),
           ),
         ],
       ),
@@ -463,28 +465,26 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   void _confirmClearData(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Clear local data?'),
-        content: const Text(
-          'This will remove all cached messages and sessions. '
-          'Your pairing will be preserved.',
-        ),
+        title: Text(l!.settingsClearDataTitle),
+        content: Text(l.settingsClearDataBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(l.settingsCancel),
           ),
           FilledButton(
             onPressed: () {
               ref.read(databaseProvider).clearAll();
               Navigator.of(ctx).pop();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Local data cleared')),
+                SnackBar(content: Text(l.settingsDataCleared)),
               );
             },
-            child: const Text('Clear'),
+            child: Text(l.settingsClear),
           ),
         ],
       ),
@@ -492,17 +492,16 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   void _confirmUnpair(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Unpair device?'),
-        content: const Text(
-          'You will need to enter the pairing code again to reconnect.',
-        ),
+        title: Text(l!.settingsUnpairTitle),
+        content: Text(l.settingsUnpairBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(l.settingsCancel),
           ),
           FilledButton(
             onPressed: () async {
@@ -514,7 +513,7 @@ class SettingsScreen extends ConsumerWidget {
               if (ctx.mounted) Navigator.of(ctx).pop();
               context.go('/');
             },
-            child: const Text('Unpair'),
+            child: Text(l.settingsUnpairConfirm),
           ),
         ],
       ),
@@ -567,9 +566,9 @@ class _McpServersSectionState extends ConsumerState<_McpServersSection> {
       child: Column(
         children: [
           if (servers.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('No MCP servers configured'),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(AppLocalizations.of(context)!.settingsMcpEmpty),
             )
           else
             ...servers.asMap().entries.map((entry) {
@@ -600,7 +599,7 @@ class _McpServersSectionState extends ConsumerState<_McpServersSection> {
           const Divider(height: 1, indent: 16, endIndent: 16),
           ListTile(
             leading: Icon(Icons.add, color: theme.colorScheme.primary),
-            title: const Text('Add MCP server'),
+            title: Text(AppLocalizations.of(context)!.settingsAddMcp),
             onTap: () => _addMcpServer(context),
           ),
         ],
@@ -618,15 +617,16 @@ class _McpServersSectionState extends ConsumerState<_McpServersSection> {
   }
 
   void _confirmDelete(BuildContext context, int index, String name) {
+    final l = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remove MCP server?'),
-        content: Text('Remove "$name"?'),
+        title: Text(l!.settingsRemoveMcpTitle),
+        content: Text(l.settingsRemoveMcpConfirm(name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(l.settingsCancel),
           ),
           FilledButton(
             onPressed: () async {
@@ -637,7 +637,7 @@ class _McpServersSectionState extends ConsumerState<_McpServersSection> {
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Remove'),
+            child: Text(l.settingsRemove),
           ),
         ],
       ),
@@ -646,6 +646,7 @@ class _McpServersSectionState extends ConsumerState<_McpServersSection> {
 
   void _showMcpServerDialog(BuildContext context,
       {int? index, McpServer? server}) {
+    final l = AppLocalizations.of(context);
     final nameCtrl = TextEditingController(text: server?.name ?? '');
     final cmdCtrl = TextEditingController(text: server?.command ?? '');
     final argsCtrl = TextEditingController(
@@ -660,26 +661,26 @@ class _McpServersSectionState extends ConsumerState<_McpServersSection> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           return AlertDialog(
-            title: Text(index != null ? 'Edit MCP server' : 'Add MCP server'),
+            title: Text(index != null ? l!.settingsEditMcp : l!.settingsAddMcp),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      hintText: 'filesystem',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l.settingsMcpName,
+                      hintText: l.settingsMcpNameHint,
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),
                   ValueListenableBuilder<bool>(
                     valueListenable: isHttpState,
                     builder: (ctx, isHttp, _) => SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(value: 'stdio', label: Text('STDIO')),
-                        ButtonSegment(value: 'http', label: Text('HTTP')),
+                      segments: [
+                        ButtonSegment(value: 'stdio', label: Text(l.settingsStdio)),
+                        ButtonSegment(value: 'http', label: Text(l.settingsHttp)),
                       ],
                       selected: {isHttp ? 'http' : 'stdio'},
                       onSelectionChanged: (set) {
@@ -694,10 +695,10 @@ class _McpServersSectionState extends ConsumerState<_McpServersSection> {
                       if (isHttp) {
                         return TextField(
                           controller: urlCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'URL',
-                            hintText: 'https://api.example.com/mcp',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: l.settingsUrl,
+                            hintText: l.settingsUrlHint,
+                            border: const OutlineInputBorder(),
                           ),
                         );
                       }
@@ -705,19 +706,19 @@ class _McpServersSectionState extends ConsumerState<_McpServersSection> {
                         children: [
                           TextField(
                             controller: cmdCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Command',
-                              hintText: '/path/to/mcp-server',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: l.settingsCommand,
+                              hintText: l.settingsCommandHint,
+                              border: const OutlineInputBorder(),
                             ),
                           ),
                           const SizedBox(height: 12),
                           TextField(
                             controller: argsCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Arguments',
-                              hintText: '--stdio --debug',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: l.settingsArguments,
+                              hintText: l.settingsArgumentsHint,
+                              border: const OutlineInputBorder(),
                             ),
                           ),
                         ],
@@ -730,7 +731,7 @@ class _McpServersSectionState extends ConsumerState<_McpServersSection> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancel'),
+                child: Text(l.settingsCancel),
               ),
               FilledButton(
                 onPressed: () async {
@@ -754,7 +755,7 @@ class _McpServersSectionState extends ConsumerState<_McpServersSection> {
                   }
                   if (ctx.mounted) Navigator.of(ctx).pop();
                 },
-                child: const Text('Save'),
+                child: Text(l.settingsSave),
               ),
             ],
           );

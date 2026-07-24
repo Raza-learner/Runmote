@@ -74,7 +74,7 @@ async def daemon_endpoint(websocket: WebSocket):
                     token = params.get("token") or ""
 
                     if RELAY_TOKEN is not None and token != RELAY_TOKEN:
-                        print(f"  → daemon {daemon_id} token rejected (got '{token}')")
+                        print(f"  → daemon {daemon_id} token rejected (got '{token[:4]}...')")
                         if msg_id:
                             await websocket.send_text(
                                 json.dumps(
@@ -121,7 +121,7 @@ async def daemon_endpoint(websocket: WebSocket):
                     print(
                         f"  → daemon {daemon_id} identified (paired_apps={len(session.paired_apps)}, ever_paired={ever_paired})"
                     )
-                    print(f"  → pairing code: {pairing_code}")
+                    print(f"  → pairing code: {pairing_code[:3]}...-{pairing_code[-3:]}")
 
                     if msg_id:
                         result = {"pairingCode": pairing_code}

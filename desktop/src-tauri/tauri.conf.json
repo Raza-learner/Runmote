@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     }
   },
   "bundle": {
@@ -32,6 +32,13 @@
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ],
+    "resources": {
+      "../../src/daemon": "acp-src/daemon",
+      "../../src/common": "acp-src/common",
+      "../../src/__init__.py": "acp-src/__init__.py",
+      "../../pyproject.toml": "acp-src/pyproject.toml",
+      "../../uv.lock": "acp-src/uv.lock"
+    },
     "windows": {
       "nsis": {
         "installMode": "currentUser",

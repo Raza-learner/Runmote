@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use std::{fs, thread, time::Duration};
 
 use serde::Serialize;
+use tauri::Manager;
 
 #[cfg(target_os = "windows")]
 fn cmd(name: &str) -> Command {
@@ -60,6 +61,35 @@ foreach ($line in $r -split "`n") {
                     }
                 }
             }
+        }
+    }
+
+    // Persist env vars to restricted config file for systemd/launchd/service use.
+    let config_dir = home_dir().join(".config").join("runmote");
+    let _ = fs::create_dir_all(&config_dir);
+    let env_file = config_dir.join("environment");
+    let mut env_lines = Vec::new();
+    if let Ok(token) = std::env::var("ACP_DAEMON_TOKEN") {
+        if !token.is_empty() {
+            env_lines.push(format!("ACP_DAEMON_TOKEN={}", token));
+        }
+    }
+    if let Ok(url) = std::env::var("ACP_RELAY_URL") {
+        if !url.is_empty() {
+            env_lines.push(format!("ACP_RELAY_URL={}", url));
+        }
+    }
+    if let Ok(id) = std::env::var("ACP_DAEMON_ID") {
+        if !id.is_empty() {
+            env_lines.push(format!("ACP_DAEMON_ID={}", id));
+        }
+    }
+    if !env_lines.is_empty() {
+        let _ = fs::write(&env_file, env_lines.join("\n"));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs::set_permissions(&env_file, std::fs::Permissions::from_mode(0o600));
         }
     }
 }
@@ -348,6 +378,7 @@ pub struct UninstallResult {
     pub config_cleaned: bool,
     pub temp_cleaned: bool,
     pub agents_removed: bool,
+    pub app_data_cleaned: bool,
 }
 
 fn home_dir() -> PathBuf {
@@ -410,6 +441,7 @@ pub fn daemon_stop(state: tauri::State<'_, DaemonManager>) -> Result<DaemonStatu
 #[tauri::command]
 pub fn daemon_uninstall(
     state: tauri::State<'_, DaemonManager>,
+    app_handle: tauri::AppHandle,
 ) -> Result<UninstallResult, String> {
     let daemon_stopped = state.stop().is_ok();
 
@@ -500,6 +532,21 @@ pub fn daemon_uninstall(
         }
     }
 
+    let app_data_cleaned;
+    {
+        if let Some(data_dir) = app_handle.path().app_data_dir().ok() {
+            let acp_dir = data_dir.join("acp");
+            if acp_dir.exists() {
+                let _ = fs::remove_dir_all(&acp_dir);
+                app_data_cleaned = true;
+            } else {
+                app_data_cleaned = true;
+            }
+        } else {
+            app_data_cleaned = false;
+        }
+    }
+
     Ok(UninstallResult {
         daemon_stopped,
         autostart_removed,
@@ -507,5 +554,6 @@ pub fn daemon_uninstall(
         config_cleaned,
         temp_cleaned,
         agents_removed,
+        app_data_cleaned,
     })
 }

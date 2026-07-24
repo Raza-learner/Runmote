@@ -356,6 +356,10 @@ function App() {
                 label="Agent CLIs removed"
                 ok={uninstallResult.agents_removed}
               />
+              <ResultRow
+                label="Bundled data cleaned"
+                ok={uninstallResult.app_data_cleaned}
+              />
             </div>
           )}
         </DialogContent>

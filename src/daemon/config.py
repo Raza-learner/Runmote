@@ -3,6 +3,7 @@ import os
 import shutil
 import socket
 import sys
+from pathlib import Path
 
 
 RELAY_HOST = os.environ.get("ACP_RELAY_HOST", "relay.runmote.dev")
@@ -136,6 +137,13 @@ else:
 
 DAEMON_ID = os.environ.get("ACP_DAEMON_ID", socket.gethostname())
 DAEMON_TOKEN = os.environ.get("ACP_DAEMON_TOKEN", "")
+if not DAEMON_TOKEN:
+    try:
+        token_file = Path.home() / ".config" / "runmote" / "daemon-token"
+        if token_file.exists():
+            DAEMON_TOKEN = token_file.read_text().strip()
+    except Exception:
+        pass
 RECONNECT_DELAY = int(os.environ.get("ACP_RECONNECT_DELAY", "5"))
 
 # Log detected agents for debugging
