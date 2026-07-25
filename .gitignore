@@ -24,3 +24,8 @@ acp_relay.db
 
 # Generated logo assets
 scripts/assets/
+
+# Build artifacts
+acp-src/
+*.exe
+
