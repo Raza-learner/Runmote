@@ -57,6 +57,10 @@ powershell -c "irm https://runmote.dev/install.ps1 | iex"
 </tr>
 </table>
 
+### Desktop app (Windows)
+
+Download `runmote.exe` from the [latest release](https://github.com/Raza-learner/Runmote/releases/latest) and run it. No installation needed — just an executable with a system tray icon for daemon control and pairing.
+
 That's it. Two minutes. After install:
 
 ```bash
