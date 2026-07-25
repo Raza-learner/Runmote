@@ -34,28 +34,11 @@
 
 ## Install
 
-<table>
-<tr>
-<td width="50%">
-
-### Linux / macOS
+### Linux / Mac
 
 ```bash
 curl -fsSL https://runmote.dev/install.sh | bash
 ```
-
-</td>
-<td width="50%">
-
-### Windows
-
-```powershell
-powershell -c "irm https://runmote.dev/install.ps1 | iex"
-```
-
-</td>
-</tr>
-</table>
 
 ### Desktop app (Windows)
 
