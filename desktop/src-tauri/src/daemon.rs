@@ -138,6 +138,71 @@ impl DaemonManager {
         Self::temp_dir().join(CODE_FILE)
     }
 
+    fn find_uv(&self) -> PathBuf {
+        let uv_name = if cfg!(target_os = "windows") { "uv.exe" } else { "uv" };
+
+        // Check PATH first
+        if let Ok(path) = std::env::var("PATH") {
+            for dir in std::env::split_paths(&path) {
+                let candidate = dir.join(uv_name);
+                if candidate.exists() {
+                    return candidate;
+                }
+            }
+        }
+
+        // Not on PATH — download standalone uv.exe to our data dir
+        let local_uv = self.acp_path.join(uv_name);
+        if local_uv.exists() {
+            return local_uv;
+        }
+
+        eprintln!("uv not found on PATH. Downloading standalone uv.exe...");
+        let url = "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip";
+        let zip_path = self.acp_path.join("uv.zip");
+
+        let _ = std::fs::create_dir_all(&self.acp_path);
+        let ok = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile", "-Command",
+                &format!("[Net.ServicePointManager]::SecurityProtocol = 'Tls12'; Invoke-WebRequest -Uri '{}' -OutFile '{}'", url, zip_path.display()),
+            ])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+
+        if ok {
+            // Extract uv.exe from the zip
+            let _ = std::process::Command::new("powershell")
+                .args([
+                    "-NoProfile", "-Command",
+                    &format!("Expand-Archive -Path '{}' -DestinationPath '{}' -Force", zip_path.display(), self.acp_path.display()),
+                ])
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
+            let _ = std::fs::remove_file(&zip_path);
+
+            // uv.exe is inside a subdirectory in the zip
+            let extracted = self.acp_path.join("uv-x86_64-pc-windows-msvc").join("uv.exe");
+            if extracted.exists() {
+                let _ = std::fs::rename(&extracted, &local_uv);
+                let _ = std::fs::remove_dir_all(self.acp_path.join("uv-x86_64-pc-windows-msvc"));
+            }
+        }
+
+        if local_uv.exists() {
+            local_uv
+        } else {
+            // Fallback — just return "uv.exe" and let Command fail with a clear error
+            self.acp_path.join(uv_name)
+        }
+    }
+
     fn find_python(&self) -> Result<PathBuf, String> {
         #[cfg(target_os = "windows")]
         let venv_python = self.acp_path.join(".venv").join("Scripts").join("python.exe");
@@ -150,14 +215,15 @@ impl DaemonManager {
 
         // No .venv — run uv sync to create it and install deps.
         eprintln!("No .venv found at {:?}. Running uv sync...", self.acp_path);
-        let uv = if cfg!(target_os = "windows") { "uv.exe" } else { "uv" };
-            let status = cmd(uv)
+        let uv = self.find_uv();
+        let uv_str = uv.to_string_lossy().to_string();
+        let status = cmd(&uv_str)
             .args(["sync", "--directory", &self.acp_path.to_string_lossy()])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::piped())
             .status()
-            .map_err(|e| format!("uv not found on PATH (install from https://docs.astral.sh/uv): {}", e))?;
+            .map_err(|e| format!("Failed to run uv — ensure uv is on PATH or the download succeeded: {}", e))?;
 
         if !status.success() {
             return Err(format!(
