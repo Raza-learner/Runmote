@@ -42,7 +42,7 @@ curl -fsSL https://runmote.dev/install.sh | bash
 
 ### Desktop app (Windows)
 
-[Download `Runmote_0.1.0_x64-setup.exe`](https://github.com/Raza-learner/Runmote/releases/latest/download/Runmote_0.1.0_x64-setup.exe) and run it. The installer registers Runmote in Windows Apps & Features so you can uninstall from Settings. No extra dependencies needed.
+[Download `Runmote_0.1.0_x64-setup.exe`](https://github.com/Raza-learner/Runmote/releases/download/v0.1.0/Runmote_0.1.0_x64-setup.exe) and run it. The installer registers Runmote in Windows Apps & Features so you can uninstall from Settings. No extra dependencies needed.
 
 That's it. Two minutes. After install:
 
