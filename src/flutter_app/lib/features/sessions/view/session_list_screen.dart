@@ -75,11 +75,25 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
   Future<void> _createSession() async {
     final conn = ref.read(connectionProvider);
     if (conn.paired && !conn.daemonConnected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot create session — daemon is not running'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot create session — daemon is not running'),
+          ),
+        );
+      }
+      return;
+    }
+
+    final hasOnlineAgent = conn.agents.any((a) => a.online);
+    if (!hasOnlineAgent && conn.agents.isNotEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to the AI agent on the desktop first'),
+          ),
+        );
+      }
       return;
     }
     // Start the directory picker at the daemon's home directory.
