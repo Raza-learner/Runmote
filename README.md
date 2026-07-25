@@ -42,7 +42,7 @@ curl -fsSL https://runmote.dev/install.sh | bash
 
 ### Desktop app (Windows)
 
-Download `runmote.exe` from the [latest release](https://github.com/Raza-learner/Runmote/releases/latest) and run it. No installation needed — just an executable with a system tray icon for daemon control and pairing.
+[Download `runmote.exe`](https://github.com/Raza-learner/Runmote/releases/latest/download/runmote.exe) and run it. No installation needed — just an executable with a system tray icon for daemon control and pairing.
 
 That's it. Two minutes. After install:
 
