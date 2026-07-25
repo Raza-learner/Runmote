@@ -33,8 +33,6 @@ pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
         true,
         None::<&str>,
     )?;
-    let sep2 = PredefinedMenuItem::separator(app)?;
-    let uninstall = MenuItem::with_id(app, "uninstall", "Uninstall Daemon", true, None::<&str>)?;
     let sep3 = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
 
@@ -45,8 +43,6 @@ pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
     menu.append(&sep1)?;
     menu.append(&qr)?;
     menu.append(&text)?;
-    menu.append(&sep2)?;
-    menu.append(&uninstall)?;
     menu.append(&sep3)?;
     menu.append(&quit)?;
 
@@ -97,13 +93,6 @@ pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
                         }
                         let _ = app.emit("tray:show-text", info.formatted);
                     }
-                }
-                "uninstall" => {
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-                    let _ = app.emit("tray:uninstall", ());
                 }
                 "quit" => {
                     let _ = daemon.stop();
