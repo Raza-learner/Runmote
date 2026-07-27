@@ -446,7 +446,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
               fillColor: isDark
                   ? Colors.white.withValues(alpha: 0.05)
                   : Colors.black.withOpacity(0.02),
-              hintText: 'wss://runmote-relay.onrender.com',
+              hintText: 'wss://runmote-relay-u2zi.onrender.com',
               hintStyle: TextStyle(
                 fontSize: 12,
                 color: isDark
