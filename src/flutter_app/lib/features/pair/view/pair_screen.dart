@@ -383,13 +383,78 @@ class _PairScreenState extends ConsumerState<PairScreen> {
             _error = null;
           }),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
         TextButton(
           onPressed: _showHelp,
           style: TextButton.styleFrom(
             foregroundColor: isDark ? Colors.white.withOpacity(0.5) : theme.colorScheme.primary.withOpacity(0.7),
           ),
           child: const Text('Need help finding your code?'),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: 300,
+          child: TextField(
+            controller: _relayUrlController,
+            textInputAction: TextInputAction.done,
+            textAlign: TextAlign.left,
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B),
+            ),
+            decoration: InputDecoration(
+              labelText: 'Relay URL',
+              labelStyle: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.4)
+                    : const Color(0xFF94A3B8),
+              ),
+              prefixIcon: Icon(
+                Icons.dns_rounded,
+                size: 18,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.3)
+                    : const Color(0xFF94A3B8),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.black.withOpacity(0.08),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.black.withOpacity(0.08),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.3)
+                      : const Color(0xFF6366F1).withOpacity(0.4),
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              filled: true,
+              fillColor: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.black.withOpacity(0.02),
+              hintText: 'wss://runmote-relay.onrender.com',
+              hintStyle: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : const Color(0xFFCBD5E1),
+              ),
+            ),
+          ),
         ),
       ],
     );
