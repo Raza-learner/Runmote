@@ -39,7 +39,6 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   void initState() {
     super.initState();
     _codeController.addListener(_onCodeChanged);
-    _relayUrlController.text = defaultRelayUrl;
     _scannerController = MobileScannerController(autoStart: false);
     WidgetsBinding.instance.addPostFrameCallback((_) => _autoConnectWithToken());
   }
@@ -118,7 +117,8 @@ class _PairScreenState extends ConsumerState<PairScreen> {
       _isConnecting = true;
       _error = null;
     });
-    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: relayUrl ?? _relayUrlController.text);
+    final customUrl = _relayUrlController.text.trim();
+    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: relayUrl ?? (customUrl.isNotEmpty ? customUrl : null));
   }
 
   bool _isValidCode(String raw) {
@@ -391,69 +391,23 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           ),
           child: const Text('Need help finding your code?'),
         ),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: 300,
-          child: TextField(
-            controller: _relayUrlController,
-            textInputAction: TextInputAction.done,
-            textAlign: TextAlign.left,
+        const SizedBox(height: 12),
+        TextButton.icon(
+          onPressed: _showRelaySettings,
+          icon: Icon(
+            Icons.settings_outlined,
+            size: 16,
+            color: isDark ? Colors.white.withValues(alpha: 0.35) : const Color(0xFF94A3B8),
+          ),
+          label: Text(
+            'Relay Settings',
             style: TextStyle(
               fontSize: 13,
-              color: isDark ? Colors.white.withValues(alpha: 0.6) : const Color(0xFF64748B),
+              color: isDark ? Colors.white.withValues(alpha: 0.35) : const Color(0xFF94A3B8),
             ),
-            decoration: InputDecoration(
-              labelText: 'Relay URL',
-              labelStyle: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.4)
-                    : const Color(0xFF94A3B8),
-              ),
-              prefixIcon: Icon(
-                Icons.dns_rounded,
-                size: 18,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.3)
-                    : const Color(0xFF94A3B8),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.black.withOpacity(0.08),
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.black.withOpacity(0.08),
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.3)
-                      : const Color(0xFF6366F1).withOpacity(0.4),
-                ),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              filled: true,
-              fillColor: isDark
-                  ? Colors.white.withValues(alpha: 0.05)
-                  : Colors.black.withOpacity(0.02),
-              hintText: 'wss://runmote-relay-u2zi.onrender.com',
-              hintStyle: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.2)
-                    : const Color(0xFFCBD5E1),
-              ),
-            ),
+          ),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           ),
         ),
       ],
@@ -736,54 +690,6 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                 const SizedBox(height: 12),
                 Text(_error!, style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 13)),
               ],
-              const SizedBox(height: 16),
-              TextField(
-                controller: _relayUrlController,
-                textInputAction: TextInputAction.done,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isDark ? Colors.white.withValues(alpha: 0.6) : theme.colorScheme.onSurface.withOpacity(0.6),
-                ),
-                decoration: InputDecoration(
-                  labelText: 'Relay URL',
-                  labelStyle: TextStyle(
-                    fontSize: 13,
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.4)
-                        : theme.colorScheme.onSurface.withOpacity(0.4),
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.15)
-                          : theme.colorScheme.outline.withOpacity(0.15),
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.15)
-                          : theme.colorScheme.outline.withOpacity(0.15),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.4)
-                          : theme.colorScheme.primary.withOpacity(0.4),
-                    ),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  filled: true,
-                  fillColor: isDark
-                      ? Colors.white.withValues(alpha: 0.05)
-                      : Colors.black.withOpacity(0.02),
-                ),
-              ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -815,6 +721,141 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showRelaySettings() {
+    final tempController = TextEditingController(text: _relayUrlController.text);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : Colors.black.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Relay Settings',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Leave empty to use the cloud relay.\nEnter a URL for a local relay.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.5)
+                          : const Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: tempController,
+                    textInputAction: TextInputAction.done,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white : theme.colorScheme.onSurface,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'ws://192.168.1.x:8000',
+                      hintStyle: TextStyle(
+                        fontSize: 14,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.25)
+                            : const Color(0xFFCBD5E1),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.15)
+                              : theme.colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.15)
+                              : theme.colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: const Color(0xFF6366F1).withOpacity(0.5),
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.black.withOpacity(0.03),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton(
+                      onPressed: () {
+                        setState(() {
+                          _relayUrlController.text = tempController.text.trim();
+                        });
+                        Navigator.of(ctx).pop();
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF6366F1),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Save',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
