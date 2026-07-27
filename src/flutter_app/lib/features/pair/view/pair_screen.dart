@@ -23,8 +23,7 @@ class PairScreen extends ConsumerStatefulWidget {
 
 class _PairScreenState extends ConsumerState<PairScreen> {
   final _codeController = TextEditingController();
-  final _manualHostController = TextEditingController(text: '192.168.1.12');
-  final _manualPortController = TextEditingController(text: '8000');
+  final _relayUrlController = TextEditingController();
   bool _isConnecting = false;
   bool _isAutoConnecting = true;
   bool _showCodeEntry = false;
@@ -40,6 +39,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   void initState() {
     super.initState();
     _codeController.addListener(_onCodeChanged);
+    _relayUrlController.text = defaultRelayUrl;
     _scannerController = MobileScannerController(autoStart: false);
     WidgetsBinding.instance.addPostFrameCallback((_) => _autoConnectWithToken());
   }
@@ -48,8 +48,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   void dispose() {
     _codeController.removeListener(_onCodeChanged);
     _codeController.dispose();
-    _manualHostController.dispose();
-    _manualPortController.dispose();
+    _relayUrlController.dispose();
     _scannerController.dispose();
     super.dispose();
   }
@@ -119,7 +118,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
       _isConnecting = true;
       _error = null;
     });
-    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: relayUrl ?? defaultRelayUrl);
+    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: relayUrl ?? _relayUrlController.text);
   }
 
   bool _isValidCode(String raw) {
@@ -672,6 +671,54 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                 const SizedBox(height: 12),
                 Text(_error!, style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 13)),
               ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: _relayUrlController,
+                textInputAction: TextInputAction.done,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? Colors.white.withValues(alpha: 0.6) : theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Relay URL',
+                  labelStyle: TextStyle(
+                    fontSize: 13,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.4)
+                        : theme.colorScheme.onSurface.withOpacity(0.4),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.15)
+                          : theme.colorScheme.outline.withOpacity(0.15),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.15)
+                          : theme.colorScheme.outline.withOpacity(0.15),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.4)
+                          : theme.colorScheme.primary.withOpacity(0.4),
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  filled: true,
+                  fillColor: isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.black.withOpacity(0.02),
+                ),
+              ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
