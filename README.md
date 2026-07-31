@@ -24,9 +24,7 @@
   </p>
 
   <br />
-  <a href="assets/Runmote-demo.mp4">
-    <img src="https://github.com/Raza-learner/Runmote/raw/dev/assets/thumbnail.png" alt="Runmote Demo" width="800" style="max-width:100%" />
-  </a>
+  <img src="https://github.com/Raza-learner/Runmote/raw/dev/assets/Runmote-demo.gif" alt="Runmote Demo" width="800" style="max-width:100%" />
   <br />
   <br />
 </div>
