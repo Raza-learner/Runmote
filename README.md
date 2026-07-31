@@ -24,8 +24,7 @@
   </p>
 
   <br />
-  <img src="https://via.placeholder.com/800x420/0d1117/58a6ff?text=Runmote+Demo" alt="Demo" width="800" />
-  <!-- [DEMO GIF HERE] -->
+  <video src="https://github.com/Raza-learner/Runmote/raw/dev/assets/Runmote-demo.mp4" controls width="800" style="max-width:100%"></video>
   <br />
   <br />
 </div>
