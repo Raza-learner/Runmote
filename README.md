@@ -99,16 +99,18 @@ You *could* SSH tunnel into your PC. If you like typing firewall rules at 11pm.
 
 ## Supported agents
 
-| Agent | Status | Get it |
-|-------|--------|--------|
-| **OpenCode** | Tested | [opencode.ai](https://opencode.ai) |
-| **Claude Code** | Tested | [claude.ai/code](https://claude.ai/code) |
-| **Codex** | Tested | [openai.com](https://openai.com) |
-| **Gemini CLI** | Tested | [gemini.google.com](https://gemini.google.com) |
-| **Cursor** | Tested | [cursor.sh](https://cursor.sh) |
-| **Copilot** | Tested | [github.com/copilot](https://github.com/copilot) |
+The daemon auto-detects what's installed. For each agent, the ACP adapter must be installed separately.
 
-Any agent that speaks [ACP](https://agentclientprotocol.com) works. Got one not listed? Open an issue.
+| Agent | Linux | Windows | macOS | ACP adapter / command |
+|-------|-------|---------|-------|-----------------------|
+| **OpenCode** | ✅ Auto-detect | ❌ Manual config | ✅ Auto-detect | `opencode acp` (native) |
+| **Cursor** | ✅ Auto-detect | ✅ Auto-detect | ✅ Auto-detect | `cursor-agent acp` or `agent acp` (bundled with Cursor) |
+| **Claude Code** | ✅ Auto-detect | ✅ Auto-detect | ✅ Auto-detect | `claude-agent-acp` or `npx @agentclientprotocol/claude-agent-acp` |
+| **Codex** | ✅ Auto-detect | ✅ Auto-detect | ✅ Auto-detect | `codex-acp` or `npx @agentclientprotocol/codex-acp` |
+| **GitHub Copilot** | ✅ Auto-detect | ❌ Manual config | ✅ Auto-detect | `github-copilot-acp` or `npx @agentclientprotocol/github-copilot-acp` |
+| **Gemini CLI** | ✅ Manual config | ❌ Not tested | ❌ Not tested | Requires `ACP_AGENT_COMMAND` env var |
+
+Any agent that speaks [ACP](https://agentclientprotocol.com) works. For agents not auto-detected, set `ACP_AGENT_COMMANDS` to a JSON array of agent configs.
 
 ---
 
@@ -160,7 +162,16 @@ The daemon generates a fresh 6-digit code each time it starts. Only someone who 
 <details>
 <summary><b>What agents are supported?</b></summary>
 
-Any agent that implements the [Agent Client Protocol](https://agentclientprotocol.com) -- OpenCode, Claude Code, Codex, Gemini CLI, Cursor, Copilot, and others. The daemon auto-detects what's installed.
+| Agent | Linux | Windows | macOS |
+|-------|-------|---------|-------|
+| OpenCode | ✅ | ❌ | ✅ |
+| Claude Code | ✅ | ✅ | ✅ |
+| Codex | ✅ | ✅ | ✅ |
+| Cursor | ✅ | ✅ | ✅ |
+| GitHub Copilot | ✅ | ❌ | ✅ |
+| Gemini CLI | ✅ | ❌ | ❌ |
+
+The daemon auto-detects what's installed. Install the agent CLI and its ACP adapter separately. Any agent that implements [ACP](https://agentclientprotocol.com) works -- for manual setup use `ACP_AGENT_COMMANDS` environment variable.
 
 </details>
 
