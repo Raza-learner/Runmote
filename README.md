@@ -1,7 +1,6 @@
 <div align="center">
   <br />
-  <img src="https://via.placeholder.com/120x120/0d1117/58a6ff?text=RM" alt="Runmote" width="120" />
-  <!-- [LOGO HERE] -->
+  <img src="https://github.com/Raza-learner/Runmote/raw/dev/assets/Runmote.jpeg" alt="Runmote" width="120" />
 
   <h3>Your PC's AI agents. In your pocket. Anywhere.</h3>
 
