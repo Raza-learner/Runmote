@@ -43,7 +43,8 @@
       "../../src/common": "acp-src/common",
       "../../src/__init__.py": "acp-src/__init__.py",
       "../../pyproject.toml": "acp-src/pyproject.toml",
-      "../../uv.lock": "acp-src/uv.lock"
+      "../../uv.lock": "acp-src/uv.lock",
+      "../../README.md": "acp-src/README.md"
     },
     "windows": {
       "nsis": {

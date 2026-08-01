@@ -91,9 +91,7 @@ pub fn run() {
                 if bundled_src.join("pyproject.toml").exists() {
                     if let Ok(app_data) = app.path().app_data_dir() {
                         let dest = app_data.join("acp");
-                        if !dest.join("pyproject.toml").exists() {
-                            let _ = copy_recursively(&bundled_src, &dest);
-                        }
+                        let _ = copy_recursively(&bundled_src, &dest);
                     }
                 }
             }
