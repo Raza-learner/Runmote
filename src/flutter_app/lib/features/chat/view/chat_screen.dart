@@ -41,7 +41,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     _title = _fallbackTitle(widget.cwd);
     _scrollController.addListener(_onScroll);
-    _textController.addListener(() => setState(() {}));
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) setState(() => _showSkeleton = false);
     });
@@ -157,9 +156,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final connection = ref.watch(connectionProvider);
-    final canSendImages = connection.capabilities?.canSendImages ?? false;
-    final daemonDown = connection.paired && !connection.daemonConnected;
+    final canSendImages = ref.watch(
+      connectionProvider.select((c) => c.capabilities?.canSendImages ?? false),
+    );
+    final daemonDown = ref.watch(
+      connectionProvider.select((c) => c.paired && !c.daemonConnected),
+    );
+    final agentName = ref.watch(
+      connectionProvider.select((c) => c.agentInfo?.name),
+    );
 
     ref.listen(
       chatProvider((widget.sessionId, widget.cwd)),
@@ -205,9 +210,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               style: theme.textTheme.titleMedium,
               overflow: TextOverflow.ellipsis,
             ),
-            if (connection.agentInfo?.name != null)
+            if (agentName != null)
               Text(
-                connection.agentInfo!.name,
+                agentName,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -240,8 +245,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   final chatState = ref.watch(
                     chatProvider((widget.sessionId, widget.cwd)),
                   );
-                  final cs = chatState.valueOrNull;
-                  final showSkeleton = _showSkeleton || chatState.isLoading || (cs?.isBusy ?? false);
+                  final showSkeleton = _showSkeleton || chatState.isLoading;
                   return AnimatedSwitcher(
                     duration: const Duration(milliseconds: 400),
                     switchInCurve: Curves.easeOut,
@@ -260,14 +264,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               if (daemonDown) const DaemonOfflineBanner(),
                               Consumer(
                         builder: (context, ref, child) {
-                          final modeOptions = ref.watch(
+                          final configOptions = ref.watch(
                             chatProvider((widget.sessionId, widget.cwd)).select(
-                              (state) => state.valueOrNull?.configOptions
-                                      .where((c) => c.category == 'mode')
-                                      .toList() ??
-                                  [],
+                              (state) =>
+                                  state.valueOrNull?.configOptions ??
+                                  const <ConfigOption>[],
                             ),
                           );
+                          final modeOptions = configOptions
+                              .where((c) => c.category == 'mode')
+                              .toList();
                           if (modeOptions.isEmpty || modeOptions.first.options.length <= 1) {
                             return const SizedBox.shrink();
                           }
@@ -422,9 +428,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildInputArea(ThemeData theme, bool canSendImages, bool daemonDown) {
-    final text = _textController.text;
     final isDark = theme.brightness == Brightness.dark;
-    final slashMatch = text.startsWith('/') ? text.substring(1) : null;
     return ClipRect(
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
@@ -443,15 +447,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             top: false,
             child: Consumer(
           builder: (context, ref, child) {
-            final chatState =
-                ref.watch(chatProvider((widget.sessionId, widget.cwd)));
-            final cs = chatState.valueOrNull;
-            final isBusy = cs?.isBusy ?? false;
+            final cs = ref.watch(
+              chatProvider((widget.sessionId, widget.cwd)).select(
+                (s) => (
+                  isBusy: s.valueOrNull?.isBusy ?? false,
+                  configOptions:
+                      s.valueOrNull?.configOptions ?? const <ConfigOption>[],
+                  availableCommands:
+                      s.valueOrNull?.availableCommands ??
+                          const <SlashCommand>[],
+                  currentModel: s.valueOrNull?.currentModel,
+                ),
+              ),
+            );
+            final isBusy = cs.isBusy;
+            final configOptions = cs.configOptions;
+            final availableCommands = cs.availableCommands;
 
-            final slashCommands = slashMatch != null && cs != null
-                ? _filterSlashCommands(cs.availableCommands, slashMatch)
-                : <SlashCommand>[];
-            final modelConfig = cs?.configOptions
+            final modelConfig = configOptions
                 .where((c) => c.category == 'model')
                 .firstOrNull;
             final modelLabel = modelConfig != null
@@ -460,8 +473,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     : modelConfig.name.isNotEmpty
                         ? modelConfig.name
                         : null)
-                : (cs?.currentModel?.isNotEmpty ?? false)
-                    ? cs!.currentModel
+                : (cs.currentModel?.isNotEmpty ?? false)
+                    ? cs.currentModel
                     : ref.read(connectionProvider).agentInfo?.name;
             final t = Theme.of(context);
 
@@ -508,75 +521,94 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       },
                     ),
                   ),
-                if (slashCommands.isNotEmpty)
-                  Container(
-                    constraints: const BoxConstraints(maxHeight: 200),
-                    margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    decoration: BoxDecoration(
-                      color: t.colorScheme.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, -2),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: slashCommands.length,
-                        separatorBuilder: (_, __) => Divider(
-                          height: 1,
-                          color: t.colorScheme.outlineVariant.withValues(alpha: 0.5),
-                        ),
-                        padding: EdgeInsets.zero,
-                        itemBuilder: (ctx, i) {
-                          final cmd = slashCommands[i];
-                          final hint = cmd.inputHint != null ? ' ${cmd.inputHint}' : '';
-                          return InkWell(
-                            onTap: () {
-                              _textController.text = '/${cmd.name} ';
-                              _textController.selection = TextSelection.collapsed(
-                                offset: _textController.text.length,
-                              );
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    '/${cmd.name}',
-                                    style: t.textTheme.labelLarge?.copyWith(
-                                      color: t.colorScheme.primary,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'monospace',
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      '${cmd.description}$hint',
-                                      style: t.textTheme.bodyMedium?.copyWith(
-                                        color: t.colorScheme.onSurfaceVariant,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _textController,
+                  builder: (context, value, _) {
+                    final text = value.text;
+                    final slashMatch =
+                        text.startsWith('/') ? text.substring(1) : null;
+                    if (slashMatch == null) {
+                      return const SizedBox.shrink();
+                    }
+                    final slashCommands =
+                        _filterSlashCommands(availableCommands, slashMatch);
+                    if (slashCommands.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return Container(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                      decoration: BoxDecoration(
+                        color: t.colorScheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, -2),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: slashCommands.length,
+                          separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            color: t.colorScheme.outlineVariant
+                                .withValues(alpha: 0.5),
+                          ),
+                          padding: EdgeInsets.zero,
+                          itemBuilder: (ctx, i) {
+                            final cmd = slashCommands[i];
+                            final hint = cmd.inputHint != null
+                                ? ' ${cmd.inputHint}'
+                                : '';
+                            return InkWell(
+                              onTap: () {
+                                _textController.text = '/${cmd.name} ';
+                                _textController.selection =
+                                    TextSelection.collapsed(
+                                  offset: _textController.text.length,
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      '/${cmd.name}',
+                                      style: t.textTheme.labelLarge?.copyWith(
+                                        color: t.colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        '${cmd.description}$hint',
+                                        style: t.textTheme.bodyMedium?.copyWith(
+                                          color: t.colorScheme.onSurfaceVariant,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 2),
                   child: Row(
@@ -584,8 +616,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       if (modelLabel != null)
                         _ModelChip(
                           label: modelLabel,
-                          onTap: (cs != null && cs.configOptions.isNotEmpty)
-                              ? () => _showConfigSheet(context, cs)
+                          onTap: configOptions.isNotEmpty
+                              ? () => _showConfigSheet(context, configOptions)
                               : null,
                         ),
                     ],
@@ -646,44 +678,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: SizedBox(
-                          width: 46,
-                          height: 46,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              IconButton.filled(
-                                onPressed: isBusy || daemonDown ||
-                                        (_textController.text.trim().isEmpty &&
-                                            _attachments.isEmpty)
-                                    ? null
-                                    : _sendMessage,
-                                icon: const Icon(Icons.arrow_upward, size: 24),
-                                style: IconButton.styleFrom(
-                                  backgroundColor: t.colorScheme.primary,
-                                  foregroundColor: t.colorScheme.onPrimary,
-                                  disabledBackgroundColor: t.colorScheme.surfaceContainerHighest,
-                                  disabledForegroundColor: t.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              if (isBusy)
-                                Positioned.fill(
-                                  child: Center(
-                                    child: SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        color: t.colorScheme.primary,
-                                      ),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _textController,
+                        builder: (context, value, _) {
+                          final canSend = !isBusy &&
+                              !daemonDown &&
+                              (value.text.trim().isNotEmpty ||
+                                  _attachments.isNotEmpty);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: SizedBox(
+                              width: 46,
+                              height: 46,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  IconButton.filled(
+                                    onPressed: canSend ? _sendMessage : null,
+                                    icon: const Icon(Icons.arrow_upward, size: 24),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: t.colorScheme.primary,
+                                      foregroundColor: t.colorScheme.onPrimary,
+                                      disabledBackgroundColor: t.colorScheme.surfaceContainerHighest,
+                                      disabledForegroundColor: t.colorScheme.onSurfaceVariant,
                                     ),
                                   ),
-                                ),
-                            ],
-                          ),
-                        ),
+                                  if (isBusy)
+                                    Positioned.fill(
+                                      child: Center(
+                                        child: SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: t.colorScheme.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -848,7 +885,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  void _showConfigSheet(BuildContext context, ChatState cs) {
+  void _showConfigSheet(BuildContext context, List<ConfigOption> configOptions) {
     FocusScope.of(context).unfocus();
     showModalBottomSheet(
       context: context,
@@ -883,7 +920,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  ...cs.configOptions.map((opt) {
+                  ...configOptions.map((opt) {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.md),
                       child: Column(

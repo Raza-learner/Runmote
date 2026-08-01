@@ -163,7 +163,6 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     final theme = Theme.of(context);
     final connection = ref.watch(connectionProvider);
     final sessionsAsync = ref.watch(sessionListProvider);
-
     final activeIds = ref.watch(activeSessionsProvider);
 
     return Scaffold(

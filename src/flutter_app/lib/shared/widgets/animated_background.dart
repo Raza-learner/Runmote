@@ -126,14 +126,18 @@ class _BlurCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ImageFiltered(
-      imageFilter: ui.ImageFilter.blur(sigmaX: 100, sigmaY: 100),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
+    // Radial gradient approximates a heavily blurred circle (sigma 100)
+    // but costs a fraction of a real ImageFilter blur, which would be
+    // re-rasterized every frame of the animation.
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          center: Alignment.center,
+          radius: 0.5,
+          colors: [color.withValues(alpha: 1.0), color.withValues(alpha: 0.0)],
         ),
       ),
     );

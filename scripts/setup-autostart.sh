@@ -139,7 +139,11 @@ WantedBy=default.target
 SERVICEEOF
 
     systemctl --user daemon-reload
-    systemctl --user enable --now runmote.service
+    systemctl --user enable runmote.service
+    # Restart even if already running so a changed environment file
+    # (relay URL, token) takes effect. "enable --now" would silently
+    # no-op on an active service and leave the daemon on stale config.
+    systemctl --user restart runmote.service
     echo "systemd user service enabled: $unit_file"
 }
 

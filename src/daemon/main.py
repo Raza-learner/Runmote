@@ -367,7 +367,11 @@ async def run_daemon():
                                 paired_count, ever_paired, public_url or "(none)",
                             )
                             if pairing_code:
-                                log("pairing code: %s-%s", pairing_code[:3], pairing_code[-3:])
+                                # Log the raw code (no dash) — consumers grep
+                                # this line and re-format it themselves. Logging
+                                # a truncated "V4N-SYJ" loses chars and causes
+                                # double-dash corruption downstream.
+                                log("pairing code: %s", pairing_code)
                                 try:
                                     print(_pairing_banner(pairing_code, public_url), flush=True)
                                 except Exception:

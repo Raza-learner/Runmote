@@ -34,7 +34,17 @@ get_daemon_name() {
 
 start_daemon() {
     case "$OS" in
-        linux)   systemctl --user start runmote.service 2>/dev/null ;;
+        linux)
+            systemctl --user daemon-reload 2>/dev/null
+            if systemctl --user is-active --quiet runmote.service 2>/dev/null; then
+                # Restart so a changed environment file (relay URL, token)
+                # takes effect — plain "start" no-ops on an active service.
+                systemctl --user restart runmote.service 2>/dev/null || \
+                    systemctl --user start runmote.service 2>/dev/null
+            else
+                systemctl --user start runmote.service 2>/dev/null
+            fi
+            ;;
         darwin)  launchctl start com.runmote.daemon 2>/dev/null || true ;;
         windows) powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SELF_DIR/runmote.ps1" -Start; return ;;
     esac
