@@ -157,7 +157,7 @@ async def daemon_endpoint(websocket: WebSocket):
                     client_id = params.get("clientId", "")
                     if session and client_id:
                         session.paired_apps.add(client_id)
-                        state.daemon_ever_paired.add(session.daemon_id)
+                        state.remember_ever_paired(session.daemon_id)
                     continue
 
                 result = data.get("result")

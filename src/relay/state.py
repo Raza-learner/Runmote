@@ -36,17 +36,36 @@ code_to_daemon: dict[str, str] = {}  # pairing code -> daemon_id
 app_to_daemon: dict[str, str] = {}  # client_id -> daemon_id
 claimed_codes: set[str] = set()
 
-# Persisted token -> daemon_id mapping.  Survives daemon disconnects so that
-# mobile apps can auto-reconnect (auth/token) even when the daemon is
-# temporarily offline.  The mapping is populated whenever a daemon identifies
-# and is never purged (tokens are random per-session, so collisions are
-# negligible).
-known_tokens: dict[str, str] = {}
+# Persisted token -> daemon_id mapping.  Survives daemon disconnects AND
+# relay restarts (stored in SQLite) so that mobile apps can auto-reconnect
+# (auth/token) even when the daemon is temporarily offline or the relay
+# spins down (free-tier Render).  The mapping is populated whenever a
+# daemon identifies and is never purged (tokens are random per-session,
+# so collisions are negligible).
+known_tokens: dict[str, str] = db.load_known_tokens()
 
 # Tracks daemons that have ever received a pairing (via pairing/complete).
 # Survives daemon disconnects so the relay can tell a reconnecting daemon
 # that it was previously paired but now has no active mobile apps.
-daemon_ever_paired: set[str] = set()
+daemon_ever_paired: set[str] = db.load_ever_paired()
+
+
+def remember_token(token: str, daemon_id: str) -> None:
+    """Persist an app token -> daemon_id mapping (memory + SQLite)."""
+    known_tokens[token] = daemon_id
+    try:
+        db.save_known_token(token, daemon_id)
+    except Exception:
+        pass
+
+
+def remember_ever_paired(daemon_id: str) -> None:
+    """Persist the fact that a daemon has been paired (memory + SQLite)."""
+    daemon_ever_paired.add(daemon_id)
+    try:
+        db.save_ever_paired(daemon_id)
+    except Exception:
+        pass
 
 
 def get_daemon_by_code(code: str) -> DaemonSession | None:
