@@ -40,6 +40,8 @@ curl -fsSL https://runmote.dev/install.sh | bash
 
 [Download `Runmote_0.1.0_x64-setup.exe`](https://github.com/Raza-learner/Runmote/releases/download/v0.1.0/Runmote_0.1.0_x64-setup.exe) and run it. The installer registers Runmote in Windows Apps & Features so you can uninstall from Settings. No extra dependencies needed.
 
+> **Windows SmartScreen Warning:** Windows may show a "Windows protected your PC" blue screen when running the installer. This is because the installer is not yet signed by a trusted certificate authority. To proceed, click **More info** → **Run anyway**. This is safe — the app is open source and fully auditable.
+
 That's it. Two minutes. After install:
 
 ```bash
