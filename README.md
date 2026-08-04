@@ -2,9 +2,7 @@
   <br />
   <img src="https://github.com/Raza-learner/Runmote/raw/main/assets/Runmote.jpeg" alt="Runmote" width="120" />
 
-  <h1>Runmote</h1>
-
-  <h3>Your PC's AI agents. In your pocket. Anywhere.</h3>
+  <h3>Run any AI coding agent on your PC from your phone.<br>No SSH. No VPN. Just a 8-digit code.</h3>
 
   <p>
     Start an <code>opencode</code> session from the bus. Resume <code>claude code</code> from bed.<br />
@@ -32,28 +30,17 @@
 
 ## Install
 
-<table>
-<tr>
-<td width="50%">
-
-### Linux / macOS
+### Linux / Mac
 
 ```bash
 curl -fsSL https://runmote.dev/install.sh | bash
 ```
 
-</td>
-<td width="50%">
+### Desktop app (Windows)
 
-### Windows
+[Download `Runmote_0.1.0_x64-setup.exe`](https://github.com/Raza-learner/Runmote/releases/download/v0.1.0/Runmote_0.1.0_x64-setup.exe) and run it. The installer registers Runmote in Windows Apps & Features so you can uninstall from Settings. No extra dependencies needed.
 
-```powershell
-powershell -c "irm https://runmote.dev/install.ps1 | iex"
-```
-
-</td>
-</tr>
-</table>
+> **Windows SmartScreen Warning:** Windows may show a "Windows protected your PC" blue screen when running the installer. This is because the installer is not yet signed by a trusted certificate authority. To proceed, click **More info** → **Run anyway**. This is safe — the app is open source and fully auditable.
 
 That's it. Two minutes. After install:
 
@@ -64,6 +51,22 @@ runmote status         # check if daemon is running
 runmote stop           # stop the daemon
 runmote --uninstall    # clean removal
 ```
+
+### Android app (closed testing)
+
+Runmote is currently in **Google Play closed testing** on Android. This is the rollout path until the app is approved for production:
+
+- **Join the testers group:** https://groups.google.com/g/runmote-closed-testing
+- **Install the app:** https://play.google.com/apps/testing/dev.runmote.app
+
+**Closed-testing steps (until approval):**
+
+1. **Join the Google Group** (link above). The Play listing is a private, closed test — only members of this group get the tester link.
+2. **Open the Play testing link** (link above) and hit **"Become a tester"**. This opts your account into the closed track. A **"Download it on Google Play"** button will appear.
+3. **Install** the app and run it — verify the daemon pairing, session resume, and streaming chat.
+4. **Test a new build:** push to the closed track in Play Console → testers get the update automatically with the newest version number.
+5. **Resolve open issues** surfaced in the group/this repo while we gather enough testers and stable sessions.
+6. **Merge to `main`:** only when the closed test is approved does the release branch get merged into `main` for production; keep unreleased work on `dev` until then.
 
 ---
 
@@ -110,16 +113,18 @@ You *could* SSH tunnel into your PC. If you like typing firewall rules at 11pm.
 
 ## Supported agents
 
-| Agent | Status | Get it |
-|-------|--------|--------|
-| **OpenCode** | Tested | [opencode.ai](https://opencode.ai) |
-| **Claude Code** | Tested | [claude.ai/code](https://claude.ai/code) |
-| **Codex** | Tested | [openai.com](https://openai.com) |
-| **Gemini CLI** | Tested | [gemini.google.com](https://gemini.google.com) |
-| **Cursor** | Tested | [cursor.sh](https://cursor.sh) |
-| **Copilot** | Tested | [github.com/copilot](https://github.com/copilot) |
+The daemon auto-detects what's installed. For each agent, the ACP adapter must be installed separately.
 
-Any agent that speaks [ACP](https://agentclientprotocol.com) works. Got one not listed? Open an issue.
+| Agent | Linux | Windows | macOS | ACP adapter / command |
+|-------|-------|---------|-------|-----------------------|
+| **OpenCode** | ✅ Auto-detect | ❌ Manual config | ✅ Auto-detect | `opencode acp` (native) |
+| **Cursor** | ✅ Auto-detect | ✅ Auto-detect | ✅ Auto-detect | `cursor-agent acp` or `agent acp` (bundled with Cursor) |
+| **Claude Code** | ✅ Auto-detect | ✅ Auto-detect | ✅ Auto-detect | `claude-agent-acp` or `npx @agentclientprotocol/claude-agent-acp` |
+| **Codex** | ✅ Auto-detect | ✅ Auto-detect | ✅ Auto-detect | `codex-acp` or `npx @agentclientprotocol/codex-acp` |
+| **GitHub Copilot** | ✅ Auto-detect | ❌ Manual config | ✅ Auto-detect | `github-copilot-acp` or `npx @agentclientprotocol/github-copilot-acp` |
+| **Gemini CLI** | ✅ Manual config | ❌ Not tested | ❌ Not tested | Requires `ACP_AGENT_COMMANDS` env var |
+
+Any agent that speaks [ACP](https://agentclientprotocol.com) works. For agents not auto-detected, set `ACP_AGENT_COMMANDS` to a JSON array of agent configs.
 
 ---
 
@@ -171,14 +176,23 @@ The daemon generates a fresh 6-digit code each time it starts. Only someone who 
 <details>
 <summary><b>What agents are supported?</b></summary>
 
-Any agent that implements the [Agent Client Protocol](https://agentclientprotocol.com) -- OpenCode, Claude Code, Codex, Gemini CLI, Cursor, Copilot, and others. The daemon auto-detects what's installed.
+| Agent | Linux | Windows | macOS |
+|-------|-------|---------|-------|
+| OpenCode | ✅ | ❌ | ✅ |
+| Claude Code | ✅ | ✅ | ✅ |
+| Codex | ✅ | ✅ | ✅ |
+| Cursor | ✅ | ✅ | ✅ |
+| GitHub Copilot | ✅ | ❌ | ✅ |
+| Gemini CLI | ✅ | ❌ | ❌ |
+
+The daemon auto-detects what's installed. Install the agent CLI and its ACP adapter separately. Any agent that implements [ACP](https://agentclientprotocol.com) works -- for manual setup use `ACP_AGENT_COMMANDS` environment variable.
 
 </details>
 
 <details>
 <summary><b>Does this work on iPhone AND Android?</b></summary>
 
-Yes. The app is built with Flutter and compiled natively for both platforms. APK available in releases. iOS TestFlight coming soon.
+Yes. The app is built with Flutter and compiled natively for both platforms. APK available in releases.
 
 </details>
 
@@ -268,12 +282,24 @@ uv sync                          # install Python deps
 cd src/flutter_app && flutter pub get  # install Flutter deps
 ```
 
+To run the daemon locally:
+
+```bash
+uv run src/daemon/main.py
+```
+
 ---
 
-
+## Author
 
 <p align="left">
-  <a href="https://www.buymeacoffee.com/raza"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee" /></a>
+Built by <b>Raza</b>, an independent developer who shipped Runmote from scratch
+across three platforms — Python daemon, Flutter mobile app, and a real-time relay server.
+If this project saved you time or made your workflow better, consider supporting it on Ko-fi.
+</p>
+
+<p align="left">
+  <a href="https://ko-fi.com/razalearner"><img src="https://img.shields.io/badge/Ko--fi-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi" /></a>
   <a href="https://github.com/sponsors/Raza-learner"><img src="https://img.shields.io/badge/sponsor-30363D?logo=github-sponsors&logoColor=#EA4AAA" alt="GitHub Sponsor" /></a>
 </p>
 
@@ -285,12 +311,4 @@ MIT © [Raza](https://github.com/Raza-learner)
 
 <br />
 
-<p align="center">
-  <a href="https://star-history.com/#Raza-learner/Runmote&Date">
-    <img src="https://api.star-history.com/svg?repos=Raza-learner/Runmote&type=Date" alt="Star History Chart" width="600" />
-  </a>
-</p>
-
-<br />
-
-<p align="center">Made with love by a student developer</p>
+<p align="center">Made with love</p>
