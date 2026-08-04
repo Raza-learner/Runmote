@@ -2,7 +2,7 @@
   <br />
   <img src="https://github.com/Raza-learner/Runmote/raw/dev/assets/Runmote.jpeg" alt="Runmote" width="120" />
 
-  <h3>Your PC's AI agents. In your pocket. Anywhere.</h3>
+  <h3>Run any AI coding agent on your PC from your phone.<br>No SSH. No VPN. Just a 8-digit code.</h3>
 
   <p>
     Start an <code>opencode</code> session from the bus. Resume <code>claude code</code> from bed.<br />
@@ -280,6 +280,12 @@ git clone https://github.com/Raza-learner/Runmote.git
 cd Runmote
 uv sync                          # install Python deps
 cd src/flutter_app && flutter pub get  # install Flutter deps
+```
+
+To run the daemon locally:
+
+```bash
+uv run src/daemon/main.py
 ```
 
 ---
