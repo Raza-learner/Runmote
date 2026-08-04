@@ -1,7 +1,6 @@
 <div align="center">
   <br />
-  <img src="https://via.placeholder.com/120x120/0d1117/58a6ff?text=RM" alt="Runmote" width="120" />
-  <!-- [LOGO HERE] -->
+  <img src="https://github.com/Raza-learner/Runmote/raw/main/assets/Runmote.jpeg" alt="Runmote" width="120" />
 
   <h1>Runmote</h1>
 
@@ -24,8 +23,7 @@
   </p>
 
   <br />
-  <img src="https://via.placeholder.com/800x420/0d1117/58a6ff?text=Runmote+Demo" alt="Demo" width="800" />
-  <!-- [DEMO GIF HERE] -->
+  <img src="https://github.com/Raza-learner/Runmote/raw/main/assets/Runmote-demo.gif" alt="Runmote Demo" width="800" style="max-width:100%" />
   <br />
   <br />
 </div>
