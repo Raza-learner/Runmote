@@ -31,6 +31,19 @@ class Database:
                 deleted_at REAL NOT NULL
             )
         """)
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS known_tokens (
+                token TEXT PRIMARY KEY,
+                daemon_id TEXT NOT NULL,
+                created_at REAL NOT NULL
+            )
+        """)
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS ever_paired (
+                daemon_id TEXT PRIMARY KEY,
+                created_at REAL NOT NULL
+            )
+        """)
         self._conn.commit()
         self._migrate_add_agent_id()
         self._migrate_add_cwd()
@@ -83,6 +96,29 @@ class Database:
     def is_deleted(self, session_id: str) -> bool:
         row = self._conn.execute("SELECT 1 FROM deleted_sessions WHERE session_id = ?", (session_id,)).fetchone()
         return row is not None
+
+    def load_known_tokens(self) -> dict[str, str]:
+        """Load persisted app token -> daemon_id mappings (survive relay restarts)."""
+        rows = self._conn.execute("SELECT token, daemon_id FROM known_tokens").fetchall()
+        return {row["token"]: row["daemon_id"] for row in rows}
+
+    def save_known_token(self, token: str, daemon_id: str):
+        self._conn.execute(
+            "INSERT OR REPLACE INTO known_tokens VALUES (?, ?, ?)",
+            (token, daemon_id, time.time()),
+        )
+        self._conn.commit()
+
+    def load_ever_paired(self) -> set[str]:
+        rows = self._conn.execute("SELECT daemon_id FROM ever_paired").fetchall()
+        return {row["daemon_id"] for row in rows}
+
+    def save_ever_paired(self, daemon_id: str):
+        self._conn.execute(
+            "INSERT OR REPLACE INTO ever_paired VALUES (?, ?)",
+            (daemon_id, time.time()),
+        )
+        self._conn.commit()
 
     def _migrate_add_agent_id(self):
         """Add agent_id column to existing sessions table (pre-v2 schema)."""

@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/session_list_provider.dart';
-import '../../../core/providers/database_provider.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/ongoing_session_banner.dart';
 import '../../../shared/widgets/daemon_offline_banner.dart';
@@ -76,45 +75,51 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
   Future<void> _createSession() async {
     final conn = ref.read(connectionProvider);
     if (conn.paired && !conn.daemonConnected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot create session — daemon is not running'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot create session — daemon is not running'),
+          ),
+        );
+      }
       return;
     }
-    final db = ref.read(databaseProvider);
-    final savedCwd = await db.getDefaultCwd();
 
-    // If no saved cwd, request the laptop's home directory
-    String initialPath;
-    if (savedCwd != null) {
-      initialPath = savedCwd;
-    } else {
-      final notifier = ref.read(connectionProvider.notifier);
-      final completer = Completer<String>();
-      int? reqId;
-      StreamSubscription<Map<String, dynamic>>? sub;
-      sub = notifier.messages.listen((msg) {
-        if (msg['id'] == reqId) {
-          sub?.cancel();
-          final result = msg['result'] as Map<String, dynamic>?;
-          if (result != null) {
-            completer.complete(result['home'] as String? ?? '/home');
-          } else {
-            completer.complete('/home');
-          }
-        }
-      });
-      reqId = notifier.getHome();
-      initialPath = await completer.future.timeout(
-        const Duration(seconds: 3),
-        onTimeout: () {
-          sub?.cancel();
-          return '/home';
-        },
-      );
+    final hasOnlineAgent = conn.agents.any((a) => a.online);
+    if (!hasOnlineAgent && conn.agents.isNotEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to the AI agent on the desktop first'),
+          ),
+        );
+      }
+      return;
     }
+    // Start the directory picker at the daemon's home directory.
+    final notifier = ref.read(connectionProvider.notifier);
+    final completer = Completer<String>();
+    int? reqId;
+    StreamSubscription<Map<String, dynamic>>? sub;
+    sub = notifier.messages.listen((msg) {
+      if (msg['id'] == reqId) {
+        sub?.cancel();
+        final result = msg['result'] as Map<String, dynamic>?;
+        if (result != null) {
+          completer.complete(result['home'] as String? ?? '/home');
+        } else {
+          completer.complete('/home');
+        }
+      }
+    });
+    reqId = notifier.getHome();
+    final initialPath = await completer.future.timeout(
+      const Duration(seconds: 3),
+      onTimeout: () {
+        sub?.cancel();
+        return '/home';
+      },
+    );
 
     if (!mounted) return;
     final pickedPath = await showModalBottomSheet<String>(
@@ -131,7 +136,6 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     );
     if (pickedPath == null || !mounted) return;
 
-    await db.setDefaultCwd(pickedPath);
     final session = await ref.read(sessionListProvider.notifier).createSession(pickedPath);
     if (session == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -159,7 +163,6 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     final theme = Theme.of(context);
     final connection = ref.watch(connectionProvider);
     final sessionsAsync = ref.watch(sessionListProvider);
-
     final activeIds = ref.watch(activeSessionsProvider);
 
     return Scaffold(

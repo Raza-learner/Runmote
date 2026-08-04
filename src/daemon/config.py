@@ -3,6 +3,7 @@ import os
 import shutil
 import socket
 import sys
+from pathlib import Path
 
 
 RELAY_HOST = os.environ.get("ACP_RELAY_HOST", "relay.runmote.dev")
@@ -20,25 +21,31 @@ AGENT_COMMAND = json.loads(_raw_agent_command)
 
 
 def _find_exe(name, *win_dirs):
-    """Find executable on PATH. On Windows also check known install dirs."""
+    """Find executable on PATH, returning full path or None.
+    On Windows also check known install dirs with .cmd/.bat/.exe extensions."""
     path_hit = shutil.which(name)
     if path_hit:
         print(f"[ACP-DETECT] {name}: found on PATH at {path_hit}", flush=True)
-        return True
+        return path_hit
     if sys.platform != "win32":
-        return False
+        return None
+    extensions = (".cmd", ".bat", ".exe", "")
     for directory in win_dirs:
         if not directory:
             continue
         if os.path.isdir(directory):
             for entry in os.scandir(directory):
-                if entry.name.lower().startswith(name.lower()) and entry.is_file():
-                    print(
-                        f"[ACP-DETECT] {name}: found in {directory} ({entry.name})",
-                        flush=True,
-                    )
-                    return True
-    return False
+                if entry.is_file():
+                    lower_name = entry.name.lower()
+                    for ext in extensions:
+                        if lower_name == (name + ext).lower():
+                            full = os.path.join(directory, entry.name)
+                            print(
+                                f"[ACP-DETECT] {name}: found in {directory} ({entry.name})",
+                                flush=True,
+                            )
+                            return full
+    return None
 
 
 def _detect_acp_agents() -> list[dict]:
@@ -58,37 +65,54 @@ def _detect_acp_agents() -> list[dict]:
     _scoop = os.path.join(_home, "scoop", "shims") if _home else ""
     _choco = os.path.join(_programdata, "chocolatey", "bin") if _programdata else ""
     _winget = os.path.join(_local, "Microsoft", "WinGet", "Links") if _local else ""
+    _pythonscripts = os.path.join(_appdata, "Python", "Scripts") if _appdata else ""
+    _dotnet = os.path.join(_home, ".dotnet", "tools") if _home else ""
 
     # opencode — native ACP mode
-    if _find_exe(
-        "opencode",
-        os.path.join(_local, "Programs", "opencode") if _local else "",
-        os.path.join(_pf, "OpenCode") if _pf else "",
-        os.path.join(_pf86, "OpenCode") if _pf86 else "",
-        os.path.join(_home, ".opencode", "bin") if _home else "",
-        _localbin,
-        _npm,
-        _cargo,
-        _bun,
-        _scoop,
-        _choco,
-        _winget,
-    ):
-        agents.append({"id": "opencode", "name": "OpenCode", "command": ["opencode", "acp"]})
+    opencode_cmd = _find_exe(
+        "opencode", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget, _pythonscripts, _dotnet
+    )
+    if opencode_cmd:
+        agents.append({"id": "opencode", "name": "Opencode", "command": [opencode_cmd, "acp"]})
+
+    # cursor — native ACP mode (binary: cursor-agent or agent)
+    cursor_paths = []
+    if _local:
+        for sub in ("cursor", "Cursor"):
+            cursor_paths.append(os.path.join(_local, "Programs", sub))
+            cursor_paths.append(os.path.join(_local, "Programs", sub, "resources", "app"))
+    if _pf:
+        cursor_paths.extend([os.path.join(_pf, "Cursor"), os.path.join(_pf, "cursor")])
+    if _pf86:
+        cursor_paths.extend([os.path.join(_pf86, "Cursor"), os.path.join(_pf86, "cursor")])
+    cursor_paths.extend([_localbin, _npm, _scoop, _choco, _winget, _pythonscripts, _dotnet])
+
+    found = _find_exe("cursor-agent", *cursor_paths)
+    if not found:
+        found = _find_exe("agent", *cursor_paths)
+    if found:
+        agents.append({"id": "cursor", "name": "Cursor", "command": [found, "acp"]})
 
     # codex — CLI + ACP adapter
-    if _find_exe("codex", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget):
-        if _find_exe("codex-acp", _npm, _localbin, _scoop, _choco, _winget):
-            agents.append({"id": "codex", "name": "Codex", "command": ["codex-acp"]})
+    codex_cli = _find_exe("codex", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+    if codex_cli:
+        codex_acp = _find_exe("codex-acp", _npm, _localbin, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+        if codex_acp:
+            agents.append({"id": "codex", "name": "Codex", "command": [codex_acp]})
         elif shutil.which("npx"):
             agents.append({"id": "codex", "name": "Codex", "command": ["npx", "-y", "@agentclientprotocol/codex-acp"]})
 
     # claude — CLI + ACP adapter
-    if _find_exe("claude", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget) or _find_exe(
-        "claude-code", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget
-    ):
-        if _find_exe("claude-agent-acp", _npm, _localbin, _scoop, _choco, _winget):
-            agents.append({"id": "claude", "name": "Claude Code", "command": ["claude-agent-acp"]})
+    claude_cli = (
+        _find_exe("claude", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+        or _find_exe("claude-code", _localbin, _npm, _cargo, _bun, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+    )
+    if claude_cli:
+        claude_acp = _find_exe(
+            "claude-agent-acp", _npm, _localbin, _scoop, _choco, _winget, _pythonscripts, _dotnet
+        )
+        if claude_acp:
+            agents.append({"id": "claude", "name": "Claude Code", "command": [claude_acp]})
         elif shutil.which("npx"):
             agents.append(
                 {
@@ -98,39 +122,32 @@ def _detect_acp_agents() -> list[dict]:
                 }
             )
 
-    # gemini — native ACP mode
-    if _find_exe("gemini", _localbin, _npm, _scoop, _choco, _winget):
-        agents.append({"id": "gemini", "name": "Gemini", "command": ["gemini", "--acp"]})
+    # github-copilot — CLI + ACP adapter
+    copilot_cli = (
+        _find_exe("gh", _localbin, _npm, _cargo, _scoop, _choco, _winget, _pythonscripts, _dotnet)
+    )
+    if copilot_cli:
+        copilot_acp = _find_exe(
+            "github-copilot-acp", _npm, _localbin, _scoop, _choco, _winget, _pythonscripts, _dotnet
+        )
+        if copilot_acp:
+            agents.append({"id": "copilot", "name": "GitHub Copilot", "command": [copilot_acp]})
+        elif shutil.which("npx"):
+            agents.append(
+                {
+                    "id": "copilot",
+                    "name": "GitHub Copilot",
+                    "command": ["npx", "-y", "@agentclientprotocol/github-copilot-acp"],
+                }
+            )
 
-    # cursor — native ACP mode
-    if _find_exe(
-        "cursor-agent",
-        os.path.join(_local, "Programs", "Cursor") if _local else "",
-        os.path.join(_pf, "Cursor") if _pf else "",
-        os.path.join(_pf86, "Cursor") if _pf86 else "",
-        _localbin,
-        _npm,
-        _scoop,
-        _choco,
-        _winget,
-    ):
-        agents.append({"id": "cursor", "name": "Cursor", "command": ["cursor-agent", "acp"]})
-
-    # copilot — native ACP mode
-    if _find_exe(
-        "copilot",
-        os.path.join(_local, "GitHubCLI") if _local else "",
-        os.path.join(_pf, "GitHub CLI") if _pf else "",
-        os.path.join(_pf86, "GitHub CLI") if _pf86 else "",
-        _localbin,
-        _npm,
-        _scoop,
-        _choco,
-        _winget,
-    ):
-        agents.append({"id": "copilot", "name": "Copilot", "command": ["copilot", "--acp", "--stdio"]})
-
-    return agents if agents else [{"id": "default", "name": "Agent", "command": AGENT_COMMAND}]
+    if agents:
+        return agents
+    # Fallback: use AGENT_COMMAND (defaults to ["opencode", "acp"])
+    exe = shutil.which(AGENT_COMMAND[0]) if AGENT_COMMAND else None
+    if exe:
+        return [{"id": "default", "name": "Agent", "command": AGENT_COMMAND}]
+    return []
 
 
 _raw_agent_commands = os.environ.get("ACP_AGENT_COMMANDS")
@@ -139,8 +156,27 @@ if _raw_agent_commands:
 else:
     AGENT_CONFIGS = _detect_acp_agents()
 
+
+def get_agent_configs() -> list[dict]:
+    """Return the agent configs to use right now.
+
+    If ACP_AGENT_COMMANDS is set explicitly, it is always respected.
+    Otherwise re-detect from the live system so installing/removing an
+    agent is reflected on the next agent/list without a daemon restart.
+    """
+    if _raw_agent_commands:
+        return AGENT_CONFIGS
+    return _detect_acp_agents()
+
 DAEMON_ID = os.environ.get("ACP_DAEMON_ID", socket.gethostname())
 DAEMON_TOKEN = os.environ.get("ACP_DAEMON_TOKEN", "")
+if not DAEMON_TOKEN:
+    try:
+        token_file = Path.home() / ".config" / "runmote" / "daemon-token"
+        if token_file.exists():
+            DAEMON_TOKEN = token_file.read_text().strip()
+    except Exception:
+        pass
 RECONNECT_DELAY = int(os.environ.get("ACP_RECONNECT_DELAY", "5"))
 
 # Log detected agents for debugging

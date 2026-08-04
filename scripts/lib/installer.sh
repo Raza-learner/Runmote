@@ -263,9 +263,22 @@ install_dependencies() {
         return 1
     fi
 
+    # Find uv — it might not be on PATH because run_task runs in a subshell
+    local uv_cmd
+    if command_exists uv; then
+        uv_cmd="uv"
+    elif [[ -x "$HOME/.local/bin/uv" ]]; then
+        uv_cmd="$HOME/.local/bin/uv"
+    elif [[ -x "$HOME/.cargo/bin/uv" ]]; then
+        uv_cmd="$HOME/.cargo/bin/uv"
+    else
+        error "uv not found. Install it first: curl -LsSf https://astral.sh/uv/install.sh | sh"
+        return 1
+    fi
+
     # Recreate venv to avoid stale packages from previous installs
     rm -rf .venv
-    uv sync || return 1
+    "$uv_cmd" sync || return 1
     success "Dependencies installed"
 
     return 0
@@ -480,7 +493,7 @@ verify_installation() {
         failed=1
     }
 
-    command -v uv >/dev/null 2>&1 || {
+    command -v uv >/dev/null 2>&1 || [[ -x "$HOME/.local/bin/uv" ]] || [[ -x "$HOME/.cargo/bin/uv" ]] || {
         error "uv not found"
         failed=1
     }

@@ -69,6 +69,15 @@ function Start-Daemon {
 
 function Stop-Daemon {
     try {
+        # Disable auto-start so the daemon doesn't restart.
+        # Without this, Task Scheduler's "restart on failure" or the HKCU Run key
+        # will re-launch the daemon within a minute.
+        try { Disable-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Out-Null } catch {}
+        try { Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue | Out-Null } catch {}
+        # Remove HKCU Run key (set by setup-autostart.ps1 for non-admin installs)
+        $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+        Remove-ItemProperty -Path $runKey -Name "Runmote Daemon" -ErrorAction SilentlyContinue | Out-Null
+
         # Try scheduled task first
         try { Stop-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null } catch {}
         # Kill by PID
@@ -176,6 +185,11 @@ function Uninstall-Daemon {
     Write-Host "  Removing wrapper script..."
     Remove-Item -Force (Join-Path $scriptDir "run-daemon.ps1") -ErrorAction SilentlyContinue
     Write-Host "  Removing install directory: $installDir"
+    Write-Host "  Removing agent CLIs..."
+    $agentsScript = Join-Path $scriptDir "setup-agents.ps1"
+    if (Test-Path $agentsScript) {
+        & powershell -ExecutionPolicy Bypass -File $agentsScript -Remove 2>$null
+    }
     Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
     Write-Host ""
     Write-Host "  Runmote daemon uninstalled." -ForegroundColor Green

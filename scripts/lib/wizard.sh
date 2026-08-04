@@ -617,17 +617,27 @@ wizard_pairing() {
     local code=""
 
     if [[ $ACP_INTERACTIVE -eq 0 ]]; then
-        # Non-interactive: fetch pairing code from journal, print it plainly
+        # Non-interactive: fetch pairing code, print it plainly
         echo ""
         echo "  Fetching pairing code..."
+        local temp_file="/tmp/runmote-pairing-code.txt"
         for i in $(seq 1 12); do
-            code=$(journalctl --user -u runmote.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1 || true)
+            # Prefer the raw code the daemon writes (no dash). Journal lines
+            # are pre-formatted (V4N-SYJ) and would double-format in the QR.
+            if [[ -f "$temp_file" ]]; then
+                code=$(head -1 "$temp_file" 2>/dev/null || true)
+            fi
+            if [[ -z "$code" ]]; then
+                code=$(journalctl --user -u runmote.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1 | tr -d '-' || true)
+            fi
             [[ -n "$code" ]] && break
             sleep 1
         done
         if [[ -n "$code" ]]; then
             local qr_output=""
             local qr_python
+            local public_url=""
+            [[ -f "$HOME/.config/runmote/public_url" ]] && public_url=$(head -1 "$HOME/.config/runmote/public_url")
             [[ -x "$ACP_INSTALL_DIR/.venv/bin/python3" ]] && qr_python="$ACP_INSTALL_DIR/.venv/bin/python3"
             [[ -x "$ACP_INSTALL_DIR/.venv/bin/python" ]] && qr_python="$ACP_INSTALL_DIR/.venv/bin/python"
             if [[ -n "${qr_python:-}" ]]; then
@@ -635,7 +645,7 @@ wizard_pairing() {
 import sys
 sys.path.insert(0, '$ACP_INSTALL_DIR/src')
 from daemon.main import _pairing_banner
-print(_pairing_banner('$code'))
+print(_pairing_banner('$code', '$public_url'))
 " 2>/dev/null) || qr_output=""
             fi
             if [[ -n "$qr_output" ]]; then
@@ -678,8 +688,16 @@ print(_pairing_banner('$code'))
         echo
         echo "  ${DIM}Fetching pairing code...${RESET}"
 
+        local temp_file="/tmp/runmote-pairing-code.txt"
         for i in $(seq 1 12); do
-            code=$(journalctl --user -u runmote.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1 || true)
+            # Prefer the raw code the daemon writes (no dash). Journal lines
+            # are pre-formatted (V4N-SYJ) and would double-format in the QR.
+            if [[ -f "$temp_file" ]]; then
+                code=$(head -1 "$temp_file" 2>/dev/null || true)
+            fi
+            if [[ -z "$code" ]]; then
+                code=$(journalctl --user -u runmote.service -n 100 --no-pager 2>/dev/null | grep -oP 'pairing code:\s+\K\S+' | tail -1 | tr -d '-' || true)
+            fi
             [[ -n "$code" ]] && break
             sleep 1
         done
@@ -688,6 +706,8 @@ print(_pairing_banner('$code'))
             echo "  ${YELLOW}Pairing code not available yet.${RESET}"
         else
             local qr_code
+            local public_url=""
+            [[ -f "$HOME/.config/runmote/public_url" ]] && public_url=$(head -1 "$HOME/.config/runmote/public_url")
             local python="python3"
             [[ -x "${ACP_PROJECT_DIR:-.}/.venv/bin/python3" ]] && python="${ACP_PROJECT_DIR:-.}/.venv/bin/python3"
             [[ -x "${ACP_PROJECT_DIR:-.}/.venv/bin/python" ]] && python="${ACP_PROJECT_DIR:-.}/.venv/bin/python"
@@ -695,7 +715,7 @@ print(_pairing_banner('$code'))
 import sys
 sys.path.insert(0, '${ACP_PROJECT_DIR:-.}/src')
 from daemon.main import _pairing_banner
-print(_pairing_banner('$code'))
+print(_pairing_banner('$code', '$public_url'))
 " 2>/dev/null) && echo "$qr_code" || {
                 local formatted="${code:0:4}-${code:4}"
                 echo ""

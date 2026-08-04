@@ -63,10 +63,16 @@ _install_symlinks() {
         ln -sf "$src" "$BIN_DIR/claude-agent-acp" 2>/dev/null || true
         echo "  claude-agent-acp linked to $BIN_DIR"
     fi
+    if command -v agy-acp &>/dev/null; then
+        local src
+        src="$(command -v agy-acp)"
+        ln -sf "$src" "$BIN_DIR/agy-acp" 2>/dev/null || true
+        echo "  agy-acp linked to $BIN_DIR"
+    fi
 }
 
 _remove_symlinks() {
-    rm -f "$BIN_DIR/codex-acp" "$BIN_DIR/claude-agent-acp"
+    rm -f "$BIN_DIR/codex-acp" "$BIN_DIR/claude-agent-acp" "$BIN_DIR/agy-acp"
 }
 
 _ensure_npm() {
@@ -112,6 +118,18 @@ install_agents() {
     _install_if_cli_found "codex"       "@agentclientprotocol/codex-acp"
     _install_if_cli_found "claude"      "@agentclientprotocol/claude-agent-acp"
     _install_if_cli_found "claude-code" "@agentclientprotocol/claude-agent-acp"
+    # agy (Antigravity CLI — gemini replacement) via agy-acp bridge
+    if command -v agy &>/dev/null || command -v gemini &>/dev/null; then
+        _install_if_cli_found "agy" "agy-acp" 2>/dev/null || \
+            echo "  agy not found — skipping agy-acp"
+    fi
+    # copilot — native ACP mode, install the CLI if missing
+    if command -v copilot &>/dev/null; then
+        echo "  copilot already installed — skipping"
+    else
+        echo "  Installing GitHub Copilot CLI..."
+        npm install -g @github/copilot 2>/dev/null || echo "  Warning: copilot install failed"
+    fi
 
     _install_symlinks
 
@@ -127,6 +145,8 @@ remove_agents() {
 
     _remove_package "@agentclientprotocol/codex-acp"
     _remove_package "@agentclientprotocol/claude-agent-acp"
+    _remove_package "agy-acp"
+    _remove_package "@github/copilot"
 
     _remove_symlinks
 
@@ -138,7 +158,7 @@ status_agents() {
     echo "Runmote Agent Adapters Status"
     echo ""
 
-    for cli in codex claude claude-code; do
+    for cli in agy copilot codex claude claude-code; do
         if command -v "$cli" &>/dev/null; then
             echo "  $cli: found ($(command -v "$cli"))"
         else
@@ -146,8 +166,16 @@ status_agents() {
         fi
     done
 
+    # Check for Cursor's ACP binary (agent or cursor-agent)
+    for bin in agent cursor-agent; do
+        if command -v "$bin" &>/dev/null; then
+            echo "  Cursor ACP: $(command -v "$bin")"
+            break
+        fi
+    done
+
     echo ""
-    for pkg in "@agentclientprotocol/codex-acp" "@agentclientprotocol/claude-agent-acp"; do
+    for pkg in "agy-acp" "@github/copilot" "@agentclientprotocol/codex-acp" "@agentclientprotocol/claude-agent-acp"; do
         if npm list -g "$pkg" &>/dev/null; then
             local ver
             ver="$(npm list -g "$pkg" --depth=0 2>/dev/null | grep "$pkg" | sed 's/.*@//')"
@@ -158,7 +186,7 @@ status_agents() {
     done
 
     echo ""
-    for bin in codex-acp claude-agent-acp; do
+    for bin in agy-acp codex-acp claude-agent-acp copilot; do
         if [[ -f "$BIN_DIR/$bin" ]]; then
             echo "  $BIN_DIR/$bin: linked"
         elif command -v "$bin" &>/dev/null; then

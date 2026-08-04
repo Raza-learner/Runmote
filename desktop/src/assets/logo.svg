@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="#F8F4EC"/>
+  <g stroke="#1A1A1A" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <!-- speed lines -->
+    <line x1="64" y1="200" x2="156" y2="200"/>
+    <line x1="64" y1="238" x2="116" y2="238"/>
+    <line x1="94" y1="276" x2="116" y2="276"/>
+    <line x1="64" y1="314" x2="116" y2="314"/>
+  </g>
+  <circle cx="96" cy="276" r="12" fill="#1A1A1A"/>
+  <!-- antenna -->
+  <line x1="304" y1="108" x2="304" y2="152" stroke="#1A1A1A" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="304" cy="96" r="26" fill="#1A1A1A"/>
+  <!-- speech bubble outline -->
+  <path d="M392 196 C392 160 360 136 304 136 L256 136 C200 136 168 160 168 196 L168 288 C168 324 200 348 256 348 L280 348 L216 388 L260 348 L304 348 C360 348 392 324 392 288 L392 196 Z"
+        stroke="#1A1A1A" stroke-width="28" fill="#F8F4EC" stroke-linejoin="round"/>
+  <!-- robot face / visor -->
+  <rect x="208" y="220" width="192" height="84" rx="42" fill="#1A1A1A"/>
+  <circle cx="256" cy="262" r="26" fill="#F8F4EC"/>
+  <circle cx="352" cy="262" r="26" fill="#F8F4EC"/>
+</svg>

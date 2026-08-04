@@ -1,7 +1,7 @@
 name: acp_remote
 description: "Runmote - Connect to ACP AI agents via pairing code"
 publish_to: 'none'
-version: 2.0.0+134
+version: 1.0.0+136
 
 environment:
   sdk: ^3.12.1
@@ -9,6 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
   flutter_riverpod: ^2.6.1
   go_router: ^14.8.1
   web_socket_channel: ^3.0.3
@@ -62,6 +65,7 @@ flutter_launcher_icons:
     image_path: "assets/logos/app_icon.png"
 
 flutter:
+  generate: true
   uses-material-design: true
   assets:
     - assets/logos/

@@ -6,6 +6,7 @@ import '../../features/agents/view/agent_list_screen.dart';
 import '../../features/sessions/view/session_list_screen.dart';
 import '../../features/chat/view/chat_screen.dart';
 import '../../features/settings/view/settings_screen.dart';
+import '../../l10n/app_localizations.dart';
 
 class AppShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
@@ -24,21 +25,21 @@ class AppShell extends StatelessWidget {
             initialLocation: index == navigationShell.currentIndex,
           );
         },
-        destinations: const [
+        destinations: [
           NavigationDestination(
             icon: Icon(Icons.smart_toy_outlined),
             selectedIcon: Icon(Icons.smart_toy),
-            label: 'Agents',
+            label: AppLocalizations.of(context)!.navAgents,
           ),
           NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Sessions',
+            label: AppLocalizations.of(context)!.navSessions,
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
+            label: AppLocalizations.of(context)!.navSettings,
           ),
         ],
       ),

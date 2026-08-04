@@ -7,7 +7,7 @@ set -euo pipefail
 
 # ── Bootstrap: detect pipe mode and download ──────────────
 if [[ ! -f "$(dirname "$0")/lib/utils.sh" ]]; then
-    echo "Downloading ACP installer..."
+    echo "Downloading Runmote installer..."
 
     BRANCH="${ACP_BRANCH:-dev}"
     REPO="${ACP_REMOTE:-https://github.com/Raza-learner/Runmote.git}"

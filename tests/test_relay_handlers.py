@@ -16,6 +16,7 @@ def _reset_state():
     relay.state.daemons = {}
     relay.state.app_to_daemon = {}
     relay.state.code_to_daemon = {}
+    relay.state.known_tokens = {}
     yield
 
 

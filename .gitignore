@@ -21,3 +21,11 @@ src/flutter_app/.flutter-plugins-dependencies
 
 acp_relay.db
 .wrangler/
+
+# Generated logo assets
+scripts/assets/
+
+# Build artifacts
+acp-src/
+*.exe
+

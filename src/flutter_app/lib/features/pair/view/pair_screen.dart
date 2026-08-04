@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/models/connection_state.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/database_provider.dart';
@@ -22,8 +23,7 @@ class PairScreen extends ConsumerStatefulWidget {
 
 class _PairScreenState extends ConsumerState<PairScreen> {
   final _codeController = TextEditingController();
-  final _manualHostController = TextEditingController(text: '192.168.1.12');
-  final _manualPortController = TextEditingController(text: '8000');
+  final _relayUrlController = TextEditingController();
   bool _isConnecting = false;
   bool _isAutoConnecting = true;
   bool _showCodeEntry = false;
@@ -47,8 +47,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   void dispose() {
     _codeController.removeListener(_onCodeChanged);
     _codeController.dispose();
-    _manualHostController.dispose();
-    _manualPortController.dispose();
+    _relayUrlController.dispose();
     _scannerController.dispose();
     super.dispose();
   }
@@ -118,7 +117,8 @@ class _PairScreenState extends ConsumerState<PairScreen> {
       _isConnecting = true;
       _error = null;
     });
-    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: relayUrl ?? defaultRelayUrl);
+    final customUrl = _relayUrlController.text.trim();
+    ref.read(connectionProvider.notifier).connect(pairingCode, relayUrl: relayUrl ?? (customUrl.isNotEmpty ? customUrl : null));
   }
 
   bool _isValidCode(String raw) {
@@ -168,14 +168,14 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         setState(() {
           _isConnecting = false;
           _showScanner = false;
-          _error = next.error ?? 'Connection failed';
+          _error = next.error ?? AppLocalizations.of(context)!.pairConnectionFailed;
           _qrScanned = false;
         });
       } else if ((prev?.daemonConnected ?? false) && !next.daemonConnected && !next.paired) {
         setState(() {
           _daemonDisconnected = true;
           _isConnecting = false;
-          _error = 'Daemon disconnected. Run \'runmote\' on your device to reconnect.';
+          _error = AppLocalizations.of(context)!.pairDaemonDisconnected;
         });
       }
     });
@@ -246,7 +246,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         ),
         const SizedBox(height: 24),
         Text(
-          'Runmote',
+          AppLocalizations.of(context)!.pairTitle,
           style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.w800,
@@ -256,7 +256,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Remote Access Redefined',
+          AppLocalizations.of(context)!.pairSubtitle,
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w400,
@@ -290,7 +290,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         ),
         const SizedBox(height: 24),
         Text(
-          'Connecting...',
+          AppLocalizations.of(context)!.pairConnecting,
           style: TextStyle(
             color: isDark ? Colors.white.withOpacity(0.6) : const Color(0xFF64748B),
             fontSize: 15,
@@ -329,7 +329,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           ),
         _OptionCard(
           icon: Icons.qr_code_scanner_rounded,
-          title: 'Scan QR Code',
+          title: AppLocalizations.of(context)!.pairScanQrTitle,
           subtitle: 'Use your camera to quickly link your device',
           isDark: isDark,
           gradient: const [Color(0xFF6366F1), Color(0xFF4F46E5)],
@@ -374,7 +374,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         const SizedBox(height: 16),
         _OptionCard(
           icon: Icons.keyboard_rounded,
-          title: 'Enter Manual Code',
+          title: AppLocalizations.of(context)!.pairManualCodeTitle,
           subtitle: 'Type the 8-character code from your terminal',
           isDark: isDark,
           gradient: const [Color(0xFF94A3B8), Color(0xFF64748B)],
@@ -383,13 +383,32 @@ class _PairScreenState extends ConsumerState<PairScreen> {
             _error = null;
           }),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
         TextButton(
           onPressed: _showHelp,
           style: TextButton.styleFrom(
             foregroundColor: isDark ? Colors.white.withOpacity(0.5) : theme.colorScheme.primary.withOpacity(0.7),
           ),
           child: const Text('Need help finding your code?'),
+        ),
+        const SizedBox(height: 12),
+        TextButton.icon(
+          onPressed: _showRelaySettings,
+          icon: Icon(
+            Icons.settings_outlined,
+            size: 16,
+            color: isDark ? Colors.white.withValues(alpha: 0.35) : const Color(0xFF94A3B8),
+          ),
+          label: Text(
+            'Relay Settings',
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.white.withValues(alpha: 0.35) : const Color(0xFF94A3B8),
+            ),
+          ),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
         ),
       ],
     );
@@ -410,7 +429,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
         ),
         const SizedBox(height: 24),
         Text(
-          'Connection Lost',
+          AppLocalizations.of(context)!.pairConnectionLostTitle,
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w700,
@@ -479,7 +498,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
               ),
               const SizedBox(width: 8),
               Text(
-                'Scan QR Code',
+                AppLocalizations.of(context)!.pairScanQrTitle,
                 style: TextStyle(
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.7)
@@ -603,7 +622,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Enter Code',
+                    AppLocalizations.of(context)!.pairCodeEntryHeader,
                     style: TextStyle(
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.7)
@@ -628,7 +647,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                   letterSpacing: 4,
                 ),
                 decoration: InputDecoration(
-                  hintText: 'XXXX-XXXX',
+                  hintText: AppLocalizations.of(context)!.pairCodeHint,
                   hintStyle: TextStyle(
                     color: isDark
                         ? Colors.white.withValues(alpha: 0.3)
@@ -692,8 +711,8 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                             color: Colors.black54,
                           ),
                         )
-                      : const Text(
-                          'Connect',
+                      : Text(
+                          AppLocalizations.of(context)!.pairConnect,
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                 ),
@@ -705,29 +724,167 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     );
   }
 
+  void _showRelaySettings() {
+    final tempController = TextEditingController(text: _relayUrlController.text);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : Colors.black.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Relay Settings',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Leave empty to use the cloud relay.\nEnter a URL for a local relay.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.5)
+                          : const Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: tempController,
+                    textInputAction: TextInputAction.done,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white : theme.colorScheme.onSurface,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'ws://192.168.1.x:8000',
+                      hintStyle: TextStyle(
+                        fontSize: 14,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.25)
+                            : const Color(0xFFCBD5E1),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.15)
+                              : theme.colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.15)
+                              : theme.colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: const Color(0xFF6366F1).withOpacity(0.5),
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.black.withOpacity(0.03),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton(
+                      onPressed: () {
+                        setState(() {
+                          _relayUrlController.text = tempController.text.trim();
+                        });
+                        Navigator.of(ctx).pop();
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF6366F1),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Save',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showHelp() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Get Your Code'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('1. Make sure the Runmote daemon is running on your PC'),
-            SizedBox(height: 8),
-            Text('2. Look for the QR code in the terminal where the daemon is running'),
-            SizedBox(height: 8),
-            Text('3. Use the QR scanner to scan it, or type the 8-character code shown below it'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Got it'),
+      builder: (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l!.pairHelpDialogTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l.pairHelpStep1),
+              const SizedBox(height: 8),
+              Text(l.pairHelpStep2),
+              const SizedBox(height: 8),
+              Text(l.pairHelpStep3),
+            ],
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(l.pairHelpGotIt),
+            ),
+          ],
+        );
+      },
     );
   }
 }

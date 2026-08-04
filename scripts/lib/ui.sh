@@ -29,8 +29,10 @@ case "${LANG:-}" in
 esac
 
 # ----------------------------------------------------------
-# Colors
+# Colors – Runmote brand palette
 # ----------------------------------------------------------
+# Brand:  #F5F0EB (cream)  #1A1A1A (near-black)
+# Accents: green=success  red=error  blue=info  yellow=warn
 
 if [[ $ACP_INTERACTIVE -eq 1 ]]; then
 
@@ -38,6 +40,14 @@ RESET=$'\033[0m'
 BOLD=$'\033[1m'
 DIM=$'\033[2m'
 
+# Truecolor brand colours (modern terminals)
+CREAM=$'\033[38;2;245;240;235m'
+DARK=$'\033[38;2;26;26;26m'
+# 256-col fallback (light peach ≈ #F5F0EB, dark gray ≈ #1A1A1A)
+CREAM_256=$'\033[38;5;230m'
+DARK_256=$'\033[38;5;240m'
+
+# Named colours
 BLACK=$'\033[30m'
 RED=$'\033[31m'
 GREEN=$'\033[32m'
@@ -47,12 +57,19 @@ MAGENTA=$'\033[35m'
 CYAN=$'\033[36m'
 WHITE=$'\033[97m'
 
+# Alias CYAN -> CREAM for brand-consistent sections
+PRIMARY="$CREAM"
+ACCENT="$DARK"
+
 else
 
 RESET=""
 BOLD=""
 DIM=""
-
+CREAM=""
+DARK=""
+CREAM_256=""
+DARK_256=""
 BLACK=""
 RED=""
 GREEN=""
@@ -61,6 +78,8 @@ BLUE=""
 MAGENTA=""
 CYAN=""
 WHITE=""
+PRIMARY=""
+ACCENT=""
 
 fi
 
@@ -120,7 +139,7 @@ divider() {
         line+="$char"
     done
 
-    echo "$line"
+    echo -e "${DIM}${line}${RESET}"
 
 }
 
@@ -182,7 +201,7 @@ section() {
 
 echo
 
-echo -e "${BOLD}${CYAN}$1${RESET}"
+echo -e "${BOLD}${PRIMARY}$1${RESET}"
 
 divider
 
@@ -282,7 +301,7 @@ do
 for ((i=0;i<${#spin};i++))
 do
 
-printf "\r${CYAN}%s${RESET}" "${spin:$i:1}"
+printf "\r${PRIMARY}%s${RESET}" "${spin:$i:1}"
 
 sleep "$delay"
 
