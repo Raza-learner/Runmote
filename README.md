@@ -122,7 +122,7 @@ The daemon auto-detects what's installed. For each agent, the ACP adapter must b
 | **Claude Code** | ✅ Auto-detect | ✅ Auto-detect | ✅ Auto-detect | `claude-agent-acp` or `npx @agentclientprotocol/claude-agent-acp` |
 | **Codex** | ✅ Auto-detect | ✅ Auto-detect | ✅ Auto-detect | `codex-acp` or `npx @agentclientprotocol/codex-acp` |
 | **GitHub Copilot** | ✅ Auto-detect | ❌ Manual config | ✅ Auto-detect | `github-copilot-acp` or `npx @agentclientprotocol/github-copilot-acp` |
-| **Gemini CLI** | ✅ Manual config | ❌ Not tested | ❌ Not tested | Requires `ACP_AGENT_COMMAND` env var |
+| **Gemini CLI** | ✅ Manual config | ❌ Not tested | ❌ Not tested | Requires `ACP_AGENT_COMMANDS` env var |
 
 Any agent that speaks [ACP](https://agentclientprotocol.com) works. For agents not auto-detected, set `ACP_AGENT_COMMANDS` to a JSON array of agent configs.
 
@@ -192,7 +192,7 @@ The daemon auto-detects what's installed. Install the agent CLI and its ACP adap
 <details>
 <summary><b>Does this work on iPhone AND Android?</b></summary>
 
-Yes. The app is built with Flutter and compiled natively for both platforms. APK available in releases. iOS TestFlight coming soon.
+Yes. The app is built with Flutter and compiled natively for both platforms. APK available in releases.
 
 </details>
 
@@ -302,14 +302,6 @@ If this project saved you time or made your workflow better, consider supporting
 ## License
 
 MIT © [Raza](https://github.com/Raza-learner)
-
-<br />
-
-<p align="center">
-  <a href="https://star-history.com/#Raza-learner/Runmote&Date">
-    <img src="https://api.star-history.com/svg?repos=Raza-learner/Runmote&type=Date" alt="Star History Chart" width="600" />
-  </a>
-</p>
 
 <br />
 
