@@ -156,6 +156,18 @@ if _raw_agent_commands:
 else:
     AGENT_CONFIGS = _detect_acp_agents()
 
+
+def get_agent_configs() -> list[dict]:
+    """Return the agent configs to use right now.
+
+    If ACP_AGENT_COMMANDS is set explicitly, it is always respected.
+    Otherwise re-detect from the live system so installing/removing an
+    agent is reflected on the next agent/list without a daemon restart.
+    """
+    if _raw_agent_commands:
+        return AGENT_CONFIGS
+    return _detect_acp_agents()
+
 DAEMON_ID = os.environ.get("ACP_DAEMON_ID", socket.gethostname())
 DAEMON_TOKEN = os.environ.get("ACP_DAEMON_TOKEN", "")
 if not DAEMON_TOKEN:

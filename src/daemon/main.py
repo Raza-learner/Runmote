@@ -16,7 +16,7 @@ _src = Path(__file__).resolve().parent
 if str(_src) not in sys.path:
     sys.path.insert(0, str(_src))
 
-from config import AGENT_CONFIGS, DAEMON_ID, DAEMON_TOKEN, RECONNECT_DELAY, RELAY_URL
+from config import get_agent_configs, DAEMON_ID, DAEMON_TOKEN, RECONNECT_DELAY, RELAY_URL
 from websockets.asyncio.client import connect
 
 
@@ -322,7 +322,9 @@ async def _send_json(websocket, message: dict):
 
 async def run_daemon():
     agents = {
-        config["id"]: AgentProcess(config) for config in AGENT_CONFIGS if config.get("id") and config.get("command")
+        config["id"]: AgentProcess(config)
+        for config in get_agent_configs()
+        if config.get("id") and config.get("command")
     }
     if not agents:
         log("WARNING: no ACP agents detected — daemon will start with no agents")
@@ -436,9 +438,15 @@ async def run_daemon():
 
                             if method == "agent/list":
                                 log("agent/list requested by relay")
-                                # Use initial configs (AGENT_CONFIGS) for re-detection instead of
-                                # live system detection, so explicit ACP_AGENT_COMMANDS is respected.
-                                detected = {a["id"]: a for a in AGENT_CONFIGS if a.get("id") and a.get("command")}
+                                # Re-detect from the live system so installing or
+                                # removing an agent shows up on the next request
+                                # without a daemon restart. Explicit
+                                # ACP_AGENT_COMMANDS is still respected.
+                                detected = {
+                                    a["id"]: a
+                                    for a in get_agent_configs()
+                                    if a.get("id") and a.get("command")
+                                }
                                 for aid in list(agents.keys()):
                                     if aid not in detected:
                                         log("Agent '%s' no longer configured, stopping...", aid)
