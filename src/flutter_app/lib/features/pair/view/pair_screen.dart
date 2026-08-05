@@ -67,9 +67,14 @@ class _PairScreenState extends ConsumerState<PairScreen> {
 
       // The relay (e.g. a free-tier Render instance) may be sleeping/waking
       // up between sessions, so a slow first connection is normal. Keep the
-      // loading state and retry a few times before falling back to pairing —
-      // only an explicit token rejection truly requires re-pairing.
+      // loading state and retry a few times before falling back to pairing.
+      // Rejections can also be transient: after a relay restart the SQLite
+      // DB is wiped, so the relay can only verify the saved token while the
+      // daemon is online — give the daemon a moment to reconnect before
+      // giving up on the saved connection.
       const maxAttempts = 6;
+      const maxRejectedAttempts = 3;
+      var rejectedCount = 0;
       for (var attempt = 1; attempt <= maxAttempts; attempt++) {
         for (final url in urlsToTry) {
           debugPrint('[RUNMOTE] autoConnect: trying url=$url attempt=$attempt');
@@ -84,10 +89,14 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           }
 
           if (result == ConnectWithTokenResult.rejected) {
-            // Token is no longer valid on the relay — require re-pairing.
-            debugPrint('[RUNMOTE] autoConnect: token rejected by relay');
-            rejectedMsg = 'Your saved connection expired. Please pair your device again.';
-            return;
+            rejectedCount++;
+            debugPrint('[RUNMOTE] autoConnect: token rejected by relay ($rejectedCount/$maxRejectedAttempts)');
+            if (rejectedCount >= maxRejectedAttempts) {
+              // Token is no longer valid on the relay — require re-pairing.
+              rejectedMsg = 'Your saved connection expired. Please pair your device again.';
+              return;
+            }
+            continue;
           }
           // unreachable — try the next URL, then retry after a delay below.
         }
