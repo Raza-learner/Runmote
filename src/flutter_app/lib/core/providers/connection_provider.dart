@@ -21,6 +21,23 @@ String _sanitizeRelayUrl(String url) {
   return u;
 }
 
+/// Outcome of an auth/token reconnect attempt, so callers can tell a
+/// transient network/relay problem (retry) apart from a token the relay
+/// no longer recognizes (requires re-pairing).
+enum ConnectWithTokenResult {
+  /// The saved token was accepted — connected.
+  success,
+
+  /// The relay explicitly rejected the token (it is no longer valid).
+  rejected,
+
+  /// The relay could not be reached or did not answer in time. The token
+  /// may still be valid — retry instead of forcing the user to re-pair.
+  unreachable,
+}
+
+const _authTimeout = Duration(seconds: 20);
+
 class AcpAgent {
   final String id;
   final String name;
@@ -287,10 +304,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     }
   }
 
-  Future<bool> connectWithToken(String token, String relayUrl) async {
+  Future<ConnectWithTokenResult> connectWithToken(
+      String token, String relayUrl) async {
     if (state.state case AcpConnectionState()
         when state.state is Connected || state.state is Connecting) {
-      return true;
+      return ConnectWithTokenResult.success;
     }
 
     final url = _sanitizeRelayUrl(relayUrl);
@@ -305,13 +323,19 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       final uri = Uri.parse('$url/app');
       debugPrint('[RUNMOTE] connectWithToken: ws uri=$uri');
       final channel = WebSocketChannel.connect(uri);
-      await channel.ready;
+      // A cloud relay (e.g. free-tier Render) can take a while to boot back
+      // up after idling. Treat a slow/unreachable relay separately from an
+      // invalid token so callers can keep retrying instead of re-pairing.
+      await channel.ready.timeout(
+        _authTimeout,
+        onTimeout: () => throw Exception('relay unreachable'),
+      );
 
       state = state.copyWith(channel: channel, token: token);
       _reconnectAttempts = 0;
       _daemonDisconnected = false;
 
-      final authCompleter = Completer<bool>();
+      final authCompleter = Completer<ConnectWithTokenResult>();
       final authId = _nextId;
       sendRaw({
         'jsonrpc': '2.0',
@@ -327,12 +351,12 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         cancelOnError: false,
       );
 
-      final ok = await authCompleter.future.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => false,
+      final result = await authCompleter.future.timeout(
+        _authTimeout,
+        onTimeout: () => ConnectWithTokenResult.unreachable,
       );
 
-      if (ok) {
+      if (result == ConnectWithTokenResult.success) {
         state = state.copyWith(
           state: const AcpConnectionState.connected(),
           paired: true,
@@ -349,7 +373,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
           'method': 'agent/list',
           'params': {},
         });
-        return true;
+        return result;
       } else {
         _sub?.cancel();
         _sub = null;
@@ -358,7 +382,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
           state: const AcpConnectionState.disconnected(),
           clearChannel: true,
         );
-        return false;
+        return result;
       }
     } catch (e) {
       debugPrint('[RUNMOTE] connectWithToken error: $e');
@@ -369,12 +393,12 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         error: '$e',
         clearChannel: true,
       );
-      return false;
+      return ConnectWithTokenResult.unreachable;
     }
   }
 
   void _handleTokenAuth(
-      dynamic data, int authId, Completer<bool> completer) {
+      dynamic data, int authId, Completer<ConnectWithTokenResult> completer) {
     try {
       final json = jsonDecode(data as String) as Map<String, dynamic>;
       final method = json['method'] as String?;
@@ -397,11 +421,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
             daemonName: daemonName,
             daemonConnected: daemonConnected,
           );
-          completer.complete(true);
+          completer.complete(ConnectWithTokenResult.success);
           return;
         }
         debugPrint('[RUNMOTE] auth/token rejected');
-        completer.complete(false);
+        completer.complete(ConnectWithTokenResult.rejected);
         return;
       }
 
@@ -815,9 +839,14 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     _reconnectAttempts++;
     _reconnectTimer = Timer(delay, () async {
       state = state.copyWith(state: const AcpConnectionState.reconnecting());
-      final ok = await connectWithToken(token, relayUrl);
-      if (!ok) {
-        // Retry on failure — keep backing off
+      final result = await connectWithToken(token, relayUrl);
+      if (result == ConnectWithTokenResult.rejected) {
+        // Token is no longer valid on the relay — stop retrying, the user
+        // will need to re-pair. Leave the app disconnected.
+        _reconnectTimer?.cancel();
+        _reconnectAttempts = 0;
+      } else if (result == ConnectWithTokenResult.unreachable) {
+        // Relay just wasn't reachable — keep backing off and retrying.
         _scheduleReconnect();
       }
     });
@@ -832,8 +861,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     _reconnectTimer?.cancel();
     if (state.state is Connected || state.state is Connecting) return;
     state = state.copyWith(state: const AcpConnectionState.reconnecting());
-    final ok = await connectWithToken(token, relayUrl);
-    if (!ok) {
+    final result = await connectWithToken(token, relayUrl);
+    if (result == ConnectWithTokenResult.rejected) {
+      _reconnectTimer?.cancel();
+      _reconnectAttempts = 0;
+    } else if (result == ConnectWithTokenResult.unreachable) {
       _scheduleReconnect();
     }
   }

@@ -53,6 +53,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   }
 
   Future<void> _autoConnectWithToken() async {
+    String? rejectedMsg;
     try {
       final p = await ref.read(preferencesServiceProvider.future);
       final token = p.getAuthToken();
@@ -64,21 +65,48 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           ? [savedUrl]
           : [savedUrl, defaultRelayUrl];
 
-      for (final url in urlsToTry) {
-        for (var attempt = 0; attempt < 2; attempt++) {
-          if (attempt > 0) await Future.delayed(const Duration(seconds: 3));
-          debugPrint('[RUNMOTE] autoConnect: trying url=$url attempt=${attempt + 1}');
-          final ok = await ref.read(connectionProvider.notifier).connectWithToken(token, url);
-          debugPrint('[RUNMOTE] autoConnect: url=$url attempt=${attempt + 1} result=$ok');
-          if (ok && mounted) {
+      // The relay (e.g. a free-tier Render instance) may be sleeping/waking
+      // up between sessions, so a slow first connection is normal. Keep the
+      // loading state and retry a few times before falling back to pairing —
+      // only an explicit token rejection truly requires re-pairing.
+      const maxAttempts = 6;
+      for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+        for (final url in urlsToTry) {
+          debugPrint('[RUNMOTE] autoConnect: trying url=$url attempt=$attempt');
+          final result =
+              await ref.read(connectionProvider.notifier).connectWithToken(token, url);
+          if (!mounted) return;
+
+          if (result == ConnectWithTokenResult.success) {
+            debugPrint('[RUNMOTE] autoConnect: connected successfully');
             context.go('/agents');
             return;
           }
+
+          if (result == ConnectWithTokenResult.rejected) {
+            // Token is no longer valid on the relay — require re-pairing.
+            debugPrint('[RUNMOTE] autoConnect: token rejected by relay');
+            rejectedMsg = 'Your saved connection expired. Please pair your device again.';
+            return;
+          }
+          // unreachable — try the next URL, then retry after a delay below.
+        }
+
+        if (attempt < maxAttempts) {
+          const delay = Duration(seconds: 10);
+          debugPrint('[RUNMOTE] autoConnect: retrying in ${delay.inSeconds}s');
+          await Future.delayed(delay);
+          if (!mounted) return;
         }
       }
-      debugPrint('[RUNMOTE] autoConnect: all attempts failed, showing pairing screen');
+      debugPrint('[RUNMOTE] autoConnect: retries exhausted, showing pairing screen');
     } finally {
-      if (mounted) setState(() => _isAutoConnecting = false);
+      if (mounted) {
+        setState(() {
+          _isAutoConnecting = false;
+          _error = rejectedMsg;
+        });
+      }
     }
   }
 

@@ -1,5 +1,4 @@
 import json
-import secrets
 import time
 import uuid
 from collections import defaultdict
@@ -88,9 +87,11 @@ async def app_endpoint(websocket: WebSocket):
                         state.app_to_daemon[client_id] = daemon_session.daemon_id
                         daemon_session.paired_apps.add(client_id)
                         state.claimed_codes.add(code)
-                        # Generate an app-specific token so multiple daemons can
-                        # coexist without clobbering each other's reconnect token.
-                        app_token = secrets.token_urlsafe(24)
+                        # Issue a reconnect token. It is derived from the daemon's
+                        # own long-lived secret so the relay can validate it again
+                        # after a restart even if the token DB is wiped (free-tier
+                        # Render). Also persisted for legacy offline-daemon support.
+                        app_token = state.issue_app_token(daemon_session.daemon_id, daemon_session.token)
                         state.remember_token(app_token, daemon_session.daemon_id)
                         await websocket.send_text(
                             json.dumps(
