@@ -177,44 +177,62 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   // ── Heartbeat (ping/pong) ────────────────────────────────────────
   Timer? _pingTimer;
   bool _pongReceived = true;
-  Timer? _pongCheckTimer;
+  int _missedPongs = 0;
 
-  static const _pingInterval = Duration(seconds: 15);
-  static const _pongCheckDelay = Duration(seconds: 5);
+  static const _pingInterval = Duration(seconds: 25);
+  static const _maxMissedPongs = 2;
 
   void _startPing() {
     _stopPing();
     _pongReceived = true;
+    _missedPongs = 0;
     _pingTimer = Timer.periodic(_pingInterval, (_) {
       if (!_pongReceived) {
-        debugPrint('[RUNMOTE] ping timeout — no pong for $_pingInterval');
-        _onDisconnected('Ping timeout');
-        return;
+        _missedPongs++;
+        debugPrint('[RUNMOTE] missed pong $_missedPongs/$_maxMissedPongs');
+        if (_missedPongs >= _maxMissedPongs) {
+          debugPrint('[RUNMOTE] ping timeout — no pong for ${_pingInterval * _maxMissedPongs}');
+          _onDisconnected('Ping timeout');
+          return;
+        }
+        // transient miss — send another ping without disconnecting
+      } else {
+        _missedPongs = 0;
       }
       _pongReceived = false;
-      sendRaw({
-        'jsonrpc': '2.0',
-        'method': r'$/ping',
-      });
-      // Asynchronous re-check after short delay for faster disconnect detection
-      _pongCheckTimer?.cancel();
-      _pongCheckTimer = Timer(_pongCheckDelay, () {
-        if (!_pongReceived) {
-          _onDisconnected('Ping timeout');
-        }
-      });
+      try {
+        sendRaw({
+          'jsonrpc': '2.0',
+          'method': r'$/ping',
+        });
+      } catch (_) {
+        // sendRaw will call _onDisconnected on failure
+      }
     });
   }
 
   void _stopPing() {
     _pingTimer?.cancel();
     _pingTimer = null;
-    _pongCheckTimer?.cancel();
-    _pongCheckTimer = null;
   }
 
   void _handlePong() {
     _pongReceived = true;
+    _missedPongs = 0;
+  }
+
+  void pauseHeartbeat() {
+    debugPrint('[RUNMOTE] heartbeat paused (app backgrounded)');
+    _stopPing();
+  }
+
+  void resumeHeartbeat() {
+    if (state.state is Connected) {
+      debugPrint('[RUNMOTE] heartbeat resumed');
+      _startPing();
+      // also refresh quickly in case we missed a disconnect while paused
+      _pongReceived = true;
+    }
   }
 
   Future<void> connect(String code, {String? relayUrl}) async {

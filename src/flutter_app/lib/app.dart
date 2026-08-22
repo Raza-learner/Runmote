@@ -33,8 +33,19 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      ref.read(connectionProvider.notifier).retryNow();
+    final notifier = ref.read(connectionProvider.notifier);
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        notifier.pauseHeartbeat();
+        break;
+      case AppLifecycleState.resumed:
+        notifier.resumeHeartbeat();
+        notifier.retryNow();
+        break;
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        break;
     }
   }
 
