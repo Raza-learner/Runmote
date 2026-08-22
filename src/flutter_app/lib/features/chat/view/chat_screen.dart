@@ -488,9 +488,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: AnimatedBackground(
         showGrid: false,
+        animate: false,
         child: Column(
           children: [
-            SizedBox(height: MediaQuery.of(context).padding.top + 8),
             Expanded(
               child: Consumer(
                 builder: (context, ref, child) {
@@ -990,36 +990,40 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ConfigOption opt,
   ) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
         border: Border(
           bottom: BorderSide(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.12),
           ),
         ),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: opt.options.map((v) {
-            final selected = v.value == opt.currentValue;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(v.name, style: const TextStyle(fontSize: 12)),
-                selected: selected,
-                visualDensity: VisualDensity.compact,
-                onSelected: (_) {
-                  ref
-                      .read(chatProvider(
-                              (widget.sessionId, widget.cwd))
-                          .notifier)
-                      .setConfigOption(opt.id, v.value);
-                },
-              ),
-            );
-          }).toList(),
+      child: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: opt.options.map((v) {
+              final selected = v.value == opt.currentValue;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(v.name, style: const TextStyle(fontSize: 12)),
+                  selected: selected,
+                  visualDensity: VisualDensity.compact,
+                  showCheckmark: true,
+                  onSelected: (_) {
+                    ref
+                        .read(chatProvider(
+                                (widget.sessionId, widget.cwd))
+                            .notifier)
+                        .setConfigOption(opt.id, v.value);
+                  },
+                ),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
