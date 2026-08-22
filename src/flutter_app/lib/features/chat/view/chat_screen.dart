@@ -71,28 +71,267 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  Future<void> _pickFile() async {
+  static const _imageExts = {
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'webp',
+    'heic',
+    'bmp',
+    'svg',
+  };
+
+  static const _docExts = {
+    'pdf',
+    'doc',
+    'docx',
+    'txt',
+    'md',
+    'csv',
+    'json',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'rtf',
+    'xml',
+    'yaml',
+    'yml',
+    'html',
+    'htm',
+  };
+
+  String _mimeForExtension(String ext) {
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'heic':
+        return 'image/heic';
+      case 'bmp':
+        return 'image/bmp';
+      case 'svg':
+        return 'image/svg+xml';
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'ppt':
+        return 'application/vnd.ms-powerpoint';
+      case 'pptx':
+        return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      case 'txt':
+        return 'text/plain';
+      case 'md':
+        return 'text/markdown';
+      case 'csv':
+        return 'text/csv';
+      case 'json':
+        return 'application/json';
+      case 'rtf':
+        return 'application/rtf';
+      case 'xml':
+        return 'application/xml';
+      case 'yaml':
+      case 'yml':
+        return 'text/yaml';
+      case 'html':
+      case 'htm':
+        return 'text/html';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  bool _isImageExt(String ext) => _imageExts.contains(ext);
+  bool _isTextMime(String mime) =>
+      mime.startsWith('text/') || mime == 'application/json' || mime == 'application/xml';
+
+  IconData _iconForAttachment(Map<String, String> att) {
+    final mime = att['mimeType'] ?? '';
+    final name = att['name'] ?? '';
+    final ext = name.split('.').last.toLowerCase();
+    if (_isImageExt(ext) || mime.startsWith('image/')) return Icons.image_outlined;
+    if (ext == 'pdf') return Icons.picture_as_pdf_outlined;
+    if (ext == 'doc' || ext == 'docx') return Icons.description_outlined;
+    if (ext == 'xls' || ext == 'xlsx') return Icons.table_chart_outlined;
+    if (ext == 'ppt' || ext == 'pptx') return Icons.slideshow_outlined;
+    return Icons.insert_drive_file_outlined;
+  }
+
+  Future<void> _showAttachmentOptions() async {
+    final theme = Theme.of(context);
+    final canSendImages =
+        ref.read(connectionProvider).capabilities?.canSendImages ?? false;
+    final canSendDocs =
+        ref.read(connectionProvider).capabilities?.supportsEmbeddedContext ?? false;
+
+    if (!canSendImages && !canSendDocs) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This agent does not support file attachments')),
+      );
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: Icon(Icons.photo_outlined, color: theme.colorScheme.primary),
+              title: const Text('Photo / Image'),
+              subtitle: const Text('JPG, PNG, GIF, WebP'),
+              enabled: canSendImages,
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _pickImage();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.picture_as_pdf_outlined, color: theme.colorScheme.primary),
+              title: const Text('Document'),
+              subtitle: const Text('PDF, Word, Excel, Text, Markdown, CSV, JSON'),
+              enabled: canSendDocs,
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _pickDocument();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.folder_outlined, color: theme.colorScheme.primary),
+              title: const Text('Other file'),
+              subtitle: const Text('Any file type'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _pickAnyFile();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage() async {
     try {
       final result = await FilePicker.pickFiles(
         type: FileType.image,
-        allowMultiple: false,
+        allowMultiple: true,
         withData: true,
       );
       if (result == null || result.files.isEmpty) return;
-      final file = result.files.first;
+      await _handlePickedFiles(result.files);
+    } catch (e) {
+      debugPrint('[RUNMOTE] image pick error: $e');
+    }
+  }
+
+  Future<void> _pickDocument() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: _docExts.toList(),
+        allowMultiple: true,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      await _handlePickedFiles(result.files);
+    } catch (e) {
+      debugPrint('[RUNMOTE] document pick error: $e');
+    }
+  }
+
+  Future<void> _pickAnyFile() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.any,
+        allowMultiple: true,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      await _handlePickedFiles(result.files);
+    } catch (e) {
+      debugPrint('[RUNMOTE] any file pick error: $e');
+    }
+  }
+
+  Future<void> _handlePickedFiles(List<PlatformFile> files) async {
+    const maxBytes = 10 * 1024 * 1024; // 10 MB per file
+    for (final file in files) {
       final bytes = file.bytes ?? (await _readFile(file.path));
-      if (bytes == null) return;
-      final ext = file.extension?.toLowerCase() ?? 'jpg';
-      final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
+      if (bytes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not read ${file.name}')),
+          );
+        }
+        continue;
+      }
+      if (bytes.length > maxBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${file.name} is too large (>10 MB)')),
+          );
+        }
+        continue;
+      }
+      final ext = (file.extension ?? file.name.split('.').last).toLowerCase();
+      final mime = _mimeForExtension(ext);
+
+      // For text-like resources, also store decoded text for embeddedContext.
+      String? decodedText;
+      if (_isTextMime(mime)) {
+        try {
+          decodedText = utf8.decode(bytes);
+          // Sanity: if decoded text is mostly non-printable, treat as binary.
+          if (decodedText.length > 200000) {
+            decodedText = decodedText.substring(0, 200000);
+          }
+        } catch (_) {
+          decodedText = null;
+        }
+      }
+
       setState(() {
         _attachments.add({
           'name': file.name,
-          'data': base64Encode(bytes),
           'mimeType': mime,
+          'data': base64Encode(bytes),
+          if (decodedText != null) 'text': decodedText,
+          'kind': _isImageExt(ext) ? 'image' : 'resource',
+          'ext': ext,
         });
       });
-    } catch (e) {
-      debugPrint('[RUNMOTE] file pick error: $e');
     }
   }
 
@@ -113,11 +352,48 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     List<Map<String, dynamic>>? extra;
     if (_attachments.isNotEmpty) {
-      extra = _attachments.map((a) => <String, dynamic>{
+      extra = _attachments.map((a) {
+        final kind = a['kind'] ?? 'image';
+        final mime = a['mimeType'] ?? 'application/octet-stream';
+        final name = a['name'] ?? 'file';
+        final data = a['data'] ?? '';
+        final decodedText = a['text'];
+
+        if (kind == 'image') {
+          return <String, dynamic>{
             'type': 'image',
-            'data': a['data'] ?? '',
-            'mimeType': a['mimeType'] ?? 'image/jpeg',
-          }).toList();
+            'data': data,
+            'mimeType': mime,
+            if (name.isNotEmpty) 'uri': 'file:///$name',
+          };
+        }
+
+        // Document / generic file -> ACP resource block.
+        // Text-like: use {resource: {uri, mimeType, text}}
+        // Binary:  use {resource: {uri, mimeType, blob}} + top-level mimeType/data for compat.
+        if (decodedText != null) {
+          return <String, dynamic>{
+            'type': 'resource',
+            'resource': {
+              'uri': 'file:///$name',
+              'mimeType': mime,
+              'text': decodedText,
+            },
+          };
+        }
+        return <String, dynamic>{
+          'type': 'resource',
+          'resource': {
+            'uri': 'file:///$name',
+            'mimeType': mime,
+            'blob': data,
+          },
+          // Some agents also look at top-level blob/data, keep for compat.
+          'mimeType': mime,
+          'data': data,
+          'uri': 'file:///$name',
+        };
+      }).toList();
       setState(() => _attachments.clear());
     }
 
@@ -159,6 +435,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final canSendImages = ref.watch(
       connectionProvider.select((c) => c.capabilities?.canSendImages ?? false),
     );
+    final canSendDocs = ref.watch(
+      connectionProvider.select((c) => c.capabilities?.supportsEmbeddedContext ?? false),
+    );
+    final canAttach = canSendImages || canSendDocs;
     final daemonDown = ref.watch(
       connectionProvider.select((c) => c.paired && !c.daemonConnected),
     );
@@ -414,7 +694,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               },
               ),
             ),
-            _buildInputArea(theme, canSendImages, daemonDown),
+            _buildInputArea(theme, canAttach, daemonDown),
           ],
         ),
       ),
@@ -427,7 +707,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return commands.where((c) => c.name.toLowerCase().contains(q)).toList();
   }
 
-  Widget _buildInputArea(ThemeData theme, bool canSendImages, bool daemonDown) {
+  Widget _buildInputArea(ThemeData theme, bool canAttach, bool daemonDown) {
     final isDark = theme.brightness == Brightness.dark;
     return ClipRect(
       child: BackdropFilter(
@@ -501,11 +781,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.image_outlined, size: 16, color: t.colorScheme.primary),
+                              Icon(_iconForAttachment(att), size: 16, color: t.colorScheme.primary),
                               const SizedBox(width: 8),
-                              Text(
-                                att['name'] ?? 'file',
-                                style: t.textTheme.labelMedium,
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 120),
+                                child: Text(
+                                  att['name'] ?? 'file',
+                                  style: t.textTheme.labelMedium,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                               const SizedBox(width: 4),
                               IconButton(
@@ -628,17 +912,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      if (canSendImages)
+                      if (canAttach)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 2),
                           child: IconButton(
-                            onPressed: (isBusy || daemonDown) ? null : _pickFile,
+                            onPressed: (isBusy || daemonDown) ? null : _showAttachmentOptions,
                             icon: Icon(
                               Icons.add_circle_outline,
                               size: 28,
                               color: t.colorScheme.primary,
                             ),
-                            tooltip: 'Attach image',
+                            tooltip: 'Attach file',
                           ),
                         ),
                       const SizedBox(width: 4),

@@ -3,6 +3,7 @@ import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:url_launcher/url_launcher.dart';
@@ -223,11 +224,26 @@ class SettingsScreen extends ConsumerWidget {
           Center(
             child: Column(
               children: [
-                Text(
-                  AppLocalizations.of(context)!.settingsVersion,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                  ),
+                FutureBuilder<PackageInfo>(
+                  future: PackageInfo.fromPlatform(),
+                  builder: (context, snapshot) {
+                    final version = snapshot.data?.version ?? '';
+                    // Show placeholder while loading to avoid flicker:
+                    if (version.isEmpty) {
+                      return Text(
+                        AppLocalizations.of(context)!.settingsVersion('...'),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                        ),
+                      );
+                    }
+                    return Text(
+                      AppLocalizations.of(context)!.settingsVersion(version),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 4),
                 Text(

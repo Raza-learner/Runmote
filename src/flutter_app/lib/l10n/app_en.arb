@@ -121,8 +121,12 @@
   "@settingsClearLocalDataSubtitle": {},
   "settingsReportIssue": "Report an Issue",
   "@settingsReportIssue": {},
-  "settingsVersion": "Runmote v2.0.0",
-  "@settingsVersion": {},
+  "settingsVersion": "Runmote v{version}",
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {}
+    }
+  },
   "settingsFooter": "Crafted with ❤️ for Developers",
   "@settingsFooter": {},
   "settingsMcpEmpty": "No MCP servers configured",

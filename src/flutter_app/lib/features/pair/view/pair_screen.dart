@@ -257,6 +257,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           child: Container(
             width: 100,
             height: 100,
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF6366F1), Color(0xFFA855F7)],
@@ -272,12 +273,14 @@ class _PairScreenState extends ConsumerState<PairScreen> {
                 ),
               ],
             ),
-            child: Image.asset(
-              'assets/logos/app_icon_foreground.png',
-              width: 56,
-              height: 56,
-              color: Colors.white,
-              colorBlendMode: BlendMode.srcIn,
+            child: Center(
+              child: Image.asset(
+                'assets/logos/app_icon_foreground.png',
+                width: 60,
+                height: 60,
+                color: Colors.white,
+                colorBlendMode: BlendMode.srcIn,
+              ),
             ),
           ),
         ),

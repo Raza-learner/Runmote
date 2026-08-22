@@ -421,8 +421,8 @@ abstract class AppLocalizations {
   /// No description provided for @settingsVersion.
   ///
   /// In en, this message translates to:
-  /// **'Runmote v2.0.0'**
-  String get settingsVersion;
+  /// **'Runmote v{version}'**
+  String settingsVersion(Object version);
 
   /// No description provided for @settingsFooter.
   ///

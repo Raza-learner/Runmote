@@ -1,7 +1,7 @@
 name: acp_remote
 description: "Runmote - Connect to ACP AI agents via pairing code"
 publish_to: 'none'
-version: 1.0.0+136
+version: 1.0.0+235
 
 environment:
   sdk: ^3.12.1
@@ -28,6 +28,8 @@ dependencies:
   multicast_dns: ^0.3.3+1
   file_picker: 12.0.0-beta.7
   flutter_markdown: ^0.7.7+1
+  markdown: ^7.3.0
+  package_info_plus: ^10.2.1
   url_launcher: ^6.3.2
   flex_color_scheme: ^8.4.0
   permission_handler: ^11.4.0

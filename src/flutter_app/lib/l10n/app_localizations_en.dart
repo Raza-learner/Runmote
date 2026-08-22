@@ -186,7 +186,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsReportIssue => 'Report an Issue';
 
   @override
-  String get settingsVersion => 'Runmote v2.0.0';
+  String settingsVersion(Object version) {
+    return 'Runmote v$version';
+  }
 
   @override
   String get settingsFooter => 'Crafted with ❤️ for Developers';
