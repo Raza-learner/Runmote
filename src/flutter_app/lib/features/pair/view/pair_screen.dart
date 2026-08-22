@@ -478,17 +478,67 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
           ),
         if (!_showCodeEntry && !_showScanner && !(_bgRetryTimer?.isActive ?? false) && !_daemonDisconnected) ...[
           _OptionCard(
-            icon: Icons.person_outlined,
-            title: AppLocalizations.of(context)!.pairGuestModeTitle,
-            subtitle: AppLocalizations.of(context)!.pairGuestModeSubtitle,
+            icon: Icons.qr_code_scanner_rounded,
+            title: AppLocalizations.of(context)!.pairScanQrTitle,
+            subtitle: AppLocalizations.of(context)!.pairScanQrSubtitle,
             isDark: isDark,
-            gradient: const [Color(0xFF10B981), Color(0xFF059669)],
-            onTap: () {
-              setState(() {
-                _codeController.text = 'DEMO-A1B2';
-                _showCodeEntry = true;
-              });
+            gradient: const [Color(0xFF6366F1), Color(0xFF4F46E5)],
+            onTap: () async {
+              try {
+                final status = await Permission.camera.request();
+                if (!mounted) return;
+                if (status.isGranted || status.isLimited) {
+                  setState(() {
+                    _showScanner = true;
+                    _isStartingCamera = true;
+                    _error = null;
+                  });
+                  WidgetsBinding.instance.addPostFrameCallback((_) async {
+                    try {
+                      await _scannerController.start();
+                      if (mounted) {
+                        setState(() => _isStartingCamera = false);
+                      }
+                    } catch (e) {
+                      debugPrint('[QR] start error: $e');
+                      if (mounted) {
+                        setState(() {
+                          _error = 'Camera error: $e';
+                          _isStartingCamera = false;
+                        });
+                      }
+                    }
+                  });
+                } else if (status.isPermanentlyDenied) {
+                  setState(() => _error = 'Camera permission permanently denied. Open app settings to enable.');
+                  await openAppSettings();
+                } else {
+                  setState(() => _error = 'Camera permission is required to scan QR codes.');
+                }
+              } catch (e) {
+                debugPrint('[QR] onTap error: $e');
+                if (mounted) setState(() => _error = 'Camera error: $e');
+              }
             },
+          ),
+          const SizedBox(height: 16),
+          TextButton.icon(
+            onPressed: () {
+              _codeController.text = 'DEMO-A1B2';
+              setState(() => _showCodeEntry = true);
+            },
+            icon: Icon(Icons.person_outlined, size: 16,
+              color: isDark ? Colors.white.withValues(alpha: 0.35) : const Color(0xFF94A3B8)),
+            label: Text(
+              AppLocalizations.of(context)!.pairGuestModeTitle,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white.withValues(alpha: 0.35) : const Color(0xFF94A3B8),
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
           ),
           const SizedBox(height: 16),
         ],
