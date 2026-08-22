@@ -74,9 +74,12 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
 
   Future<void> _autoConnectWithToken() async {
     String? rejectedMsg;
+    String? autoToken;
+    bool didSucceed = false;
     try {
       final p = await ref.read(preferencesServiceProvider.future);
       final token = p.getAuthToken();
+      autoToken = token;
       final savedUrl = p.getRelayUrl();
       debugPrint('[RUNMOTE] autoConnect: token=${token != null ? "present" : "null"}, savedUrl=$savedUrl');
       if (token == null || savedUrl == null) return;
@@ -104,6 +107,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
 
           if (result == ConnectWithTokenResult.success) {
             debugPrint('[RUNMOTE] autoConnect: connected successfully');
+            didSucceed = true;
             context.go('/agents');
             return;
           }
@@ -136,13 +140,15 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
           _isAutoConnecting = false;
           _error = rejectedMsg;
         });
-        // Keep retrying in background even after showing the pairing UI.
-        // If the daemon was temporarily offline (relay DB wipe), this heals
-        // automatically when the daemon comes back without requiring the user
-        // to re-pair or restart the app.
-        _startBackgroundRetry();
-        // Also ensure the provider's reconnect loop is armed.
-        ref.read(connectionProvider.notifier).retryNow();
+        // Only keep retrying if we actually have a saved token and didn't
+        // already succeed. After an explicit unpair the token is cleared and
+        // we must show the pairing screen immediately, not the reconnecting
+        // loader.
+        if (!didSucceed && autoToken != null) {
+          _startBackgroundRetry();
+          // Also ensure the provider's reconnect loop is armed.
+          ref.read(connectionProvider.notifier).retryNow();
+        }
       }
     }
   }
@@ -330,12 +336,14 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
               ],
             ),
             child: Center(
-              child: Image.asset(
-                'assets/logos/app_icon_foreground.png',
-                width: 60,
-                height: 60,
-                color: Colors.white,
-                colorBlendMode: BlendMode.srcIn,
+              child: Padding(
+                padding: EdgeInsets.all(14),
+                child: Image.asset(
+                  'assets/logos/app_icon_foreground.png',
+                  color: Colors.white,
+                  colorBlendMode: BlendMode.srcIn,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           ),
@@ -383,37 +391,9 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Pulsing logo + progress — Material 3 loading pattern, keeps size stable
-        TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.95, end: 1.0),
-          duration: const Duration(milliseconds: 1200),
-          curve: Curves.easeInOut,
-          builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
-          child: Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF6366F1).withValues(alpha: 0.35),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: const Icon(Icons.sync_rounded, color: Colors.white, size: 36),
-          ),
-        ),
-        const SizedBox(height: 20),
         SizedBox(
-          width: 32,
-          height: 32,
+          width: 36,
+          height: 36,
           child: CircularProgressIndicator(
             strokeWidth: 3,
             color: isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF6366F1),
