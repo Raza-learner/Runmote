@@ -172,18 +172,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _showAttachmentOptions() async {
     final theme = Theme.of(context);
-    final canSendImages =
-        ref.read(connectionProvider).capabilities?.canSendImages ?? false;
-    final canSendDocs =
-        ref.read(connectionProvider).capabilities?.supportsEmbeddedContext ?? false;
-
-    if (!canSendImages && !canSendDocs) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This agent does not support file attachments')),
-      );
-      return;
-    }
 
     await showModalBottomSheet<void>(
       context: context,
@@ -208,7 +196,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               leading: Icon(Icons.photo_outlined, color: theme.colorScheme.primary),
               title: const Text('Photo / Image'),
               subtitle: const Text('JPG, PNG, GIF, WebP'),
-              enabled: canSendImages,
               onTap: () {
                 Navigator.of(ctx).pop();
                 _pickImage();
@@ -218,7 +205,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               leading: Icon(Icons.picture_as_pdf_outlined, color: theme.colorScheme.primary),
               title: const Text('Document'),
               subtitle: const Text('PDF, Word, Excel, Text, Markdown, CSV, JSON'),
-              enabled: canSendDocs,
               onTap: () {
                 Navigator.of(ctx).pop();
                 _pickDocument();
