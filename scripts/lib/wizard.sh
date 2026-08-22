@@ -15,6 +15,28 @@ if [[ -z "${ACP_UI_LOADED:-}" ]]; then
 fi
 
 # ----------------------------------------------------------
+# Helpers
+# ----------------------------------------------------------
+
+is_cloud_relay() {
+    # Detect Runmote's managed cloud relay — show friendly name instead of raw wss link
+    case "${1,,}" in
+        *runmote-relay-u2zi.onrender.com*|*runmote-relay*onrender.com*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+relay_display_name() {
+    if is_cloud_relay "${1:-}"; then
+        echo "Runmote Relay"
+    elif [[ -n "${1:-}" ]]; then
+        echo "$1"
+    else
+        echo "Local"
+    fi
+}
+
+# ----------------------------------------------------------
 # Wizard State
 # ----------------------------------------------------------
 
@@ -480,13 +502,19 @@ wizard_cloud_summary() {
 
     if [[ "$ACP_CLOUD_MODE" == true ]]; then
         success "Mode: Cloud"
-        printf " %-18s %s\n" "Relay URL:" "$ACP_RELAY_URL"
+        if is_cloud_relay "$ACP_RELAY_URL"; then
+            printf " %-18s %s\n" "Relay:" "Runmote Relay"
+        else
+            printf " %-18s %s\n" "Relay URL:" "$ACP_RELAY_URL"
+        fi
         if [[ -n "$ACP_RELAY_TOKEN" ]]; then
             printf " %-18s %s\n" "Token:" "********"
         else
             printf " %-18s %s\n" "Token:" "${DIM}(none)${RESET}"
         fi
-        printf " %-18s %s\n" "Public URL:" "$ACP_RELAY_PUBLIC_URL"
+        if ! is_cloud_relay "$ACP_RELAY_URL"; then
+            printf " %-18s %s\n" "Public URL:" "$ACP_RELAY_PUBLIC_URL"
+        fi
     else
         success "Mode: Local (LAN)"
     fi
@@ -540,7 +568,11 @@ wizard_confirm() {
         printf " %-22s %s\n" "Install Directory:" "$ACP_INSTALL_DIR"
 
         if [[ "$ACP_CLOUD_MODE" == true ]]; then
-            printf " %-22s %s\n" "Relay:" "Cloud ($ACP_RELAY_URL)"
+            if is_cloud_relay "$ACP_RELAY_URL"; then
+                printf " %-22s %s\n" "Relay:" "Runmote Relay"
+            else
+                printf " %-22s %s\n" "Relay:" "Cloud ($ACP_RELAY_URL)"
+            fi
         else
             printf " %-22s %s\n" "Relay:" "$(relay_status)"
         fi
@@ -853,7 +885,13 @@ wizard_install_complete() {
         printf " %-20s %s\n" "Install Path:" "$ACP_INSTALL_DIR"
     fi
 
-    printf " %-20s %s\n" "Relay:" "$(relay_status)"
+    if [[ "$ACP_CLOUD_MODE" == true ]] && is_cloud_relay "${ACP_RELAY_URL:-}"; then
+        printf " %-20s %s\n" "Relay:" "Runmote Relay"
+    elif [[ "$ACP_CLOUD_MODE" == true ]]; then
+        printf " %-20s %s\n" "Relay:" "Cloud ($ACP_RELAY_URL)"
+    else
+        printf " %-20s %s\n" "Relay:" "$(relay_status)"
+    fi
 
     if [[ "$ACP_ENABLE_AUTOSTART" == true ]]; then
         printf " %-20s %s\n" "Auto-start:" "Enabled"

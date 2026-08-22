@@ -157,6 +157,14 @@ else:
     AGENT_CONFIGS = _detect_acp_agents()
 
 
+def is_cloud_relay(url: str) -> bool:
+    return "runmote-relay" in (url or "").lower() and "onrender.com" in (url or "").lower()
+
+
+def relay_display_name(url: str) -> str:
+    return "Runmote Relay" if is_cloud_relay(url) else (url or "Local")
+
+
 def get_agent_configs() -> list[dict]:
     """Return the agent configs to use right now.
 

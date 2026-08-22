@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../core/env.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/preferences_provider.dart';
 import '../../../core/providers/database_provider.dart';
@@ -72,11 +73,33 @@ class SettingsScreen extends ConsumerWidget {
                   trailing: connection.relayUrl != null ? IconButton(
                     icon: const Icon(Icons.info_outline, size: 20),
                     onPressed: () {
+                      final url = connection.relayUrl!;
+                      final isCloud = isCloudRelay(url);
                       showDialog(
                         context: context,
                         builder: (ctx) => AlertDialog(
                           title: Text(AppLocalizations.of(context)!.settingsRelayDetails),
-                          content: SelectableText(connection.relayUrl!),
+                          content: isCloud
+                              ? Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      relayDisplayName(url),
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      relayDisplaySubtitle(url),
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
+                                )
+                              : SelectableText(url),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx),
