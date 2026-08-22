@@ -212,6 +212,15 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
       setState(() => _error = 'Please enter a 6-digit or 8-character pairing code');
       return;
     }
+    // Guest demo mode: allow reviewer to bypass pairing wall for Play Console review
+    if (pairingCode == 'DEMO-A1B2') {
+      setState(() {
+        _isConnecting = false;
+        _showCodeEntry = false;
+      });
+      context.go('/agents');
+      return;
+    }
     setState(() {
       _isConnecting = true;
       _error = null;
