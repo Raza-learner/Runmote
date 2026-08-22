@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'dart:convert';
 import 'dart:io';
 
@@ -472,16 +470,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
+      extendBodyBehindAppBar: false,
       appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.1),
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
-        flexibleSpace: ClipRect(
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(color: Colors.transparent),
-          ),
-        ),
+        scrolledUnderElevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -708,18 +701,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildInputArea(ThemeData theme, bool canAttach, bool daemonDown) {
-    final isDark = theme.brightness == Brightness.dark;
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
+    return Container(
           decoration: BoxDecoration(
-            color: isDark 
-                ? theme.colorScheme.surface.withValues(alpha: 0.1)
-                : theme.colorScheme.surface.withValues(alpha: 0.4),
+            color: theme.colorScheme.surface,
             border: Border(
               top: BorderSide(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.12),
               ),
             ),
           ),
@@ -1014,8 +1001,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           },
             ),
           ),
-        ),
-      ),
     );
   }
 

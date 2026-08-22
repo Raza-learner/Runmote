@@ -17,7 +17,6 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isUser = message.role == ChatMessageRole.user;
-    final isDark = theme.brightness == Brightness.dark;
 
     // User: compact bubble on the right (like iMessage).
     if (isUser) {
@@ -74,76 +73,48 @@ class MessageBubble extends StatelessWidget {
       );
     }
 
-    // Assistant: full-width "AI chat" style — avatar on top, content spans
-    // available width so text, bullets, and tables breathe horizontally.
+    // Assistant: full-screen plain text (ChatGPT/Claude style) — no bubble,
+    // spans available width for readable markdown, tables, and code.
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
+      padding: const EdgeInsets.only(bottom: 20, left: 4, right: 4),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _MessageAvatar(isUser: false),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.045)
-                        : theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.06)
-                          : theme.colorScheme.outlineVariant.withValues(alpha: 0.22),
-                    ),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (message.content.isNotEmpty)
-                        SelectionArea(
-                          child: SafeMarkdownBody(
-                            data: message.content,
-                            theme: theme,
-                          ),
-                        ),
-                      if (message.segments.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _buildSegments(theme),
-                          ),
-                        ),
-                      if (message.isStreaming) ...[
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: theme.colorScheme.primary.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+          if (message.content.isNotEmpty)
+            SelectionArea(
+              child: SafeMarkdownBody(
+                data: message.content,
+                theme: theme,
+              ),
+            ),
+          if (message.segments.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: _buildSegments(theme),
+              ),
+            ),
+          if (message.isStreaming)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: theme.colorScheme.primary.withValues(alpha: 0.7),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 5, left: 4),
-                  child: Text(
-                    _formatTime(message.createdAt),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 10,
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
-                    ),
-                  ),
-                ),
-              ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 2),
+            child: Text(
+              _formatTime(message.createdAt),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 10,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.38),
+              ),
             ),
           ),
         ],

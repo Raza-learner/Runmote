@@ -152,7 +152,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   StreamSubscription? _sub;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
-  int _rejectedStrikes = 0;
   final Ref _ref;
 
   /// Set to true when a `daemon/disconnected` message is received, so that
@@ -244,7 +243,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
       state = state.copyWith(channel: channel);
       _reconnectAttempts = 0;
-      _rejectedStrikes = 0;
       _daemonDisconnected = false;
 
       // Send auth/pair with the pairing code
@@ -853,15 +851,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       state = state.copyWith(state: const AcpConnectionState.reconnecting());
       final result = await connectWithToken(token, relayUrl);
       if (result == ConnectWithTokenResult.success) {
-        _rejectedStrikes = 0;
         _reconnectAttempts = 0;
       } else if (result == ConnectWithTokenResult.rejected) {
         // `rejected` right after a relay restart is often transient: the
         // free-tier DB is wiped, so the relay can only verify the
-        // deterministic token while the daemon is online. The daemon usually
-        // reconnects within a few seconds, so keep retrying with backoff
-        // instead of giving up and forcing the user to re-pair.
-        _rejectedStrikes++;
+        // deterministic token while the daemon is online. Keep retrying.
         _scheduleReconnect();
       } else if (result == ConnectWithTokenResult.unreachable) {
         // Relay just wasn't reachable — keep backing off and retrying.
@@ -884,7 +878,6 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         if (savedToken != null && savedUrl != null) {
           state = state.copyWith(token: savedToken, relayUrl: savedUrl);
           final res = await connectWithToken(savedToken, savedUrl);
-          if (res == ConnectWithTokenResult.success) _rejectedStrikes = 0;
           if (res != ConnectWithTokenResult.success) _scheduleReconnect();
           return;
         }
@@ -896,10 +889,8 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     state = state.copyWith(state: const AcpConnectionState.reconnecting());
     final result = await connectWithToken(token, relayUrl);
     if (result == ConnectWithTokenResult.success) {
-      _rejectedStrikes = 0;
       _reconnectAttempts = 0;
     } else if (result == ConnectWithTokenResult.rejected) {
-      _rejectedStrikes++;
       _scheduleReconnect();
     } else if (result == ConnectWithTokenResult.unreachable) {
       _scheduleReconnect();

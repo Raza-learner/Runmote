@@ -379,11 +379,6 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
     return _buildOptions(theme, isDark);
   }
 
-  Widget _buildLoading(bool isDark) => _buildReconnectingLoader(
-        Theme.of(context),
-        isDark,
-      );
-
   Widget _buildReconnectingLoader(ThemeData theme, bool isDark, {bool isBackgroundRetry = false}) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,

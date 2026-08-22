@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 class AnimatedBackground extends StatefulWidget {
   final Widget child;
   final bool showGrid;
+  final bool animate;
 
   const AnimatedBackground({
     super.key,
     required this.child,
     this.showGrid = true,
+    this.animate = true,
   });
 
   @override
@@ -25,7 +27,18 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 20),
-    )..repeat();
+    );
+    if (widget.animate) _controller.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant AnimatedBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.animate && !_controller.isAnimating) {
+      _controller.repeat();
+    } else if (!widget.animate && _controller.isAnimating) {
+      _controller.stop();
+    }
   }
 
   @override
@@ -68,50 +81,51 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
               painter: _GridPainter(isDark: isDark),
             ),
           ),
-        AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return Stack(
-              children: [
-                Positioned(
-                  top: -150 +
-                      (ui.lerpDouble(0, 100,
-                              Curves.easeInOut.transform(_controller.value)) ??
-                          0),
-                  right: -100 +
-                      (ui.lerpDouble(
-                              0,
-                              80,
-                              Curves.easeInOut.transform(
-                                  (_controller.value + 0.5) % 1.0)) ??
-                          0),
-                  child: _BlurCircle(
-                    color: const Color(0xFF6366F1)
-                        .withValues(alpha: isDark ? 0.08 : 0.04),
-                    size: 500,
+        if (widget.animate)
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return Stack(
+                children: [
+                  Positioned(
+                    top: -150 +
+                        (ui.lerpDouble(0, 100,
+                                Curves.easeInOut.transform(_controller.value)) ??
+                            0),
+                    right: -100 +
+                        (ui.lerpDouble(
+                                0,
+                                80,
+                                Curves.easeInOut.transform(
+                                    (_controller.value + 0.5) % 1.0)) ??
+                            0),
+                    child: _BlurCircle(
+                      color: const Color(0xFF6366F1)
+                          .withValues(alpha: isDark ? 0.08 : 0.04),
+                      size: 500,
+                    ),
                   ),
-                ),
-                Positioned(
-                  bottom: -120 +
-                      (ui.lerpDouble(0, 100,
-                              Curves.easeInOut.transform(
-                                  (_controller.value + 0.3) % 1.0)) ??
-                          0),
-                  left: -150 +
-                      (ui.lerpDouble(0, 120,
-                              Curves.easeInOut.transform(
-                                  (_controller.value + 0.8) % 1.0)) ??
-                          0),
-                  child: _BlurCircle(
-                    color: const Color(0xFFA855F7)
-                        .withValues(alpha: isDark ? 0.08 : 0.04),
-                    size: 450,
+                  Positioned(
+                    bottom: -120 +
+                        (ui.lerpDouble(0, 100,
+                                Curves.easeInOut.transform(
+                                    (_controller.value + 0.3) % 1.0)) ??
+                            0),
+                    left: -150 +
+                        (ui.lerpDouble(0, 120,
+                                Curves.easeInOut.transform(
+                                    (_controller.value + 0.8) % 1.0)) ??
+                            0),
+                    child: _BlurCircle(
+                      color: const Color(0xFFA855F7)
+                          .withValues(alpha: isDark ? 0.08 : 0.04),
+                      size: 450,
+                    ),
                   ),
-                ),
-              ],
-            );
-          },
-        ),
+                ],
+              );
+            },
+          ),
         widget.child,
       ],
     );
