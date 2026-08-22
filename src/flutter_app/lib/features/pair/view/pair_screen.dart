@@ -467,7 +467,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
               ),
             ),
           ),
-        if (!_showCodeEntry && !_showScanner && !_bgRetryTimer?.isActive ?? false && !_daemonDisconnected) ...[
+        if (!_showCodeEntry && !_showScanner && !(_bgRetryTimer?.isActive ?? false) && !_daemonDisconnected) ...[
           _OptionCard(
             icon: Icons.person_outlined,
             title: 'Guest Demo Mode',
