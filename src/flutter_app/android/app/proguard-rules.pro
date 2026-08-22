@@ -1,90 +1,26 @@
-# Image loading and cache
--keep class flutter.** { *; }
--keep class image.** { *; }
--keepclassmembers class * {
-    @dart.* interface <types>;
-}
-
-# Riverpod / State management (general keep)
--keep class * extends Riverpod { *; }
--keep class * implements Riverpod { *; }
-
-# Freezed code generation
--keep class **.freezed.** { *; }
-
-# GoRouter
--keep class com.acp.acp_router.GoRoute { *; }
--keep enum com.acp.acp_router.GoRouteType { *; }
-
-# ACP adapter & daemon
--keep class com.acp.** { *; }
--keep class agentclientprotocol.** { *; }
-
-# Core services
--keep class com.acp.acp_remote.** { *; }
-
-# Websocket / channel
--keep class web_socket_channel.** { *; }
--keep class web_socket_channel.platform.** { *; }
-
-# Mobile scanner
--keep class mobile_scanner.** { *; }
--dontwarn mobile_scanner.**
-
-# Flex color scheme
--keep class flex_color_scheme.** { *; }
--dontwarn flex_color_scheme.**
-
-# Intl
--keep class intl.** { *; }
--dontwarn intl.**
-
-# Shared preferences
--keep class shared_preferences.** { *; }
--dontwarn shared_preferences.**
-
-# Dart SDK
--keep class dart.** { *; }
-
-# Keep application code
--keep class dev.runmote.app.** { *; }
-
-# Needed for Flutter framework
--keep class androidx.annotation.** { *; }
--keep class kotlin.** { *; }
-
-# Needed for Flutter engine
--keep class io.flutter.** { *; }
--keep class io.flutter.plugins.** { *; }
+# Flutter engine and plugins (Java/Kotlin side only; Dart code lives in libapp.so)
+-keep class io.flutter.app.** { *; }
+-keep class io.flutter.plugin.text.** { *; }
+-keep class io.flutter.plugin.* { *; }
 -dontwarn io.flutter.**
 
-# Needed for image picking / file picking
--keep class file_picker.** { *; }
--dontwarn file_picker.**
+# App entry point
+-keep class com.acp.acp_remote.MainActivity { *; }
 
-# Needed for permission handler
--keep class permission_handler.** { *; }
--dontwarn permission_handler.**
+# Only keep specific needed classes from plugins, not entire packages
+# file_picker - keep only what's actually used
+-keep class com.baseflow.filepicker.** { *; }
+-dontwarn org.apache.tika.**
+-dontwarn com.baseflow.filepicker.**
 
-# Keep models and freezed-generated code
--keep class dev.runmote.app.core.models.** { *; }
--keep class dev.runmote.app.shared.** { *; }
--keep class dev.runmote.app.features.** { *; }
+# mobile_scanner - keep only needed components
+-keep class dev.steenbakker.mobile_scanner.ScanActivity { *; }
+-keep class dev.steenbakker.mobile_scanner.* { *; }
+-dontwarn dev.steenbakker.mobile_scanner.**
 
-# General keep for Dart classes
--keepclassmembers class * {
-    @dartjson *;
-}
+# permission_handler - keep only needed components
+-keep class com.baseflow.permissionhandler.PermissionHandler { *; }
+-dontwarn com.baseflow.permissionhandler.**
 
-# Keep Dart runtime
--keep class java.lang.String { *; }
-
-# Allow optimization
--optimizationpasses 5
-
-# Trust not keep if not needed
--assumenosideeffects class java.lang.Object {
-    public boolean equals(java.lang.Object);
-    public int hashCode();
-    public java.lang.String toString();
-}
+# Preserve annotations used by plugins
+-keepattributes *Annotation*

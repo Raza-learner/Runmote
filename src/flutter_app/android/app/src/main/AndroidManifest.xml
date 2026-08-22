@@ -36,10 +36,6 @@
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
-        <!-- Edge-to-edge support for Android 15+ -->
-        <meta-data
-            android:name="androidx.core.view.WindowCompat.enablePreferEdgeToEdge"
-            android:value="true" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
