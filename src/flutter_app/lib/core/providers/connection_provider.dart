@@ -826,10 +826,13 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     _agentCapabilities.clear();
     _agentInfos.clear();
     _ref.read(activeSessionsProvider.notifier).clear();
+    // Keep `paired` and the saved token/relayUrl so the app can
+    // auto-reconnect on resume or after a transient relay restart.
+    // Only an explicit `disconnect()` or a permanent auth rejection
+    // should clear pairing.
     state = state.copyWith(
       clearChannel: true,
       state: const AcpConnectionState.disconnected(),
-      paired: false,
       error: reason,
       daemonConnected: false,
     );
@@ -851,21 +854,15 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       final result = await connectWithToken(token, relayUrl);
       if (result == ConnectWithTokenResult.success) {
         _rejectedStrikes = 0;
+        _reconnectAttempts = 0;
       } else if (result == ConnectWithTokenResult.rejected) {
-        // A rejection right after a relay restart is often transient: the
+        // `rejected` right after a relay restart is often transient: the
         // free-tier DB is wiped, so the relay can only verify the
-        // deterministic token while the daemon is online — and the daemon may
-        // still be reconnecting. Tolerate a few rejections before giving up.
+        // deterministic token while the daemon is online. The daemon usually
+        // reconnects within a few seconds, so keep retrying with backoff
+        // instead of giving up and forcing the user to re-pair.
         _rejectedStrikes++;
-        if (_rejectedStrikes >= 3) {
-          // Token is no longer valid on the relay — stop retrying, the user
-          // will need to re-pair. Leave the app disconnected.
-          _reconnectTimer?.cancel();
-          _reconnectAttempts = 0;
-          _rejectedStrikes = 0;
-        } else {
-          _scheduleReconnect();
-        }
+        _scheduleReconnect();
       } else if (result == ConnectWithTokenResult.unreachable) {
         // Relay just wasn't reachable — keep backing off and retrying.
         _scheduleReconnect();
@@ -878,22 +875,32 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   Future<void> retryNow() async {
     final token = state.token;
     final relayUrl = state.relayUrl;
-    if (token == null || relayUrl == null) return;
+    if (token == null || relayUrl == null) {
+      // Cold start: state has no token yet. Try to load from prefs.
+      try {
+        final p = await _ref.read(preferencesServiceProvider.future);
+        final savedToken = p.getAuthToken();
+        final savedUrl = p.getRelayUrl();
+        if (savedToken != null && savedUrl != null) {
+          state = state.copyWith(token: savedToken, relayUrl: savedUrl);
+          final res = await connectWithToken(savedToken, savedUrl);
+          if (res == ConnectWithTokenResult.success) _rejectedStrikes = 0;
+          if (res != ConnectWithTokenResult.success) _scheduleReconnect();
+          return;
+        }
+      } catch (_) {}
+      return;
+    }
     _reconnectTimer?.cancel();
     if (state.state is Connected || state.state is Connecting) return;
     state = state.copyWith(state: const AcpConnectionState.reconnecting());
     final result = await connectWithToken(token, relayUrl);
     if (result == ConnectWithTokenResult.success) {
       _rejectedStrikes = 0;
+      _reconnectAttempts = 0;
     } else if (result == ConnectWithTokenResult.rejected) {
       _rejectedStrikes++;
-      if (_rejectedStrikes >= 3) {
-        _reconnectTimer?.cancel();
-        _reconnectAttempts = 0;
-        _rejectedStrikes = 0;
-      } else {
-        _scheduleReconnect();
-      }
+      _scheduleReconnect();
     } else if (result == ConnectWithTokenResult.unreachable) {
       _scheduleReconnect();
     }

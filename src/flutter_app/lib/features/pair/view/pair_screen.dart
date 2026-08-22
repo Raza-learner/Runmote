@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -21,7 +22,7 @@ class PairScreen extends ConsumerStatefulWidget {
   _PairScreenState createState() => _PairScreenState();
 }
 
-class _PairScreenState extends ConsumerState<PairScreen> {
+class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObserver {
   final _codeController = TextEditingController();
   final _relayUrlController = TextEditingController();
   bool _isConnecting = false;
@@ -29,6 +30,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
   bool _showCodeEntry = false;
   bool _daemonDisconnected = false;
   String? _error;
+  Timer? _bgRetryTimer;
 
   bool _qrScanned = false;
   bool _showScanner = false;
@@ -40,16 +42,34 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     super.initState();
     _codeController.addListener(_onCodeChanged);
     _scannerController = MobileScannerController(autoStart: false);
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _autoConnectWithToken());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _bgRetryTimer?.cancel();
     _codeController.removeListener(_onCodeChanged);
     _codeController.dispose();
     _relayUrlController.dispose();
     _scannerController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final conn = ref.read(connectionProvider);
+      if (conn.state is Connected) return;
+      // If we have a saved token, try to reconnect immediately on resume.
+      if (_isAutoConnecting) return;
+      debugPrint('[RUNMOTE] pairScreen resumed, retrying auto-connect');
+      setState(() => _isAutoConnecting = true);
+      _autoConnectWithToken();
+      // Also trigger provider retry.
+      ref.read(connectionProvider.notifier).retryNow();
+    }
   }
 
   Future<void> _autoConnectWithToken() async {
@@ -115,8 +135,43 @@ class _PairScreenState extends ConsumerState<PairScreen> {
           _isAutoConnecting = false;
           _error = rejectedMsg;
         });
+        // Keep retrying in background even after showing the pairing UI.
+        // If the daemon was temporarily offline (relay DB wipe), this heals
+        // automatically when the daemon comes back without requiring the user
+        // to re-pair or restart the app.
+        _startBackgroundRetry();
+        // Also ensure the provider's reconnect loop is armed.
+        ref.read(connectionProvider.notifier).retryNow();
       }
     }
+  }
+
+  void _startBackgroundRetry() {
+    _bgRetryTimer?.cancel();
+    _bgRetryTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      if (!mounted) return;
+      final conn = ref.read(connectionProvider);
+      if (conn.state is Connected) {
+        _bgRetryTimer?.cancel();
+        return;
+      }
+      final p = await ref.read(preferencesServiceProvider.future);
+      final token = p.getAuthToken();
+      final savedUrl = p.getRelayUrl();
+      if (token == null || savedUrl == null) {
+        _bgRetryTimer?.cancel();
+        return;
+      }
+      debugPrint('[RUNMOTE] bg retry: trying $savedUrl');
+      final res =
+          await ref.read(connectionProvider.notifier).connectWithToken(token, savedUrl);
+      if (!mounted) return;
+      if (res == ConnectWithTokenResult.success) {
+        debugPrint('[RUNMOTE] bg retry: connected');
+        _bgRetryTimer?.cancel();
+        if (mounted) context.go('/agents');
+      }
+    });
   }
 
   void _onCodeChanged() {
