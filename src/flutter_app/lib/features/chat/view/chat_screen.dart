@@ -894,14 +894,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.only(bottom: 2),
-                        child: IconButton(
-                          onPressed: (isBusy || daemonDown) ? null : _showAttachmentOptions,
-                          icon: Icon(
-                            Icons.add_circle_outline,
-                            size: 28,
-                            color: t.colorScheme.primary,
+                        child: Material(
+                          color: t.colorScheme.surfaceContainerHighest,
+                          shape: const CircleBorder(),
+                          clipBehavior: Clip.antiAlias,
+                          child: IconButton(
+                            onPressed: (isBusy || daemonDown) ? null : _showAttachmentOptions,
+                            icon: const Icon(Icons.add_rounded, size: 22),
+                            color: t.colorScheme.onSurfaceVariant,
+                            tooltip: 'Attach file',
+                            visualDensity: VisualDensity.compact,
                           ),
-                          tooltip: 'Attach file',
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -1001,12 +1004,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ConfigOption opt,
   ) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      margin: const EdgeInsets.only(top: 6),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
           ),
         ),
       ),
