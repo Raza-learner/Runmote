@@ -52,21 +52,13 @@ runmote stop           # stop the daemon
 runmote --uninstall    # clean removal
 ```
 
-### Android app (closed testing)
+### Android app
 
-Runmote is currently in **Google Play closed testing** on Android. This is the rollout path until the app is approved for production:
+Get it on Google Play:
 
-- **Join the testers group:** https://groups.google.com/g/runmote-closed-testing
-- **Install the app:** https://play.google.com/apps/testing/dev.runmote.app
+**[Runmote on Google Play](https://play.google.com/store/apps/details?id=dev.runmote.app)**
 
-**Closed-testing steps (until approval):**
-
-1. **Join the Google Group** (link above). The Play listing is a private, closed test — only members of this group get the tester link.
-2. **Open the Play testing link** (link above) and hit **"Become a tester"**. This opts your account into the closed track. A **"Download it on Google Play"** button will appear.
-3. **Install** the app and run it — verify the daemon pairing, session resume, and streaming chat.
-4. **Test a new build:** push to the closed track in Play Console → testers get the update automatically with the newest version number.
-5. **Resolve open issues** surfaced in the group/this repo while we gather enough testers and stable sessions.
-6. **Merge to `main`:** only when the closed test is approved does the release branch get merged into `main` for production; keep unreleased work on `dev` until then.
+Or download the APK from [Releases](https://github.com/Raza-learner/Runmote/releases).
 
 ---
 

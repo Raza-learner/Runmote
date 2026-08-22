@@ -467,6 +467,22 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
               ),
             ),
           ),
+        if (!_showCodeEntry && !_showScanner && !_bgRetryTimer?.isActive ?? false && !_daemonDisconnected) ...[
+          _OptionCard(
+            icon: Icons.person_outlined,
+            title: 'Guest Demo Mode',
+            subtitle: 'Use demo code to review app flow without daemon',
+            isDark: isDark,
+            gradient: const [Color(0xFF10B981), Color(0xFF059669)],
+            onTap: () {
+              setState(() {
+                _codeController.text = 'DEMO-A1B2';
+                _showCodeEntry = true;
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
         _OptionCard(
           icon: Icons.qr_code_scanner_rounded,
           title: AppLocalizations.of(context)!.pairScanQrTitle,
