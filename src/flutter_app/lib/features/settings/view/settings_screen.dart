@@ -246,7 +246,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          _SectionHeader(title: 'Diagnostics'),
+          _SectionHeader(title: AppLocalizations.of(context)!.settingsSupport),
           const SizedBox(height: AppSpacing.sm),
           _DiagnosticsCard(),
           const SizedBox(height: AppSpacing.xl),
@@ -532,69 +532,62 @@ class _DiagnosticsCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final conn = ref.watch(connectionProvider);
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: Column(
-          children: [
-            FutureBuilder<PackageInfo>(
-              future: PackageInfo.fromPlatform(),
-              builder: (ctx, snap) {
-                final version = snap.data?.version ?? '—';
-                final build = snap.data?.buildNumber ?? '';
-                final diagnostics = [
-                  'App: $version ${build.isNotEmpty ? "($build)" : ""}',
-                  'Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion.split(" ").first}',
-                  'Theme: ${ref.watch(themeModeStateProvider).name} / ${ref.watch(flexSchemeProvider).name}',
-                  'Relay: ${conn.relayUrl ?? "—"}',
-                  'Pairing: ${conn.pairingCode ?? "—"}',
-                  'Daemon: ${conn.daemonConnected ? "online" : "offline"}${conn.daemonName != null ? " (${conn.daemonName})" : ""}',
-                  'Agents: ${conn.agents.length} (${conn.agents.where((a) => a.online).length} online)',
-                ].join('\n');
-                return Column(
-                  children: [
-                    ListTile(
-                      leading: Icon(Icons.info_outline, color: theme.colorScheme.primary),
-                      title: const Text('App Info'),
-                      subtitle: Text('Runmote $version', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
-                        ),
-                        child: SelectableText(diagnostics, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, height: 1.5)),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.copy_rounded, size: 16),
-                              label: const Text('Copy diagnostics'),
-                              onPressed: () async {
-                                await Clipboard.setData(ClipboardData(text: diagnostics));
-                                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Diagnostics copied'), behavior: SnackBarBehavior.floating));
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                  ],
-                );
-              },
+      clipBehavior: Clip.antiAlias,
+      child: FutureBuilder<PackageInfo>(
+        future: PackageInfo.fromPlatform(),
+        builder: (ctx, snap) {
+          final version = snap.data?.version ?? '—';
+          final build = snap.data?.buildNumber ?? '';
+          final diagnostics = [
+            'App: $version ${build.isNotEmpty ? "($build)" : ""}',
+            'Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion.split(" ").first}',
+            'Theme: ${ref.watch(themeModeStateProvider).name} / ${ref.watch(flexSchemeProvider).name}',
+            'Relay: ${conn.relayUrl ?? "—"}',
+            'Pairing: ${conn.pairingCode ?? "—"}',
+            'Daemon: ${conn.daemonConnected ? "online" : "offline"}${conn.daemonName != null ? " (${conn.daemonName})" : ""}',
+            'Agents: ${conn.agents.length} (${conn.agents.where((a) => a.online).length} online)',
+          ].join('\n');
+          return ExpansionTile(
+            leading: Icon(Icons.info_outline, color: theme.colorScheme.primary),
+            title: Text(AppLocalizations.of(context)!.settingsAppInfo),
+            subtitle: Text(
+              AppLocalizations.of(context)!.settingsAppInfoSubtitle,
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
-          ],
-        ),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                ),
+                child: SelectableText(diagnostics, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, height: 1.5)),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.copy_rounded, size: 16),
+                  label: Text(AppLocalizations.of(context)!.settingsCopyDiagnostics),
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: diagnostics));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(AppLocalizations.of(context)!.settingsDiagnosticsCopied),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

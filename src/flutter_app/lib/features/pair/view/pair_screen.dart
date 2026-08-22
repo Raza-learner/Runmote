@@ -479,8 +479,8 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
         if (!_showCodeEntry && !_showScanner && !(_bgRetryTimer?.isActive ?? false) && !_daemonDisconnected) ...[
           _OptionCard(
             icon: Icons.person_outlined,
-            title: 'Guest Demo Mode',
-            subtitle: 'Use demo code to review app flow without daemon',
+            title: AppLocalizations.of(context)!.pairGuestModeTitle,
+            subtitle: AppLocalizations.of(context)!.pairGuestModeSubtitle,
             isDark: isDark,
             gradient: const [Color(0xFF10B981), Color(0xFF059669)],
             onTap: () {
@@ -495,7 +495,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
         _OptionCard(
           icon: Icons.qr_code_scanner_rounded,
           title: AppLocalizations.of(context)!.pairScanQrTitle,
-          subtitle: 'Use your camera to quickly link your device',
+          subtitle: AppLocalizations.of(context)!.pairScanQrSubtitle,
           isDark: isDark,
           gradient: const [Color(0xFF6366F1), Color(0xFF4F46E5)],
           onTap: () async {
@@ -540,7 +540,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
         _OptionCard(
           icon: Icons.keyboard_rounded,
           title: AppLocalizations.of(context)!.pairManualCodeTitle,
-          subtitle: 'Type the 8-character code from your terminal',
+          subtitle: AppLocalizations.of(context)!.pairManualCodeSubtitle,
           isDark: isDark,
           gradient: const [Color(0xFF94A3B8), Color(0xFF64748B)],
           onTap: () => setState(() {
@@ -554,7 +554,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
           style: TextButton.styleFrom(
             foregroundColor: isDark ? Colors.white.withOpacity(0.5) : theme.colorScheme.primary.withOpacity(0.7),
           ),
-          child: const Text('Need help finding your code?'),
+          child: Text(AppLocalizations.of(context)!.pairNeedHelp),
         ),
         const SizedBox(height: 12),
         TextButton.icon(
