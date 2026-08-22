@@ -430,13 +430,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final canSendImages = ref.watch(
-      connectionProvider.select((c) => c.capabilities?.canSendImages ?? false),
-    );
-    final canSendDocs = ref.watch(
-      connectionProvider.select((c) => c.capabilities?.supportsEmbeddedContext ?? false),
-    );
-    final canAttach = canSendImages || canSendDocs;
     final daemonDown = ref.watch(
       connectionProvider.select((c) => c.paired && !c.daemonConnected),
     );
@@ -687,7 +680,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               },
               ),
             ),
-            _buildInputArea(theme, canAttach, daemonDown),
+            _buildInputArea(theme, daemonDown),
           ],
         ),
       ),
@@ -700,7 +693,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return commands.where((c) => c.name.toLowerCase().contains(q)).toList();
   }
 
-  Widget _buildInputArea(ThemeData theme, bool canAttach, bool daemonDown) {
+  Widget _buildInputArea(ThemeData theme, bool daemonDown) {
     return Container(
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
@@ -899,19 +892,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      if (canAttach)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: IconButton(
-                            onPressed: (isBusy || daemonDown) ? null : _showAttachmentOptions,
-                            icon: Icon(
-                              Icons.add_circle_outline,
-                              size: 28,
-                              color: t.colorScheme.primary,
-                            ),
-                            tooltip: 'Attach file',
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: IconButton(
+                          onPressed: (isBusy || daemonDown) ? null : _showAttachmentOptions,
+                          icon: Icon(
+                            Icons.add_circle_outline,
+                            size: 28,
+                            color: t.colorScheme.primary,
                           ),
+                          tooltip: 'Attach file',
                         ),
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: TextField(
@@ -1009,7 +1001,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ConfigOption opt,
   ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      margin: const EdgeInsets.only(top: 4),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
