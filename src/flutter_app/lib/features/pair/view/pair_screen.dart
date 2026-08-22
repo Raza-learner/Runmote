@@ -111,11 +111,9 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
           if (result == ConnectWithTokenResult.rejected) {
             rejectedCount++;
             debugPrint('[RUNMOTE] autoConnect: token rejected by relay ($rejectedCount/$maxRejectedAttempts)');
-            if (rejectedCount >= maxRejectedAttempts) {
-              // Token is no longer valid on the relay — require re-pairing.
-              rejectedMsg = 'Your saved connection expired. Please pair your device again.';
-              return;
-            }
+            // Don't give up immediately — free-tier DB wipes make rejections
+            // transient while the daemon reconnects. Treat like unreachable and
+            // keep the loader visible; background retry will heal.
             continue;
           }
           // unreachable — try the next URL, then retry after a delay below.
@@ -129,6 +127,9 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
         }
       }
       debugPrint('[RUNMOTE] autoConnect: retries exhausted, showing pairing screen');
+      if (rejectedCount >= maxRejectedAttempts) {
+        rejectedMsg = 'Your saved connection expired. Please pair your device again.';
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -364,33 +365,102 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
   }
 
   Widget _buildContent(ThemeData theme, bool isDark) {
-    if (_isAutoConnecting) return _buildLoading(isDark);
+    if (_isAutoConnecting) return _buildReconnectingLoader(theme, isDark);
+    // If a background retry is still active after the initial auto-connect
+    // failed, keep showing the reconnecting loader instead of flashing the
+    // pairing options. This prevents the "pairing for a few seconds then
+    // auto-connect" flicker on cold starts where the relay is waking up.
+    if (_bgRetryTimer?.isActive ?? false) {
+      return _buildReconnectingLoader(theme, isDark, isBackgroundRetry: true);
+    }
     if (_daemonDisconnected) return _buildDaemonDisconnected(theme, isDark);
     if (_showScanner) return _buildQrScanner(isDark);
     if (_showCodeEntry) return _buildCodeInput(isDark);
     return _buildOptions(theme, isDark);
   }
 
-  Widget _buildLoading(bool isDark) {
+  Widget _buildLoading(bool isDark) => _buildReconnectingLoader(
+        Theme.of(context),
+        isDark,
+      );
+
+  Widget _buildReconnectingLoader(ThemeData theme, bool isDark, {bool isBackgroundRetry = false}) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // Pulsing logo + progress — Material 3 loading pattern, keeps size stable
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.95, end: 1.0),
+          duration: const Duration(milliseconds: 1200),
+          curve: Curves.easeInOut,
+          builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.sync_rounded, color: Colors.white, size: 36),
+          ),
+        ),
+        const SizedBox(height: 20),
         SizedBox(
-          width: 48,
-          height: 48,
+          width: 32,
+          height: 32,
           child: CircularProgressIndicator(
             strokeWidth: 3,
-            color: isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF6366F1),
+            color: isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF6366F1),
           ),
         ),
         const SizedBox(height: 24),
         Text(
-          AppLocalizations.of(context)!.pairConnecting,
+          isBackgroundRetry ? 'Restoring your session…' : AppLocalizations.of(context)!.pairConnecting,
           style: TextStyle(
-            color: isDark ? Colors.white.withOpacity(0.6) : const Color(0xFF64748B),
-            fontSize: 15,
+            color: isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF1E293B),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
           ),
         ),
+        const SizedBox(height: 8),
+        Text(
+          isBackgroundRetry
+              ? 'Securely reconnecting to your relay'
+              : 'This may take a moment if the relay is waking up',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B),
+            fontSize: 13,
+            height: 1.4,
+          ),
+        ),
+        if (isBackgroundRetry) ...[
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              _bgRetryTimer?.cancel();
+              setState(() {});
+            },
+            child: Text(
+              'Show pairing options',
+              style: TextStyle(
+                color: isDark ? Colors.white.withValues(alpha: 0.7) : const Color(0xFF6366F1),
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
