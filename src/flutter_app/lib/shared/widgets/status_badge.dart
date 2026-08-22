@@ -49,7 +49,12 @@ class StatusLabel extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: theme.textTheme.labelSmall?.copyWith(color: color),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.2,
+            fontSize: 11,
+          ),
         ),
       ],
     );

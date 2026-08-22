@@ -79,15 +79,7 @@ class _ThinkingSectionState extends State<ThinkingSection> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (widget.isStreaming) 
-                    SizedBox(
-                      width: 10,
-                      height: 10,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        valueColor: AlwaysStoppedAnimation(isDark ? Colors.orange.shade200 : Colors.grey),
-                      ),
-                    ),
+                  if (widget.isStreaming) _AnimatedThinkingDots() else const SizedBox.shrink(),
                   const Spacer(),
                   Icon(
                     _expanded

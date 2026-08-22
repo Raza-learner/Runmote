@@ -1,6 +1,8 @@
+import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -243,6 +245,10 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: AppSpacing.lg),
+          _SectionHeader(title: 'Diagnostics'),
+          const SizedBox(height: AppSpacing.sm),
+          _DiagnosticsCard(),
           const SizedBox(height: AppSpacing.xl),
           Center(
             child: Column(
@@ -293,7 +299,20 @@ class SettingsScreen extends ConsumerWidget {
         .replaceFirst(scheme.name[0], scheme.name[0].toUpperCase());
   }
 
+  // Curated first — reduces decision fatigue (P2.1)
+  static const _featured = [
+    FlexScheme.shadNeutral,
+    FlexScheme.shadSlate,
+    FlexScheme.shadViolet,
+    FlexScheme.shadBlue,
+    FlexScheme.indigoM3,
+    FlexScheme.blueM3,
+    FlexScheme.tealM3,
+    FlexScheme.amber,
+  ];
+
   static const _schemeGroups = [
+    ('Featured', _featured),
     ('Shadcn', [
       FlexScheme.shadNeutral,
       FlexScheme.shadSlate,
@@ -502,6 +521,80 @@ class SettingsScreen extends ConsumerWidget {
             child: Text(l.settingsUnpairConfirm),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DiagnosticsCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final conn = ref.watch(connectionProvider);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Column(
+          children: [
+            FutureBuilder<PackageInfo>(
+              future: PackageInfo.fromPlatform(),
+              builder: (ctx, snap) {
+                final version = snap.data?.version ?? '—';
+                final build = snap.data?.buildNumber ?? '';
+                final diagnostics = [
+                  'App: $version ${build.isNotEmpty ? "($build)" : ""}',
+                  'Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion.split(" ").first}',
+                  'Theme: ${ref.watch(themeModeStateProvider).name} / ${ref.watch(flexSchemeProvider).name}',
+                  'Relay: ${conn.relayUrl ?? "—"}',
+                  'Pairing: ${conn.pairingCode ?? "—"}',
+                  'Daemon: ${conn.daemonConnected ? "online" : "offline"}${conn.daemonName != null ? " (${conn.daemonName})" : ""}',
+                  'Agents: ${conn.agents.length} (${conn.agents.where((a) => a.online).length} online)',
+                ].join('\n');
+                return Column(
+                  children: [
+                    ListTile(
+                      leading: Icon(Icons.info_outline, color: theme.colorScheme.primary),
+                      title: const Text('App Info'),
+                      subtitle: Text('Runmote $version', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                        ),
+                        child: SelectableText(diagnostics, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, height: 1.5)),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.copy_rounded, size: 16),
+                              label: const Text('Copy diagnostics'),
+                              onPressed: () async {
+                                await Clipboard.setData(ClipboardData(text: diagnostics));
+                                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Diagnostics copied'), behavior: SnackBarBehavior.floating));
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

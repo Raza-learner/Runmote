@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/pair/view/pair_screen.dart';
@@ -15,34 +16,69 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (index) {
-          navigationShell.goBranch(
-            index,
-            initialLocation: index == navigationShell.currentIndex,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet = constraints.maxWidth >= 700;
+        if (isTablet) {
+          return Scaffold(
+            body: Row(
+              children: [
+                NavigationRail(
+                  selectedIndex: navigationShell.currentIndex,
+                  onDestinationSelected: (index) {
+                    if (index != navigationShell.currentIndex) {
+                      HapticFeedback.selectionClick();
+                    }
+                    navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
+                  },
+                  labelType: NavigationRailLabelType.all,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  indicatorColor: Theme.of(context).colorScheme.primaryContainer,
+                  leading: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFFA855F7)]),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
+                    ),
+                  ),
+                  destinations: [
+                    NavigationRailDestination(icon: const Icon(Icons.smart_toy_outlined), selectedIcon: const Icon(Icons.smart_toy), label: Text(AppLocalizations.of(context)!.navAgents)),
+                    NavigationRailDestination(icon: const Icon(Icons.chat_bubble_outline), selectedIcon: const Icon(Icons.chat_bubble), label: Text(AppLocalizations.of(context)!.navSessions)),
+                    NavigationRailDestination(icon: const Icon(Icons.settings_outlined), selectedIcon: const Icon(Icons.settings), label: Text(AppLocalizations.of(context)!.navSettings)),
+                  ],
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: navigationShell),
+              ],
+            ),
           );
-        },
-        destinations: [
-          NavigationDestination(
-            icon: Icon(Icons.smart_toy_outlined),
-            selectedIcon: Icon(Icons.smart_toy),
-            label: AppLocalizations.of(context)!.navAgents,
+        }
+        return Scaffold(
+          body: navigationShell,
+          bottomNavigationBar: NavigationBar(
+            height: 72,
+            elevation: 2,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            indicatorColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.9),
+            selectedIndex: navigationShell.currentIndex,
+            onDestinationSelected: (index) {
+              if (index != navigationShell.currentIndex) {
+                HapticFeedback.selectionClick();
+              }
+              navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
+            },
+            destinations: [
+              NavigationDestination(icon: const Icon(Icons.smart_toy_outlined), selectedIcon: const Icon(Icons.smart_toy), label: AppLocalizations.of(context)!.navAgents),
+              NavigationDestination(icon: const Icon(Icons.chat_bubble_outline), selectedIcon: const Icon(Icons.chat_bubble), label: AppLocalizations.of(context)!.navSessions),
+              NavigationDestination(icon: const Icon(Icons.settings_outlined), selectedIcon: const Icon(Icons.settings), label: AppLocalizations.of(context)!.navSettings),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: AppLocalizations.of(context)!.navSessions,
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: AppLocalizations.of(context)!.navSettings,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

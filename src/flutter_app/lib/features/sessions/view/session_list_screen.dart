@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,6 +12,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/ongoing_session_banner.dart';
 import '../../../shared/widgets/daemon_offline_banner.dart';
 import '../../../shared/widgets/animated_background.dart';
+import '../../../shared/widgets/command_palette.dart';
 import 'widgets/session_card.dart';
 import 'widgets/session_list_skeleton.dart';
 import 'widgets/directory_picker_sheet.dart';
@@ -158,6 +160,17 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     return '${days ~/ 7}w ago';
   }
 
+  void _openPalette() {
+    final cmds = [
+      PaletteCommand(title: 'New Session', subtitle: 'Create a workspace', icon: Icons.add_rounded, onSelect: _createSession),
+      PaletteCommand(title: 'Refresh Sessions', subtitle: 'Reload from agent', icon: Icons.refresh_rounded, onSelect: () => ref.read(sessionListProvider.notifier).loadSessions()),
+      PaletteCommand(title: 'Go to Agents', subtitle: 'Switch agent', icon: Icons.smart_toy_outlined, onSelect: () => context.go('/agents')),
+      PaletteCommand(title: 'Go to Settings', subtitle: 'Preferences & MCP', icon: Icons.settings_outlined, onSelect: () => context.go('/settings')),
+      PaletteCommand(title: 'Search Sessions', subtitle: 'Filter sessions', icon: Icons.search_rounded, onSelect: () => setState(() => _showSearch = true)),
+    ];
+    showCommandPalette(context, ref, cmds);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -165,58 +178,61 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     final sessionsAsync = ref.watch(sessionListProvider);
     final activeIds = ref.watch(activeSessionsProvider);
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.1),
-        elevation: 0,
-        flexibleSpace: ClipRect(
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(color: Colors.transparent),
+    return CommandPaletteShortcut(
+      onOpen: _openPalette,
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.1),
+          elevation: 0,
+          flexibleSpace: ClipRect(
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(color: Colors.transparent),
+            ),
           ),
-        ),
-        title: _showSearch
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Search sessions...',
-                  border: InputBorder.none,
-                  filled: false,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                style: theme.textTheme.titleMedium,
-                onChanged: (v) => setState(() => _searchQuery = v),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Sessions',
-                    style: theme.textTheme.titleMedium,
+          title: _showSearch
+              ? TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Search sessions...',
+                    border: InputBorder.none,
+                    filled: false,
+                    contentPadding: EdgeInsets.zero,
                   ),
-                  Text(
-                    connection.agentInfo?.name ?? 'Agent',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                  style: theme.textTheme.titleMedium,
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sessions',
+                      style: theme.textTheme.titleMedium,
                     ),
-                  ),
-                ],
-              ),
-        actions: [
-          IconButton(
-            icon: Icon(_showSearch ? Icons.close : Icons.search),
-            onPressed: () => setState(() {
-              _showSearch = !_showSearch;
-              if (!_showSearch) {
-                _searchController.clear();
-                _searchQuery = '';
-              }
-            }),
-          ),
-        ],
-      ),
+                    Text(
+                      connection.agentInfo?.name ?? 'Agent',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+          actions: [
+            IconButton(tooltip: 'Command palette (Ctrl+K)', icon: const Icon(Icons.auto_awesome_rounded), onPressed: _openPalette),
+            IconButton(
+              icon: Icon(_showSearch ? Icons.close : Icons.search),
+              onPressed: () => setState(() {
+                _showSearch = !_showSearch;
+                if (!_showSearch) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                }
+              }),
+            ),
+          ],
+        ),
       body: AnimatedBackground(
         child: Column(
           children: [
@@ -243,6 +259,13 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
                       const OngoingSessionBanner(),
                       if (connection.paired && !connection.daemonConnected)
                         const DaemonOfflineBanner(),
+                      if (sessions.isNotEmpty)
+                        _InsightsHeader(
+                          total: sessions.length,
+                          active: activeIds.length,
+                          daemonOnline: connection.daemonConnected,
+                          agentName: connection.agentInfo?.name,
+                        ),
                       if (!supportsSessionList && sessions.isNotEmpty)
                         _LocalOnlyBanner(),
                       Expanded(
@@ -264,10 +287,13 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _createSession,
+        onPressed: () {
+          HapticFeedback.mediumImpact();
+          _createSession();
+        },
         child: const Icon(Icons.add),
       ),
-    );
+    ));
   }
 
   Widget _buildSessionList(
@@ -399,6 +425,63 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
             child: card,
           );
         },
+      ),
+    );
+  }
+}
+
+class _InsightsHeader extends StatelessWidget {
+  final int total;
+  final int active;
+  final bool daemonOnline;
+  final String? agentName;
+  const _InsightsHeader({required this.total, required this.active, required this.daemonOnline, this.agentName});
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.04) : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.06) : theme.colorScheme.outlineVariant.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 8, height: 8,
+              decoration: BoxDecoration(
+                color: daemonOnline ? const Color(0xFF22C55E) : Colors.orange,
+                shape: BoxShape.circle,
+                boxShadow: daemonOnline ? [BoxShadow(color: const Color(0xFF22C55E).withValues(alpha: 0.4), blurRadius: 6)] : [],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    daemonOnline ? 'All systems operational' : 'Daemon offline',
+                    style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 0.1),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$total sessions · $active active${agentName != null ? ' · $agentName' : ''}',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75), fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(daemonOnline ? Icons.check_circle_rounded : Icons.warning_amber_rounded, size: 16, color: daemonOnline ? const Color(0xFF22C55E) : Colors.orange),
+          ],
+        ),
       ),
     );
   }

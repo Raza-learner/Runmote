@@ -6,20 +6,24 @@ ThemeData buildFlexTheme({
   required Brightness brightness,
 }) {
   const sub = FlexSubThemesData(
-    defaultRadius: 14,
+    // Consolidated radii 12/16/20 (P1.1)
+    defaultRadius: 12,
     cardRadius: 16,
-    textButtonRadius: 14,
-    filledButtonRadius: 14,
-    elevatedButtonRadius: 14,
-    outlinedButtonRadius: 14,
+    textButtonRadius: 12,
+    filledButtonRadius: 12,
+    elevatedButtonRadius: 12,
+    outlinedButtonRadius: 12,
     inputDecoratorRadius: 16,
     chipRadius: 8,
-    dialogRadius: 20,
-    bottomSheetRadius: 24,
+    dialogRadius: 16,
+    bottomSheetRadius: 20,
     snackBarRadius: 12,
-    popupMenuRadius: 14,
+    popupMenuRadius: 12,
     searchBarRadius: 16,
-    fabRadius: 28,
+    fabRadius: 16,
+    interactionEffects: true,
+    tintedDisabledControls: true,
+    useMaterial3Typography: true,
   );
   if (brightness == Brightness.light) {
     return FlexThemeData.light(
@@ -34,12 +38,16 @@ ThemeData buildFlexTheme({
   return FlexThemeData.dark(
     scheme: scheme,
     subThemesData: sub.copyWith(
-      cardElevation: 2,
+      cardElevation: 1,
+      blendOnLevel: 12,
+      blendOnColors: false,
     ),
     surfaceMode: FlexSurfaceMode.highScaffoldLowSurfaces,
-    blendLevel: 4,
+    blendLevel: 2, // P3.1: single accent, reduce blue tint
     darkIsTrueBlack: false,
-    surface: const Color(0xFF0F172A),
-    scaffoldBackground: const Color(0xFF020617),
+    appBarBackground: const Color(0xFF141417),
+    surface: const Color(0xFF141417),
+    scaffoldBackground: const Color(0xFF0A0A0B), // true dev black
+    tooltipsMatchBackground: true,
   );
 }

@@ -257,6 +257,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   PermissionRequest? _permissionRequest;
 
   void _syncState() {
+    if (!mounted) return;
     if (!_connected) {
       debugPrint('[chat_provider] _syncState skipped: not connected');
       return;
@@ -477,6 +478,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
               _populateFromLoad(result);
             }
             _finalizeStreaming();
+            if (_loaded) _syncState();
           }
 
           // If the agent says the session doesn't exist, remove it locally
@@ -495,6 +497,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
               _ref.read(sessionListProvider.notifier).deleteSession(_sessionId);
               _finalizeStreaming();
               _ref.read(activeSessionsProvider.notifier).markInactive(_sessionId);
+              if (_loaded) _syncState();
               return;
             }
           }
@@ -510,6 +513,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
           if (!wasLoad) {
             _ref.read(sessionListProvider.notifier).loadSessions();
           }
+          if (!wasLoad && _loaded) _syncState();
         }
 
         // Capture configOptions from session/new or session/load response.
@@ -640,14 +644,17 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   Timer? _finalizeTimer;
 
   void _finalizeStreaming() {
+    if (!mounted) return;
     if (!_connected) return;
     _finalizeTimer?.cancel();
     _finalizeTimer = Timer(const Duration(milliseconds: 600), () {
+      if (!mounted) return;
       _doFinalizeStreaming();
     });
   }
 
   void _doFinalizeStreaming() {
+    if (!mounted) return;
     if (!_connected) return;
     for (var i = 0; i < _buffer.length; i++) {
       if (_buffer[i].isStreaming) {
@@ -839,6 +846,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
         createdAt: DateTime.now().millisecondsSinceEpoch,
       ));
       _finalizeStreaming();
+      if (_loaded) _syncState();
       return;
     }
 

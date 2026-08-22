@@ -1,50 +1,105 @@
 import 'package:flutter/material.dart';
 
-class DiffViewer extends StatelessWidget {
+class DiffViewer extends StatefulWidget {
   final String oldText;
   final String newText;
+  final String? filePath;
 
   const DiffViewer({
     super.key,
     required this.oldText,
     required this.newText,
+    this.filePath,
   });
+
+  @override
+  State<DiffViewer> createState() => _DiffViewerState();
+}
+
+class _DiffViewerState extends State<DiffViewer> {
+  bool _expanded = true;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final diffLines = _computeDiff(oldText, newText);
+    final diffLines = _computeDiff(widget.oldText, widget.newText);
+    final addCount = diffLines.where((l) => l.type == _DiffType.addition).length;
+    final delCount = diffLines.where((l) => l.type == _DiffType.deletion).length;
 
     return Semantics(
       label: 'Diff viewer',
+      container: true,
+      explicitChildNodes: true,
       child: Container(
         decoration: BoxDecoration(
-          color: isDark ? Colors.black.withValues(alpha: 0.3) : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: isDark ? Colors.white.withValues(alpha: 0.1) : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
+          color: isDark ? Colors.black.withValues(alpha: 0.28) : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : theme.colorScheme.outlineVariant.withValues(alpha: 0.35)),
         ),
         clipBehavior: Clip.antiAlias,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final line in diffLines)
-                _DiffLine(
-                  line: line.text,
-                  type: line.type,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    height: 1.5,
-                  ),
-                  bgColors: _bgColors(theme),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.04) : theme.colorScheme.surfaceContainerLow.withValues(alpha: 0.9),
+                  border: Border(bottom: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.18))),
                 ),
-            ],
-          ),
+                child: Row(
+                  children: [
+                    Icon(Icons.description_outlined, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        widget.filePath?.isNotEmpty == true ? widget.filePath! : 'Changes',
+                        style: theme.textTheme.labelSmall?.copyWith(fontFamily: 'monospace', fontWeight: FontWeight.w600, fontSize: 11),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (addCount > 0)
+                      Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(6)),
+                        child: Text('+$addCount', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.green.shade300 : Colors.green.shade700, fontFamily: 'monospace')),
+                      ),
+                    if (delCount > 0)
+                      Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(6)),
+                        child: Text('-$delCount', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.red.shade300 : Colors.red.shade700, fontFamily: 'monospace')),
+                      ),
+                    Icon(_expanded ? Icons.expand_less : Icons.expand_more, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final line in diffLines)
+                      _DiffLine(
+                        line: line.text,
+                        type: line.type,
+                        style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace', fontSize: 11, height: 1.5),
+                        bgColors: _bgColors(theme),
+                      ),
+                  ],
+                ),
+              ),
+              crossFadeState: _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+            ),
+          ],
         ),
       ),
     );

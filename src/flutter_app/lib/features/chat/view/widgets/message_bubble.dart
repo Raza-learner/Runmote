@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
@@ -58,8 +59,9 @@ class MessageBubble extends StatelessWidget {
                     child: Text(
                       _formatTime(message.createdAt),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 10,
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
+                        fontSize: 11,
+                        letterSpacing: 0.3,
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.65),
                       ),
                     ),
                   ),
@@ -112,8 +114,9 @@ class MessageBubble extends StatelessWidget {
             child: Text(
               _formatTime(message.createdAt),
               style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: 10,
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.38),
+                fontSize: 11,
+                letterSpacing: 0.3,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.65),
               ),
             ),
           ),
@@ -278,6 +281,7 @@ class SafeMarkdownBody extends StatelessWidget {
 
       // For messages with tables, render inside a horizontal scroll wrapper
       // via a custom table builder. For non-table messages, use default.
+      final codeBuilder = _CodeBlockBuilder(theme);
       if (hasTable) {
         return LayoutBuilder(
           builder: (context, constraints) {
@@ -296,6 +300,7 @@ class SafeMarkdownBody extends StatelessWidget {
                 softLineBreak: true,
                 builders: {
                   'table': _TableScrollBuilder(theme),
+                  'pre': codeBuilder,
                 },
                 onTapLink: (text, href, title) {
                   if (href != null) {
@@ -315,6 +320,9 @@ class SafeMarkdownBody extends StatelessWidget {
           styleSheet: sheet,
           extensionSet: md.ExtensionSet.gitHubFlavored,
           softLineBreak: true,
+          builders: {
+            'pre': codeBuilder,
+          },
           selectable: false,
           onTapLink: (text, href, title) {
             if (href != null) {
@@ -493,6 +501,139 @@ class _TableScrollBuilder extends MarkdownElementBuilder {
       return buf.toString();
     }
     return '';
+  }
+}
+
+class _CodeBlockBuilder extends MarkdownElementBuilder {
+  final ThemeData theme;
+  _CodeBlockBuilder(this.theme);
+
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    String code = '';
+    String language = '';
+    for (final child in element.children ?? []) {
+      if (child is md.Element && child.tag == 'code') {
+        final cls = child.attributes['class'];
+        if (cls != null && cls.startsWith('language-')) {
+          language = cls.substring(9);
+        }
+        code = child.textContent;
+        if (code.isEmpty) {
+          final buf = StringBuffer();
+          for (final c in child.children ?? []) {
+            buf.write(c.textContent);
+          }
+          code = buf.toString();
+        }
+      } else if (child is md.Text) {
+        code += child.text;
+      }
+    }
+    if (code.isEmpty) code = element.textContent;
+    if (code.endsWith('\n')) code = code.substring(0, code.length - 1);
+    return _CodeBlockWidget(code: code, language: language, theme: theme);
+  }
+}
+
+class _CodeBlockWidget extends StatefulWidget {
+  final String code;
+  final String language;
+  final ThemeData theme;
+  const _CodeBlockWidget({required this.code, required this.language, required this.theme});
+
+  @override
+  State<_CodeBlockWidget> createState() => _CodeBlockWidgetState();
+}
+
+class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
+  bool _copied = false;
+
+  void _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.code));
+    HapticFeedback.lightImpact();
+    if (!mounted) return;
+    setState(() => _copied = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Copied to clipboard'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating),
+    );
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _copied = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.theme.brightness == Brightness.dark;
+    final cs = widget.theme.colorScheme;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black.withValues(alpha: 0.35) : cs.surfaceContainerHighest.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.25)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withValues(alpha: 0.06) : cs.surfaceContainerLow.withValues(alpha: 0.9),
+              border: Border(bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.18))),
+            ),
+            child: Row(
+              children: [
+                if (widget.language.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      widget.language,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.primary, fontFamily: 'monospace'),
+                    ),
+                  )
+                else
+                  Text('code', style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant, fontFamily: 'monospace')),
+                const Spacer(),
+                InkWell(
+                  onTap: _copy,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(_copied ? Icons.check_rounded : Icons.copy_rounded, size: 14, color: _copied ? cs.primary : cs.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text(_copied ? 'Copied' : 'Copy', style: TextStyle(fontSize: 11, color: _copied ? cs.primary : cs.onSurfaceVariant, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.all(14),
+            child: SelectableText(
+              widget.code,
+              style: TextStyle(
+                fontSize: 13,
+                fontFamily: 'monospace',
+                height: 1.5,
+                color: isDark ? Colors.white.withValues(alpha: 0.92) : cs.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

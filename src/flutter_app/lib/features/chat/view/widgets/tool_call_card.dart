@@ -47,17 +47,26 @@ class _ToolCallCardState extends State<ToolCallCard> {
     final showRunning = widget.isStreaming && !widget.isCompleted && !hasOutput;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 4),
+      margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
-        color: isDark 
-            ? Colors.black.withValues(alpha: 0.2)
-            : theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
+        color: isDark
+            ? Colors.black.withValues(alpha: 0.18)
+            : theme.colorScheme.surfaceContainerLow.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isDark 
-              ? Colors.white.withValues(alpha: 0.05)
-              : theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
         ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,6 +160,7 @@ class _ToolCallCardState extends State<ToolCallCard> {
                             child: DiffViewer(
                               oldText: d['oldText'] ?? '',
                               newText: d['newText'] ?? '',
+                              filePath: d['path'],
                             ),
                           )),
                     if (hasOutput && widget.terminalId == null)

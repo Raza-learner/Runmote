@@ -9,8 +9,8 @@ void main() {
       home: Scaffold(body: ChatSkeleton()),
     ));
 
-    // The skeleton renders 6 placeholder containers
-    expect(find.byType(Container), findsNWidgets(6));
+    // Skeleton renders 6 rows x 2 containers (avatar + bubble) = 12 Container widgets
+    expect(find.byType(Container), findsNWidgets(12));
   });
 
   testWidgets('ChatSkeleton animation runs', (WidgetTester tester) async {
@@ -22,7 +22,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     // Widget still renders after animation tick
-    expect(find.byType(Container), findsNWidgets(6));
+    expect(find.byType(Container), findsNWidgets(12));
   });
 
   testWidgets('ChatSkeleton has Semantics label', (WidgetTester tester) async {

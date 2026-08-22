@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,6 +12,7 @@ import '../viewmodel/chat_provider.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/session_list_provider.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../shared/widgets/command_palette.dart';
 import '../../../shared/widgets/daemon_offline_banner.dart';
 import '../../../shared/widgets/animated_background.dart';
 import 'widgets/chat_skeleton.dart';
@@ -331,7 +333,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _sendMessage() {
     final text = _textController.text.trim();
     if (text.isEmpty && _attachments.isEmpty) return;
-
+    HapticFeedback.lightImpact();
     _textController.clear();
 
     List<Map<String, dynamic>>? extra;
@@ -413,6 +415,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return 'Chat';
   }
 
+  void _openSlashPalette() {
+    final cs = ref.read(chatProvider((widget.sessionId, widget.cwd))).valueOrNull;
+    final cmds = cs?.availableCommands ?? [];
+    final palette = <PaletteCommand>[
+      if (cmds.isEmpty)
+        PaletteCommand(title: 'No slash commands', subtitle: 'Agent has not exposed commands', icon: Icons.info_outline, onSelect: () {}),
+      for (final c in cmds)
+        PaletteCommand(
+          title: '/${c.name}',
+          subtitle: c.description + (c.inputHint != null ? ' — ${c.inputHint}' : ''),
+          icon: Icons.terminal_rounded,
+          onSelect: () {
+            _textController.text = '/${c.name} ';
+            _textController.selection = TextSelection.collapsed(offset: _textController.text.length);
+            FocusScope.of(context).requestFocus(FocusNode());
+            Future.delayed(const Duration(milliseconds: 100), () => FocusScope.of(context).requestFocus(Focus.of(context).hasFocus ? FocusNode() : FocusNode()));
+          },
+        ),
+      PaletteCommand(title: 'Copy Session ID', subtitle: widget.sessionId, icon: Icons.copy_rounded, onSelect: () async { await Clipboard.setData(ClipboardData(text: widget.sessionId)); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session ID copied'))) ;}),
+      PaletteCommand(title: 'Copy CWD', subtitle: widget.cwd, icon: Icons.folder_outlined, onSelect: () async { await Clipboard.setData(ClipboardData(text: widget.cwd)); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CWD copied'))) ;}),
+    ];
+    showCommandPalette(context, ref, palette);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -476,6 +502,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onPressed: () => context.pop(),
         ),
         actions: [
+          IconButton(tooltip: 'Commands (Ctrl+K)', icon: const Icon(Icons.auto_awesome_rounded), onPressed: _openSlashPalette),
           IconButton(
             icon: const Icon(Icons.close),
             tooltip: 'Close session',
@@ -576,6 +603,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                                 height: 1.5,
                                               ),
                                               textAlign: TextAlign.center,
+                                            ),
+                                            const SizedBox(height: 20),
+                                            Wrap(
+                                              spacing: 8,
+                                              runSpacing: 8,
+                                              alignment: WrapAlignment.center,
+                                              children: [
+                                                for (final chip in const [
+                                                  ('Explain this repo', Icons.description_outlined),
+                                                  ('Fix failing tests', Icons.bug_report_outlined),
+                                                  ('Review last diff', Icons.rate_review_outlined),
+                                                ])
+                                                  ActionChip(
+                                                    avatar: Icon(chip.$2, size: 14, color: t.colorScheme.primary),
+                                                    label: Text(chip.$1, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                                                    onPressed: () {
+                                                      HapticFeedback.selectionClick();
+                                                      _textController.text = chip.$1;
+                                                      _textController.selection = TextSelection.collapsed(offset: _textController.text.length);
+                                                    },
+                                                  ),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -688,6 +737,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 color: theme.colorScheme.outlineVariant.withValues(alpha: 0.12),
               ),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 12,
+                offset: const Offset(0, -2),
+              ),
+            ],
           ),
           child: SafeArea(
             top: false,
@@ -786,16 +842,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       return const SizedBox.shrink();
                     }
                     return Container(
-                      constraints: const BoxConstraints(maxHeight: 200),
+                      constraints: const BoxConstraints(maxHeight: 240),
                       margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                       decoration: BoxDecoration(
                         color: t.colorScheme.surfaceContainerHigh,
                         borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: t.colorScheme.outlineVariant.withValues(alpha: 0.15),
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, -2),
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 16,
+                            offset: const Offset(0, -4),
                           ),
                         ],
                       ),
@@ -885,7 +944,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           shape: const CircleBorder(),
                           clipBehavior: Clip.antiAlias,
                           child: IconButton(
-                            onPressed: (isBusy || daemonDown) ? null : _showAttachmentOptions,
+                            onPressed: (isBusy || daemonDown)
+                                ? null
+                                : () {
+                                    HapticFeedback.selectionClick();
+                                    _showAttachmentOptions();
+                                  },
                             icon: const Icon(Icons.add_rounded, size: 22),
                             color: t.colorScheme.onSurfaceVariant,
                             tooltip: 'Attach file',
@@ -915,16 +979,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               vertical: 12,
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(28),
+                              borderRadius: BorderRadius.circular(24),
                               borderSide: BorderSide.none,
                             ),
                             enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(28),
+                              borderRadius: BorderRadius.circular(24),
                               borderSide: BorderSide.none,
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(28),
-                              borderSide: BorderSide.none,
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide(
+                                color: t.colorScheme.primary.withValues(alpha: 0.45),
+                                width: 1.4,
+                              ),
                             ),
                           ),
                         ),
@@ -942,23 +1009,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             child: SizedBox(
                               width: 46,
                               height: 46,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  IconButton.filled(
-                                    onPressed: canSend ? _sendMessage : null,
-                                    icon: const Icon(Icons.arrow_upward, size: 24),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: t.colorScheme.primary,
-                                      foregroundColor: t.colorScheme.onPrimary,
-                                      disabledBackgroundColor: t.colorScheme.surfaceContainerHighest,
-                                      disabledForegroundColor: t.colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  if (isBusy)
-                                    Positioned.fill(
-                                      child: Center(
-                                        child: SizedBox(
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 220),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                transitionBuilder: (child, anim) => ScaleTransition(
+                                  scale: anim,
+                                  child: FadeTransition(opacity: anim, child: child),
+                                ),
+                                child: isBusy
+                                    ? IconButton.filled(
+                                        key: const ValueKey('busy'),
+                                        onPressed: null,
+                                        icon: SizedBox(
                                           width: 18,
                                           height: 18,
                                           child: CircularProgressIndicator(
@@ -966,9 +1029,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                             color: t.colorScheme.primary,
                                           ),
                                         ),
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: t.colorScheme.surfaceContainerHighest,
+                                          foregroundColor: t.colorScheme.primary,
+                                        ),
+                                      )
+                                    : IconButton.filled(
+                                        key: const ValueKey('send'),
+                                        onPressed: canSend ? _sendMessage : null,
+                                        icon: const Icon(Icons.arrow_upward, size: 22),
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: t.colorScheme.primary,
+                                          foregroundColor: t.colorScheme.onPrimary,
+                                          disabledBackgroundColor: t.colorScheme.surfaceContainerHighest,
+                                          disabledForegroundColor: t.colorScheme.onSurfaceVariant,
+                                        ),
                                       ),
-                                    ),
-                                ],
                               ),
                             ),
                           );

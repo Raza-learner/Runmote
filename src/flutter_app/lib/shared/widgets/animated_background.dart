@@ -28,12 +28,32 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
       vsync: this,
       duration: const Duration(seconds: 20),
     );
-    if (widget.animate) _controller.repeat();
+    // Respect reduced-motion
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final reduce = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      if (widget.animate && !reduce) _controller.repeat();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduce) {
+      if (_controller.isAnimating) _controller.stop();
+    } else if (widget.animate && !_controller.isAnimating) {
+      _controller.repeat();
+    }
   }
 
   @override
   void didUpdateWidget(covariant AnimatedBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final reduce = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduce) {
+      if (_controller.isAnimating) _controller.stop();
+      return;
+    }
     if (widget.animate && !_controller.isAnimating) {
       _controller.repeat();
     } else if (!widget.animate && _controller.isAnimating) {
@@ -81,48 +101,50 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
               painter: _GridPainter(isDark: isDark),
             ),
           ),
-        if (widget.animate)
+        if (widget.animate && !(MediaQuery.maybeOf(context)?.disableAnimations ?? false))
           AnimatedBuilder(
             animation: _controller,
             builder: (context, child) {
-              return Stack(
-                children: [
-                  Positioned(
-                    top: -150 +
-                        (ui.lerpDouble(0, 100,
-                                Curves.easeInOut.transform(_controller.value)) ??
-                            0),
-                    right: -100 +
-                        (ui.lerpDouble(
-                                0,
-                                80,
-                                Curves.easeInOut.transform(
-                                    (_controller.value + 0.5) % 1.0)) ??
-                            0),
-                    child: _BlurCircle(
-                      color: const Color(0xFF6366F1)
-                          .withValues(alpha: isDark ? 0.08 : 0.04),
-                      size: 500,
+              return RepaintBoundary(
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: -150 +
+                          (ui.lerpDouble(0, 100,
+                                  Curves.easeInOut.transform(_controller.value)) ??
+                              0),
+                      right: -100 +
+                          (ui.lerpDouble(
+                                  0,
+                                  80,
+                                  Curves.easeInOut.transform(
+                                      (_controller.value + 0.5) % 1.0)) ??
+                              0),
+                      child: _BlurCircle(
+                        color: const Color(0xFF6366F1)
+                            .withValues(alpha: isDark ? 0.06 : 0.035),
+                        size: 500,
+                      ),
                     ),
-                  ),
-                  Positioned(
-                    bottom: -120 +
-                        (ui.lerpDouble(0, 100,
-                                Curves.easeInOut.transform(
-                                    (_controller.value + 0.3) % 1.0)) ??
-                            0),
-                    left: -150 +
-                        (ui.lerpDouble(0, 120,
-                                Curves.easeInOut.transform(
-                                    (_controller.value + 0.8) % 1.0)) ??
-                            0),
-                    child: _BlurCircle(
-                      color: const Color(0xFFA855F7)
-                          .withValues(alpha: isDark ? 0.08 : 0.04),
-                      size: 450,
+                    Positioned(
+                      bottom: -120 +
+                          (ui.lerpDouble(0, 100,
+                                  Curves.easeInOut.transform(
+                                      (_controller.value + 0.3) % 1.0)) ??
+                              0),
+                      left: -150 +
+                          (ui.lerpDouble(0, 120,
+                                  Curves.easeInOut.transform(
+                                      (_controller.value + 0.8) % 1.0)) ??
+                              0),
+                      child: _BlurCircle(
+                        color: const Color(0xFFA855F7)
+                            .withValues(alpha: isDark ? 0.06 : 0.035),
+                        size: 450,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               );
             },
           ),

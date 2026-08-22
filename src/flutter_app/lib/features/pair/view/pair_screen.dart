@@ -702,6 +702,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
                       );
                     },
                   ),
+                  if (!_isStartingCamera) const _QrViewfinder(),
                   if (_isStartingCamera)
                     Container(
                       color: Colors.black,
@@ -1000,32 +1001,142 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
   }
 
   void _showHelp() {
-    showDialog(
+    final l = AppLocalizations.of(context);
+    final steps = [
+      (Icons.download_rounded, l!.pairHelpStep1, 'Install daemon with one curl command'),
+      (Icons.qr_code_rounded, l.pairHelpStep2, 'Get 8-char code from terminal'),
+      (Icons.phone_android_rounded, l.pairHelpStep3, 'Pair phone & start coding anywhere'),
+    ];
+    showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
-        final l = AppLocalizations.of(ctx);
-        return AlertDialog(
-          title: Text(l!.pairHelpDialogTitle),
-          content: Column(
+        final theme = Theme.of(ctx);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(l.pairHelpStep1),
-              const SizedBox(height: 8),
-              Text(l.pairHelpStep2),
-              const SizedBox(height: 8),
-              Text(l.pairHelpStep3),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 16),
+              Text(l.pairHelpDialogTitle, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              for (int i = 0; i < steps.length; i++)
+                Padding(
+                  padding: EdgeInsets.only(bottom: i == steps.length - 1 ? 0 : 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44, height: 44,
+                        decoration: BoxDecoration(color: theme.colorScheme.primaryContainer, borderRadius: BorderRadius.circular(12)),
+                        child: Icon(steps[i].$1, size: 22, color: theme.colorScheme.onPrimaryContainer),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Step ${i + 1}', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 2),
+                        Text(steps[i].$2, style: theme.textTheme.bodyMedium?.copyWith(height: 1.4)),
+                        Text(steps[i].$3, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                      ])),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 20),
+              SizedBox(width: double.infinity, height: 48, child: FilledButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(l.pairHelpGotIt))),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(l.pairHelpGotIt),
-            ),
-          ],
         );
       },
     );
+  }
+}
+
+class _QrViewfinder extends StatefulWidget {
+  const _QrViewfinder();
+  @override
+  State<_QrViewfinder> createState() => _QrViewfinderState();
+}
+
+class _QrViewfinderState extends State<_QrViewfinder> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  late final Animation<double> _pos;
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat(reverse: true);
+    _pos = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SizedBox(
+        width: 220,
+        height: 220,
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1)),
+            ),
+            ..._corners(),
+            AnimatedBuilder(
+              animation: _pos,
+              builder: (_, __) => Positioned(
+                top: 12 + _pos.value * (220 - 24 - 2),
+                left: 12,
+                right: 12,
+                child: Container(
+                  height: 2,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [Colors.transparent, const Color(0xFF6366F1).withValues(alpha: 0.9), Colors.transparent]),
+                    borderRadius: BorderRadius.circular(1),
+                    boxShadow: [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.6), blurRadius: 8)],
+                  ),
+                ),
+              ),
+            ),
+            Center(child: Text('Align QR code', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.3))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _corners() {
+    const len = 22.0;
+    const thick = 3.0;
+    const radius = 16.0;
+    Widget corner({required Alignment alignment, required BorderRadius borderRadius}) {
+      return Align(
+        alignment: alignment,
+        child: Container(
+          width: len,
+          height: len,
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: Colors.white, width: alignment.y == -1 ? thick : 0),
+              left: BorderSide(color: Colors.white, width: alignment.x == -1 ? thick : 0),
+              right: BorderSide(color: Colors.white, width: alignment.x == 1 ? thick : 0),
+              bottom: BorderSide(color: Colors.white, width: alignment.y == 1 ? thick : 0),
+            ),
+            borderRadius: borderRadius,
+          ),
+        ),
+      );
+    }
+
+    return [
+      corner(alignment: Alignment.topLeft, borderRadius: const BorderRadius.only(topLeft: Radius.circular(radius))),
+      corner(alignment: Alignment.topRight, borderRadius: const BorderRadius.only(topRight: Radius.circular(radius))),
+      corner(alignment: Alignment.bottomLeft, borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(radius))),
+      corner(alignment: Alignment.bottomRight, borderRadius: const BorderRadius.only(bottomRight: Radius.circular(radius))),
+    ];
   }
 }
 

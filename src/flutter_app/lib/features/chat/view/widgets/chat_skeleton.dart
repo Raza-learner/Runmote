@@ -17,9 +17,11 @@ class _ChatSkeletonState extends State<ChatSkeleton>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
-    _opacity = Tween<double>(begin: 0.55, end: 0.9).animate(_controller);
+    _opacity = Tween<double>(begin: 0.45, end: 0.92).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
   }
 
   @override
