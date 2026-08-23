@@ -169,6 +169,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   // Preserved across agent switches so selecting an agent uses its own data.
   final _agentCapabilities = <String, AgentCapabilities>{};
   final _agentInfos = <String, AgentInfo>{};
+  bool _isConnectingToken = false;
 
   ConnectionNotifier(this._ref) : super(const AcpConnection());
 
@@ -366,25 +367,26 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
   Future<ConnectWithTokenResult> connectWithToken(
       String token, String relayUrl) async {
-    debugPrint('[RUNMOTE] connectWithToken: entry state=${state.state.runtimeType}, url=$relayUrl, token=${token.substring(0, token.length > 8 ? 8 : token.length)}...');
+    debugPrint('[RUNMOTE] connectWithToken: entry state=${state.state.runtimeType}, _isConnectingToken=$_isConnectingToken, url=$relayUrl, token=${token.substring(0, token.length > 8 ? 8 : token.length)}...');
     if (state.state case AcpConnectionState() when state.state is Connected) {
       debugPrint('[RUNMOTE] connectWithToken: already Connected, return success');
       return ConnectWithTokenResult.success;
     }
-    if (state.state case AcpConnectionState()
-        when state.state is Connecting || state.state is Reconnecting) {
+    if (_isConnectingToken) {
       // Another attempt is already in flight (e.g. a background
       // `_scheduleReconnect`). Don't claim success — that would make callers
       // (like `_autoConnectWithToken`) navigate away before the connection is
       // actually established. Report as unreachable so they keep retrying and
       // eventually observe the real result.
-      debugPrint('[RUNMOTE] connectWithToken: already Connecting/Reconnecting, return unreachable');
+      debugPrint('[RUNMOTE] connectWithToken: _isConnectingToken true, return unreachable');
       return ConnectWithTokenResult.unreachable;
     }
+    _isConnectingToken = true;
     final url = _sanitizeRelayUrl(relayUrl);
     debugPrint('[RUNMOTE] connectWithToken: sanitized url=$url');
+    final wasReconnecting = state.state is Reconnecting;
     state = state.copyWith(
-      state: const AcpConnectionState.connecting(),
+      state: wasReconnecting ? const AcpConnectionState.reconnecting() : const AcpConnectionState.connecting(),
       relayUrl: url,
       error: null,
     );
@@ -447,6 +449,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
           'method': 'agent/list',
           'params': {},
         });
+        _isConnectingToken = false;
         return result;
       } else {
         _sub?.cancel();
@@ -456,6 +459,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
           state: const AcpConnectionState.disconnected(),
           clearChannel: true,
         );
+        _isConnectingToken = false;
         return result;
       }
     } catch (e, st) {
@@ -467,6 +471,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         error: '$e',
         clearChannel: true,
       );
+      _isConnectingToken = false;
       return ConnectWithTokenResult.unreachable;
     }
   }
