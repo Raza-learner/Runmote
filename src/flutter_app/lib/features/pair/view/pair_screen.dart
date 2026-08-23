@@ -546,54 +546,8 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
             ),
           ),
           const SizedBox(height: 16),
-        ],
-        _OptionCard(
-          icon: Icons.qr_code_scanner_rounded,
-          title: AppLocalizations.of(context)!.pairScanQrTitle,
-          subtitle: AppLocalizations.of(context)!.pairScanQrSubtitle,
-          isDark: isDark,
-          gradient: const [Color(0xFF6366F1), Color(0xFF4F46E5)],
-          onTap: () async {
-            try {
-              final status = await Permission.camera.request();
-              if (!mounted) return;
-              if (status.isGranted || status.isLimited) {
-                setState(() {
-                  _showScanner = true;
-                  _isStartingCamera = true;
-                  _error = null;
-                });
-                WidgetsBinding.instance.addPostFrameCallback((_) async {
-                  try {
-                    await _scannerController.start();
-                    if (mounted) {
-                      setState(() => _isStartingCamera = false);
-                    }
-                  } catch (e) {
-                    debugPrint('[QR] start error: $e');
-                    if (mounted) {
-                      setState(() {
-                        _error = 'Camera error: $e';
-                        _isStartingCamera = false;
-                      });
-                    }
-                  }
-                });
-              } else if (status.isPermanentlyDenied) {
-                setState(() => _error = 'Camera permission permanently denied. Open app settings to enable.');
-                await openAppSettings();
-              } else {
-                setState(() => _error = 'Camera permission is required to scan QR codes.');
-              }
-            } catch (e) {
-              debugPrint('[QR] scanner onTap error: $e');
-              if (mounted) setState(() => _error = 'Camera error: $e');
-            }
-          },
-        ),
-        const SizedBox(height: 16),
-        _OptionCard(
-          icon: Icons.keyboard_rounded,
+          _OptionCard(
+            icon: Icons.keyboard_rounded,
           title: AppLocalizations.of(context)!.pairManualCodeTitle,
           subtitle: AppLocalizations.of(context)!.pairManualCodeSubtitle,
           isDark: isDark,
@@ -603,6 +557,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
             _error = null;
           }),
         ),
+        ],
         const SizedBox(height: 24),
         TextButton(
           onPressed: _showHelp,
