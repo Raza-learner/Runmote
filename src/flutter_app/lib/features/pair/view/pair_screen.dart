@@ -42,9 +42,58 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     _codeController.addListener(_onCodeChanged);
-    _scannerController = MobileScannerController(autoStart: false);
+    _scannerController = MobileScannerController(
+      facing: CameraFacing.back,
+      detectionSpeed: DetectionSpeed.normal,
+      autoStart: false,
+    );
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _autoConnectWithToken());
+  }
+
+  Future<void> _startCamera() async {
+    try {
+      await _scannerController.start();
+      if (mounted) setState(() => _isStartingCamera = false);
+    } on MobileScannerException catch (e) {
+      debugPrint('[QR] MobileScannerException: ${e.errorCode} ${e.errorDetails}');
+      if (mounted) {
+        setState(() {
+          if (e.errorCode == MobileScannerErrorCode.permissionDenied) {
+            _error = 'Camera permission denied. Please allow camera in Settings.';
+          } else if (e.errorCode == MobileScannerErrorCode.unsupported) {
+            _error = 'Camera not supported on this device. Use manual code.';
+          } else {
+            _error = 'Camera unavailable. Try again or use manual code.';
+          }
+          _isStartingCamera = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[QR] start error: $e');
+      if (mounted) {
+        setState(() {
+          _error = 'Camera error: $e. Try again or use manual code.';
+          _isStartingCamera = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _retryCamera() async {
+    try {
+      await _scannerController.stop();
+    } catch (_) {}
+    try {
+      await _scannerController.dispose();
+    } catch (_) {}
+    _scannerController = MobileScannerController(
+      facing: CameraFacing.back,
+      detectionSpeed: DetectionSpeed.normal,
+      autoStart: false,
+    );
+    if (mounted) setState(() => _isStartingCamera = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startCamera());
   }
 
   @override
@@ -60,6 +109,17 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Camera lifecycle: pause/resume scanner when app backgrounds
+    if (_showScanner) {
+      if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+        _scannerController.stop();
+      } else if (state == AppLifecycleState.resumed) {
+        // Small delay to let OS release camera
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted && _showScanner) _startCamera();
+        });
+      }
+    }
     if (state == AppLifecycleState.resumed) {
       // Delegate to the central provider which validates the socket and
       // reconnects if needed. Avoid early return on Connected – the OS
@@ -498,22 +558,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
                     _isStartingCamera = true;
                     _error = null;
                   });
-                  WidgetsBinding.instance.addPostFrameCallback((_) async {
-                    try {
-                      await _scannerController.start();
-                      if (mounted) {
-                        setState(() => _isStartingCamera = false);
-                      }
-                    } catch (e) {
-                      debugPrint('[QR] start error: $e');
-                      if (mounted) {
-                        setState(() {
-                          _error = 'Camera error: $e';
-                          _isStartingCamera = false;
-                        });
-                      }
-                    }
-                  });
+                  WidgetsBinding.instance.addPostFrameCallback((_) => _startCamera());
                 } else if (status.isPermanentlyDenied) {
                   setState(() => _error = 'Camera permission permanently denied. Open app settings to enable.');
                   await openAppSettings();
@@ -708,6 +753,14 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
                     },
                     errorBuilder: (context, error) {
                       debugPrint('[QR] scanner error: $error');
+                      String msg;
+                      if (error.errorCode == MobileScannerErrorCode.permissionDenied) {
+                        msg = 'Camera permission denied. Please allow camera in Settings.';
+                      } else if (error.errorCode == MobileScannerErrorCode.unsupported) {
+                        msg = 'Camera not supported on this device.';
+                      } else {
+                        msg = 'Camera unavailable. Please try again or use manual code.';
+                      }
                       return Center(
                         child: Padding(
                           padding: const EdgeInsets.all(24),
@@ -723,7 +776,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'Camera error: ${error.errorCode.name}',
+                                msg,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: isDark
@@ -731,6 +784,40 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
                                       : theme.colorScheme.onSurface,
                                 ),
                               ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Error: ${error.errorCode.name}',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.4)
+                                      : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              FilledButton.icon(
+                                onPressed: _retryCamera,
+                                icon: const Icon(Icons.refresh, size: 18),
+                                label: const Text('Retry'),
+                              ),
+                              const SizedBox(height: 12),
+                              TextButton(
+                                onPressed: () {
+                                  _scannerController.stop();
+                                  setState(() {
+                                    _showScanner = false;
+                                    _showCodeEntry = true;
+                                    _error = null;
+                                  });
+                                },
+                                child: const Text('Use manual code instead'),
+                              ),
+                              if (error.errorCode == MobileScannerErrorCode.permissionDenied)
+                                TextButton(
+                                  onPressed: openAppSettings,
+                                  child: const Text('Open Settings'),
+                                ),
                             ],
                           ),
                         ),
