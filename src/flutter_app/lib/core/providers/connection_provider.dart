@@ -433,12 +433,14 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       debugPrint('[RUNMOTE] connectWithToken: auth result=$result');
 
       if (result == ConnectWithTokenResult.success) {
+        final p = await _ref.read(preferencesServiceProvider.future);
+        final savedPairingCode = p.getPairingCode();
         state = state.copyWith(
           state: const AcpConnectionState.connected(),
           paired: true,
+          pairingCode: savedPairingCode ?? state.pairingCode,
         );
         _startPing();
-        final p = await _ref.read(preferencesServiceProvider.future);
         if (state.token != null) {
           await p.setAuthToken(state.token!);
           await p.setRelayUrl(url);
@@ -960,8 +962,9 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         final savedUrl = p.getRelayUrl();
         debugPrint('[RUNMOTE] retryNow: prefs load token=${savedToken != null ? "present" : "null"}, url=$savedUrl');
         if (savedToken != null && savedUrl != null) {
-          state = state.copyWith(token: savedToken, relayUrl: savedUrl);
-          debugPrint('[RUNMOTE] retryNow: prefs has token, calling connectWithToken');
+          final savedPairingCode = p.getPairingCode();
+          state = state.copyWith(token: savedToken, relayUrl: savedUrl, pairingCode: savedPairingCode ?? state.pairingCode);
+          debugPrint('[RUNMOTE] retryNow: prefs has token, pairingCode=${savedPairingCode ?? "null"}, calling connectWithToken');
           final res = await connectWithToken(savedToken, savedUrl);
           debugPrint('[RUNMOTE] retryNow: connectWithToken result=$res');
           if (res != ConnectWithTokenResult.success) _scheduleReconnect();
