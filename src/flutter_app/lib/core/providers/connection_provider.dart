@@ -243,6 +243,9 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   Future<void> onAppResumed() async {
     final isConnected = state.state is Connected;
     final hasChannel = state.channel != null;
+    final token = state.token;
+    final relayUrl = state.relayUrl;
+    debugPrint('[RUNMOTE] onAppResumed: state=${state.state.runtimeType}, hasChannel=$hasChannel, token=${token != null ? "present(${token.length}c)" : "null"}, relayUrl=$relayUrl, daemonConnected=${state.daemonConnected}');
     if (isConnected && hasChannel) {
       debugPrint('[RUNMOTE] onAppResumed: was Connected, validating socket');
       _startPing();
@@ -251,7 +254,9 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       _pongReceived = false;
       try {
         sendRaw({'jsonrpc': '2.0', 'method': r'$/ping'});
-      } catch (_) {
+        debugPrint('[RUNMOTE] onAppResumed: ping sent, waiting for pong');
+      } catch (e) {
+        debugPrint('[RUNMOTE] onAppResumed: ping send failed: $e');
         // sendRaw already handles disconnect
       }
       // If no pong comes back quickly (relay/OS killed socket silently),
@@ -260,13 +265,16 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         if (!_pongReceived && state.state is Connected) {
           debugPrint('[RUNMOTE] onAppResumed: no pong after 4s, forcing reconnect');
           _onDisconnected('Resume validation timeout');
+        } else {
+          debugPrint('[RUNMOTE] onAppResumed: pong received within 4s, socket alive');
         }
       });
       return;
     }
     // Not connected – try to reconnect with saved token if any.
-    debugPrint('[RUNMOTE] onAppResumed: not connected (${state.state.runtimeType}), retrying');
+    debugPrint('[RUNMOTE] onAppResumed: not connected (${state.state.runtimeType}), retrying via retryNow()');
     await retryNow();
+    debugPrint('[RUNMOTE] onAppResumed: retryNow completed, new state=${state.state.runtimeType}');
   }
 
   Future<void> connect(String code, {String? relayUrl}) async {
@@ -358,7 +366,9 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
   Future<ConnectWithTokenResult> connectWithToken(
       String token, String relayUrl) async {
+    debugPrint('[RUNMOTE] connectWithToken: entry state=${state.state.runtimeType}, url=$relayUrl, token=${token.substring(0, token.length > 8 ? 8 : token.length)}...');
     if (state.state case AcpConnectionState() when state.state is Connected) {
+      debugPrint('[RUNMOTE] connectWithToken: already Connected, return success');
       return ConnectWithTokenResult.success;
     }
     if (state.state case AcpConnectionState()
@@ -368,10 +378,11 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       // (like `_autoConnectWithToken`) navigate away before the connection is
       // actually established. Report as unreachable so they keep retrying and
       // eventually observe the real result.
+      debugPrint('[RUNMOTE] connectWithToken: already Connecting/Reconnecting, return unreachable');
       return ConnectWithTokenResult.unreachable;
     }
     final url = _sanitizeRelayUrl(relayUrl);
-    debugPrint('[RUNMOTE] connectWithToken: url=$url');
+    debugPrint('[RUNMOTE] connectWithToken: sanitized url=$url');
     state = state.copyWith(
       state: const AcpConnectionState.connecting(),
       relayUrl: url,
@@ -412,8 +423,12 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
 
       final result = await authCompleter.future.timeout(
         _authTimeout,
-        onTimeout: () => ConnectWithTokenResult.unreachable,
+        onTimeout: () {
+          debugPrint('[RUNMOTE] connectWithToken: auth timeout after ${_authTimeout.inSeconds}s, unreachable');
+          return ConnectWithTokenResult.unreachable;
+        },
       );
+      debugPrint('[RUNMOTE] connectWithToken: auth result=$result');
 
       if (result == ConnectWithTokenResult.success) {
         state = state.copyWith(
@@ -443,8 +458,8 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         );
         return result;
       }
-    } catch (e) {
-      debugPrint('[RUNMOTE] connectWithToken error: $e');
+    } catch (e, st) {
+      debugPrint('[RUNMOTE] connectWithToken error: $e\n$st');
       _sub?.cancel();
       _sub = null;
       state = state.copyWith(
@@ -858,6 +873,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   }
 
   void _onDisconnected(String reason) {
+    debugPrint('[RUNMOTE] _onDisconnected: reason="$reason", prevState=${state.state.runtimeType}, _daemonDisconnected=$_daemonDisconnected');
     _stopPing();
     _sub?.cancel();
     _sub = null;
@@ -871,6 +887,7 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
         state: const AcpConnectionState.disconnected(),
         error: reason,
       );
+      debugPrint('[RUNMOTE] _onDisconnected: daemon path, new state=${state.state.runtimeType} (no reconnect)');
       return;
     }
     _agentCapabilities.clear();
@@ -886,22 +903,29 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
       error: reason,
       daemonConnected: false,
     );
+    debugPrint('[RUNMOTE] _onDisconnected: new state=${state.state.runtimeType}, scheduling reconnect, token=${state.token != null ? "present" : "null"}');
     _scheduleReconnect();
   }
 
   void _scheduleReconnect() {
     final token = state.token;
     final relayUrl = state.relayUrl;
-    if (token == null || relayUrl == null) return;
+    if (token == null || relayUrl == null) {
+      debugPrint('[RUNMOTE] _scheduleReconnect: no token/relayUrl (token=${token != null}, url=$relayUrl), abort');
+      return;
+    }
 
     _reconnectTimer?.cancel();
     final delay = Duration(
       seconds: min(pow(2, _reconnectAttempts).toInt(), 60),
     );
+    debugPrint('[RUNMOTE] _scheduleReconnect: attempt=$_reconnectAttempts, delay=${delay.inSeconds}s, token present, url=$relayUrl');
     _reconnectAttempts++;
     _reconnectTimer = Timer(delay, () async {
+      debugPrint('[RUNMOTE] _scheduleReconnect: timer fired, trying connectWithToken');
       state = state.copyWith(state: const AcpConnectionState.reconnecting());
       final result = await connectWithToken(token, relayUrl);
+      debugPrint('[RUNMOTE] _scheduleReconnect: connectWithToken result=$result');
       if (result == ConnectWithTokenResult.success) {
         _reconnectAttempts = 0;
       } else if (result == ConnectWithTokenResult.rejected) {
@@ -921,25 +945,40 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
   Future<void> retryNow() async {
     final token = state.token;
     final relayUrl = state.relayUrl;
+    debugPrint('[RUNMOTE] retryNow: entry state=${state.state.runtimeType}, token=${token != null ? "present" : "null"}, relayUrl=$relayUrl');
     if (token == null || relayUrl == null) {
       // Cold start: state has no token yet. Try to load from prefs.
+      debugPrint('[RUNMOTE] retryNow: token or url null in state, loading from prefs');
       try {
         final p = await _ref.read(preferencesServiceProvider.future);
         final savedToken = p.getAuthToken();
         final savedUrl = p.getRelayUrl();
+        debugPrint('[RUNMOTE] retryNow: prefs load token=${savedToken != null ? "present" : "null"}, url=$savedUrl');
         if (savedToken != null && savedUrl != null) {
           state = state.copyWith(token: savedToken, relayUrl: savedUrl);
+          debugPrint('[RUNMOTE] retryNow: prefs has token, calling connectWithToken');
           final res = await connectWithToken(savedToken, savedUrl);
+          debugPrint('[RUNMOTE] retryNow: connectWithToken result=$res');
           if (res != ConnectWithTokenResult.success) _scheduleReconnect();
           return;
+        } else {
+          debugPrint('[RUNMOTE] retryNow: prefs has no token/url, abort');
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[RUNMOTE] retryNow: prefs load error: $e');
+      }
       return;
     }
     _reconnectTimer?.cancel();
-    if (state.state is Connected || state.state is Connecting) return;
+    debugPrint('[RUNMOTE] retryNow: cancelled timer, current state=${state.state.runtimeType}');
+    if (state.state is Connected || state.state is Connecting) {
+      debugPrint('[RUNMOTE] retryNow: already Connected/Connecting, abort');
+      return;
+    }
     state = state.copyWith(state: const AcpConnectionState.reconnecting());
+    debugPrint('[RUNMOTE] retryNow: set Reconnecting, calling connectWithToken url=$relayUrl');
     final result = await connectWithToken(token, relayUrl);
+    debugPrint('[RUNMOTE] retryNow: connectWithToken result=$result, new state=${state.state.runtimeType}');
     if (result == ConnectWithTokenResult.success) {
       _reconnectAttempts = 0;
     } else if (result == ConnectWithTokenResult.rejected) {

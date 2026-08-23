@@ -33,19 +33,25 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint('[RUNMOTE] AppLifecycleState: $state (current conn=${ref.read(connectionProvider).state.runtimeType})');
     final notifier = ref.read(connectionProvider.notifier);
     switch (state) {
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
+        debugPrint('[RUNMOTE] -> pauseHeartbeat');
         notifier.pauseHeartbeat();
         break;
       case AppLifecycleState.resumed:
+        debugPrint('[RUNMOTE] -> onAppResumed');
         // Use the new resume handler that validates the socket and
         // reconnects immediately instead of waiting for ping timeout.
         notifier.onAppResumed();
         break;
       case AppLifecycleState.detached:
+        debugPrint('[RUNMOTE] -> detached (no-op)');
+        break;
       case AppLifecycleState.hidden:
+        debugPrint('[RUNMOTE] -> hidden (no-op)');
         break;
     }
   }
