@@ -55,6 +55,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Type the 8-character code from your terminal';
 
   @override
+  String get pairGuestModeTitle => 'Continue without pairing';
+
+  @override
+  String get pairGuestModeSubtitle =>
+      'Use the verification path to preview the app';
+
+  @override
   String get pairNeedHelp => 'Need help finding your code?';
 
   @override
@@ -134,6 +141,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAbout => 'About';
 
   @override
+  String get settingsSupport => 'Support';
+
+  @override
   String get settingsConnectionStatus => 'Connection Status';
 
   @override
@@ -184,6 +194,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsReportIssue => 'Report an Issue';
+
+  @override
+  String get settingsAppInfo => 'App info';
+
+  @override
+  String get settingsAppInfoSubtitle => 'Device and connection details';
+
+  @override
+  String get settingsCopyDiagnostics => 'Copy details';
+
+  @override
+  String get settingsDiagnosticsCopied => 'Details copied';
 
   @override
   String settingsVersion(Object version) {

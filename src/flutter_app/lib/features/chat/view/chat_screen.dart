@@ -521,9 +521,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             Expanded(
               child: Consumer(
                 builder: (context, ref, child) {
-                  final chatState = ref.watch(
-                    chatProvider((widget.sessionId, widget.cwd)),
-                  );
+final chatState = ref.watch(
+                  chatProvider((widget.sessionId, widget.cwd)).select(
+                    (state) => state,
+                  ),
+                );
                   final showSkeleton = _showSkeleton || chatState.isLoading;
                   return AnimatedSwitcher(
                     duration: const Duration(milliseconds: 400),

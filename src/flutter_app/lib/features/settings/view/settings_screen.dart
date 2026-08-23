@@ -25,7 +25,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final connection = ref.watch(connectionProvider);
-    final themeMode = ref.watch(themeModeStateProvider);
+    final themeMode = ref.watch(themeModeStateProvider.select((mode) => mode));
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -150,7 +150,7 @@ class SettingsScreen extends ConsumerWidget {
                   leading: const Icon(Icons.palette_outlined),
                   title: Text(AppLocalizations.of(context)!.settingsColorScheme),
                   subtitle: Text(
-                    _schemeName(ref.watch(flexSchemeProvider)),
+                    _schemeName(ref.watch(flexSchemeProvider.select((scheme) => scheme))),
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showSchemePicker(context, ref),
@@ -362,7 +362,7 @@ class SettingsScreen extends ConsumerWidget {
   ];
 
   void _showSchemePicker(BuildContext context, WidgetRef ref) {
-    final current = ref.watch(flexSchemeProvider);
+    final current = ref.watch(flexSchemeProvider.select((scheme) => scheme));
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -541,8 +541,8 @@ class _DiagnosticsCard extends ConsumerWidget {
           final diagnostics = [
             'App: $version ${build.isNotEmpty ? "($build)" : ""}',
             'Platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion.split(" ").first}',
-            'Theme: ${ref.watch(themeModeStateProvider).name} / ${ref.watch(flexSchemeProvider).name}',
-            'Relay: ${conn.relayUrl ?? "—"}',
+            'Theme: ${ref.watch(themeModeStateProvider.select((mode) => mode)).name} / ${ref.watch(flexSchemeProvider.select((scheme) => scheme)).name}',
+            'Relay: ${conn.relayUrl != null ? (isCloudRelay(conn.relayUrl!) ? "Runmote relay" : conn.relayUrl!) : "—"}',
             'Pairing: ${conn.pairingCode ?? "—"}',
             'Daemon: ${conn.daemonConnected ? "online" : "offline"}${conn.daemonName != null ? " (${conn.daemonName})" : ""}',
             'Agents: ${conn.agents.length} (${conn.agents.where((a) => a.online).length} online)',

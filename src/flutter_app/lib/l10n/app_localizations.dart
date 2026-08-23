@@ -178,6 +178,18 @@ abstract class AppLocalizations {
   /// **'Type the 8-character code from your terminal'**
   String get pairManualCodeSubtitle;
 
+  /// No description provided for @pairGuestModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue without pairing'**
+  String get pairGuestModeTitle;
+
+  /// No description provided for @pairGuestModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the verification path to preview the app'**
+  String get pairGuestModeSubtitle;
+
   /// No description provided for @pairNeedHelp.
   ///
   /// In en, this message translates to:
@@ -316,6 +328,12 @@ abstract class AppLocalizations {
   /// **'About'**
   String get settingsAbout;
 
+  /// No description provided for @settingsSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get settingsSupport;
+
   /// No description provided for @settingsConnectionStatus.
   ///
   /// In en, this message translates to:
@@ -417,6 +435,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Report an Issue'**
   String get settingsReportIssue;
+
+  /// No description provided for @settingsAppInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'App info'**
+  String get settingsAppInfo;
+
+  /// No description provided for @settingsAppInfoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device and connection details'**
+  String get settingsAppInfoSubtitle;
+
+  /// No description provided for @settingsCopyDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy details'**
+  String get settingsCopyDiagnostics;
+
+  /// No description provided for @settingsDiagnosticsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Details copied'**
+  String get settingsDiagnosticsCopied;
 
   /// No description provided for @settingsVersion.
   ///
