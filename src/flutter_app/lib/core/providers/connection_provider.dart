@@ -235,6 +235,40 @@ class ConnectionNotifier extends StateNotifier<AcpConnection> {
     }
   }
 
+  /// Called when app resumes from background. Ensures the WebSocket is still
+  /// alive – the OS may have killed the socket while the app was paused
+  /// without delivering onDone. If we think we are Connected but the channel
+  /// is dead, force a reconnect instead of waiting for the next ping timeout
+  /// (~50s) which causes the "connecting to relay" stuck state.
+  Future<void> onAppResumed() async {
+    final isConnected = state.state is Connected;
+    final hasChannel = state.channel != null;
+    if (isConnected && hasChannel) {
+      debugPrint('[RUNMOTE] onAppResumed: was Connected, validating socket');
+      _startPing();
+      // Send an immediate ping to validate the socket. If the sink is closed
+      // sendRaw will call _onDisconnected and we will reconnect.
+      _pongReceived = false;
+      try {
+        sendRaw({'jsonrpc': '2.0', 'method': r'$/ping'});
+      } catch (_) {
+        // sendRaw already handles disconnect
+      }
+      // If no pong comes back quickly (relay/OS killed socket silently),
+      // force a reconnect after a short grace period.
+      Future.delayed(const Duration(seconds: 4), () {
+        if (!_pongReceived && state.state is Connected) {
+          debugPrint('[RUNMOTE] onAppResumed: no pong after 4s, forcing reconnect');
+          _onDisconnected('Resume validation timeout');
+        }
+      });
+      return;
+    }
+    // Not connected – try to reconnect with saved token if any.
+    debugPrint('[RUNMOTE] onAppResumed: not connected (${state.state.runtimeType}), retrying');
+    await retryNow();
+  }
+
   Future<void> connect(String code, {String? relayUrl}) async {
     if (state.state case AcpConnectionState()
         when state.state is Connected || state.state is Connecting) {

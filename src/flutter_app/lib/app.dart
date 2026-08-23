@@ -40,8 +40,9 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
         notifier.pauseHeartbeat();
         break;
       case AppLifecycleState.resumed:
-        notifier.resumeHeartbeat();
-        notifier.retryNow();
+        // Use the new resume handler that validates the socket and
+        // reconnects immediately instead of waiting for ping timeout.
+        notifier.onAppResumed();
         break;
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:

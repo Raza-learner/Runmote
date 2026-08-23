@@ -60,15 +60,18 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      final conn = ref.read(connectionProvider);
-      if (conn.state is Connected) return;
-      // If we have a saved token, try to reconnect immediately on resume.
+      // Delegate to the central provider which validates the socket and
+      // reconnects if needed. Avoid early return on Connected – the OS
+      // may have killed the socket while backgrounded.
       if (_isAutoConnecting) return;
-      debugPrint('[RUNMOTE] pairScreen resumed, retrying auto-connect');
-      setState(() => _isAutoConnecting = true);
-      _autoConnectWithToken();
-      // Also trigger provider retry.
-      ref.read(connectionProvider.notifier).retryNow();
+      debugPrint('[RUNMOTE] pairScreen resumed, delegating to provider');
+      ref.read(connectionProvider.notifier).onAppResumed();
+      // Also keep the local auto-connect flow for the pairing wall.
+      final conn = ref.read(connectionProvider);
+      if (conn.state is! Connected) {
+        setState(() => _isAutoConnecting = true);
+        _autoConnectWithToken();
+      }
     }
   }
 
