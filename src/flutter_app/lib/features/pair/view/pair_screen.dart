@@ -54,7 +54,12 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
   Future<void> _startCamera() async {
     try {
       await _scannerController.start();
-      if (mounted) setState(() => _isStartingCamera = false);
+      if (mounted) {
+        setState(() {
+          _isStartingCamera = false;
+          _error = null;
+        });
+      }
     } on MobileScannerException catch (e) {
       debugPrint('[QR] MobileScannerException: ${e.errorCode} ${e.errorDetails}');
       if (mounted) {
@@ -92,7 +97,12 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
       detectionSpeed: DetectionSpeed.normal,
       autoStart: false,
     );
-    if (mounted) setState(() => _isStartingCamera = true);
+    if (mounted) {
+      setState(() {
+        _isStartingCamera = true;
+        _error = null;
+      });
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _startCamera());
   }
 
