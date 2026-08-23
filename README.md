@@ -17,6 +17,7 @@
     <a href="#"><img src="https://img.shields.io/badge/Flutter-3.x-blue?logo=flutter" alt="Flutter" /></a>
     <a href="#"><img src="https://img.shields.io/badge/Python-3.13+-green?logo=python" alt="Python" /></a>
     <a href="#"><img src="https://img.shields.io/badge/platform-iOS%20%7C%20Android-lightgrey" alt="iOS Android" /></a>
+    <a href="https://play.google.com/store/apps/details?id=dev.runmote.app"><img src="https://img.shields.io/badge/Google%20Play-Get%20it%20on-414141?logo=google-play&logoColor=white" alt="Google Play" /></a>
     <a href="https://github.com/Raza-learner/Runmote/stargazers"><img src="https://img.shields.io/github/stars/Raza-learner/Runmote?style=social" alt="Stars" /></a>
   </p>
 
@@ -54,9 +55,7 @@ runmote --uninstall    # clean removal
 
 ### Android app
 
-Get it on Google Play:
-
-**[Runmote on Google Play](https://play.google.com/store/apps/details?id=dev.runmote.app)**
+<a href="https://play.google.com/store/apps/details?id=dev.runmote.app"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" height="80"/></a>
 
 Or download the APK from [Releases](https://github.com/Raza-learner/Runmote/releases).
 
