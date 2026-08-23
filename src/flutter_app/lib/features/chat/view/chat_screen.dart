@@ -31,6 +31,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
+  final _focusNode = FocusNode();
   bool _showScrollButton = false;
   final List<Map<String, String>> _attachments = [];
   late String _title;
@@ -58,6 +59,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -429,8 +431,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onSelect: () {
             _textController.text = '/${c.name} ';
             _textController.selection = TextSelection.collapsed(offset: _textController.text.length);
-            FocusScope.of(context).requestFocus(FocusNode());
-            Future.delayed(const Duration(milliseconds: 100), () => FocusScope.of(context).requestFocus(Focus.of(context).hasFocus ? FocusNode() : FocusNode()));
+            // Keep keyboard focused on input
+            Future.microtask(() => _focusNode.requestFocus());
           },
         ),
       PaletteCommand(title: 'Copy Session ID', subtitle: widget.sessionId, icon: Icons.copy_rounded, onSelect: () async { await Clipboard.setData(ClipboardData(text: widget.sessionId)); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session ID copied'))) ;}),
@@ -883,6 +885,8 @@ final chatState = ref.watch(
                                     TextSelection.collapsed(
                                   offset: _textController.text.length,
                                 );
+                                // Keep keyboard focused on input after selecting slash command
+                                _focusNode.requestFocus();
                               },
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -963,6 +967,7 @@ final chatState = ref.watch(
                       Expanded(
                         child: TextField(
                           controller: _textController,
+                          focusNode: _focusNode,
                           textInputAction: TextInputAction.send,
                           onSubmitted: (_) => _sendMessage(),
                           readOnly: isBusy || daemonDown,

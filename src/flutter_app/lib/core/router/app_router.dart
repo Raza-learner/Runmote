@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/pair/view/pair_screen.dart';
@@ -7,15 +8,18 @@ import '../../features/agents/view/agent_list_screen.dart';
 import '../../features/sessions/view/session_list_screen.dart';
 import '../../features/chat/view/chat_screen.dart';
 import '../../features/settings/view/settings_screen.dart';
+import '../../features/agents/view/widgets/agent_logo.dart';
+import '../../core/providers/connection_provider.dart';
 import '../../l10n/app_localizations.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
   const AppShell({super.key, required this.navigationShell});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedAgent = ref.watch(connectionProvider.select((c) => c.selectedAgent));
     return LayoutBuilder(
       builder: (context, constraints) {
         final isTablet = constraints.maxWidth >= 700;
@@ -36,14 +40,24 @@ class AppShell extends StatelessWidget {
                   indicatorColor: Theme.of(context).colorScheme.primaryContainer,
                   leading: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFFA855F7)]),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
-                    ),
+                    child: selectedAgent != null
+                        ? AgentLogo(id: selectedAgent.id, name: selectedAgent.name, size: 40)
+                        : Container(
+                            width: 40, height: 40,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFFA855F7)]),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Image.asset(
+                                'assets/logos/app_icon_foreground.png',
+                                color: Colors.white,
+                                colorBlendMode: BlendMode.srcIn,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
                   ),
                   destinations: [
                     NavigationRailDestination(icon: const Icon(Icons.smart_toy_outlined), selectedIcon: const Icon(Icons.smart_toy), label: Text(AppLocalizations.of(context)!.navAgents)),
