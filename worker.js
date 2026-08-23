@@ -34,7 +34,7 @@ export default {
 <p>Windows: <code>powershell -c "irm https://runmote.dev/install.ps1 | iex"</code></p>
 <p>Windows (dev): <code>powershell -c "irm https://runmote.dev/install.ps1/dev | iex"</code></p>
 <hr>
-<p>Daemon connects to your relay at <code>runmote-relay.onrender.com</code></p>`
+<p>Daemon connects via <code>Runmote Relay</code> (custom relay supported)</p>`
     return new Response(html, { headers: { 'content-type': 'text/html;charset=utf-8' } })
   },
 

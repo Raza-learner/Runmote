@@ -84,7 +84,12 @@ def _pairing_banner(code: str, public_url: str = "") -> str:
     lines.append(f"║{' ' * (inner_width + 2)}║")
     lines.append(f"╚{'═' * (inner_width + 2)}╝")
     if public_url:
-        lines.append(f"  Relay: {public_url}")
+        # Only show custom relay links; hide default Runmote cloud relay
+        from config import is_cloud_relay
+        if not is_cloud_relay(public_url):
+            lines.append(f"  Relay: {public_url}")
+        else:
+            lines.append(f"  Relay: Runmote Relay")
     return "\n" + "\n".join(lines) + "\n"
 
 
@@ -332,7 +337,8 @@ async def run_daemon():
         log("  The app will see the daemon as online with no agents")
 
     while True:
-        log("Connecting to relay: %s ...", RELAY_URL)
+        from config import is_cloud_relay, relay_display_name
+        log("Connecting to relay: %s ...", relay_display_name(RELAY_URL) if is_cloud_relay(RELAY_URL) else RELAY_URL)
         ping_tag = id(RELAY_URL) & 0xFFFF  # don't leak address
         try:
             async with connect(
