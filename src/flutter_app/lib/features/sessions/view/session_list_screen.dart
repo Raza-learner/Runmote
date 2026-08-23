@@ -8,9 +8,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/session_list_provider.dart';
+import '../../../core/demo/demo_mode.dart';
+import '../../../core/demo/demo_data.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/ongoing_session_banner.dart';
 import '../../../shared/widgets/daemon_offline_banner.dart';
+import '../../../shared/widgets/demo_banner.dart';
 import '../../../shared/widgets/animated_background.dart';
 import '../../../shared/widgets/command_palette.dart';
 import 'widgets/session_card.dart';
@@ -174,8 +177,10 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDemo = ref.watch(demoModeProvider);
     final connection = ref.watch(connectionProvider);
-    final sessionsAsync = ref.watch(sessionListProvider);
+    final realSessionsAsync = ref.watch(sessionListProvider);
+    final sessionsAsync = isDemo ? AsyncValue.data(mockSessions) : realSessionsAsync;
     final activeIds = ref.watch(activeSessionsProvider);
 
     return CommandPaletteShortcut(
@@ -256,8 +261,9 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
 
                   return Column(
                     children: [
+                      if (isDemo) const DemoBanner(),
                       const OngoingSessionBanner(),
-                      if (connection.paired && !connection.daemonConnected)
+                      if (!isDemo && connection.paired && !connection.daemonConnected)
                         const DaemonOfflineBanner(),
                       if (sessions.isNotEmpty)
                         _InsightsHeader(

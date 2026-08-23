@@ -11,8 +11,11 @@ import 'package:go_router/go_router.dart';
 import '../viewmodel/chat_provider.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/session_list_provider.dart';
+import '../../../core/demo/demo_mode.dart';
+import '../../../core/demo/demo_data.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/command_palette.dart';
+import '../../../shared/widgets/demo_banner.dart';
 import '../../../shared/widgets/daemon_offline_banner.dart';
 import '../../../shared/widgets/animated_background.dart';
 import 'widgets/chat_skeleton.dart';
@@ -337,6 +340,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (text.isEmpty && _attachments.isEmpty) return;
     HapticFeedback.lightImpact();
     _textController.clear();
+    // Demo mode: don't actually send, show CTA
+    final isDemoSend = ref.read(demoModeProvider) && demoSessionIds.contains(widget.sessionId);
+    if (isDemoSend) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Demo mode – Pair your daemon to chat with real agents'),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Pair now',
+              onPressed: () {
+                ref.read(demoModeProvider.notifier).state = false;
+                context.go('/');
+              },
+            ),
+          ),
+        );
+      }
+      if (_attachments.isNotEmpty) setState(() => _attachments.clear());
+      return;
+    }
 
     List<Map<String, dynamic>>? extra;
     if (_attachments.isNotEmpty) {
@@ -520,15 +544,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         animate: false,
         child: Column(
           children: [
+            if (ref.watch(demoModeProvider) && demoSessionIds.contains(widget.sessionId))
+              const DemoBanner(),
             Expanded(
               child: Consumer(
                 builder: (context, ref, child) {
-final chatState = ref.watch(
+                  final isDemo = ref.watch(demoModeProvider) && demoSessionIds.contains(widget.sessionId);
+                  final realChatState = ref.watch(
                   chatProvider((widget.sessionId, widget.cwd)).select(
                     (state) => state,
                   ),
                 );
-                  final showSkeleton = _showSkeleton || chatState.isLoading;
+                  final chatState = isDemo
+                      ? AsyncValue.data(ChatState(
+                          messages: widget.sessionId == 'demo-1' ? mockMessagesDemo1 : mockMessagesDemo2,
+                          availableCommands: mockSlashCommands,
+                        ))
+                      : realChatState;
+                  final showSkeleton = isDemo ? false : (_showSkeleton || chatState.isLoading);
                   return AnimatedSwitcher(
                     duration: const Duration(milliseconds: 400),
                     switchInCurve: Curves.easeOut,
@@ -547,12 +580,15 @@ final chatState = ref.watch(
                               if (daemonDown) const DaemonOfflineBanner(),
                               Consumer(
                         builder: (context, ref, child) {
-                          final configOptions = ref.watch(
-                            chatProvider((widget.sessionId, widget.cwd)).select(
-                              (state) =>
-                                  state.valueOrNull?.configOptions ??
-                                  const <ConfigOption>[],
-                            ),
+                          final isDemoCfg = ref.watch(demoModeProvider) && demoSessionIds.contains(widget.sessionId);
+                          final configOptions = isDemoCfg
+                              ? const <ConfigOption>[]
+                              : ref.watch(
+                                  chatProvider((widget.sessionId, widget.cwd)).select(
+                                    (state) =>
+                                        state.valueOrNull?.configOptions ??
+                                        const <ConfigOption>[],
+                                  ),
                           );
                           final modeOptions = configOptions
                               .where((c) => c.category == 'mode')
@@ -753,7 +789,8 @@ final chatState = ref.watch(
             top: false,
             child: Consumer(
           builder: (context, ref, child) {
-            final cs = ref.watch(
+            final isDemoInput = ref.watch(demoModeProvider) && demoSessionIds.contains(widget.sessionId);
+            final realCs = ref.watch(
               chatProvider((widget.sessionId, widget.cwd)).select(
                 (s) => (
                   isBusy: s.valueOrNull?.isBusy ?? false,
@@ -766,6 +803,9 @@ final chatState = ref.watch(
                 ),
               ),
             );
+            final cs = isDemoInput
+                ? (isBusy: false, configOptions: realCs.configOptions, availableCommands: mockSlashCommands, currentModel: realCs.currentModel)
+                : realCs;
             final isBusy = cs.isBusy;
             final configOptions = cs.configOptions;
             final availableCommands = cs.availableCommands;

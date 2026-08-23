@@ -8,11 +8,14 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/models/connection_state.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/demo/demo_mode.dart';
+import '../../../core/demo/demo_data.dart';
 import 'widgets/agent_card.dart';
 import 'widgets/agent_logo.dart';
 import '../../../../shared/widgets/error_banner.dart';
 import '../../../../shared/widgets/status_badge.dart';
 import '../../../../shared/widgets/animated_background.dart';
+import '../../../../shared/widgets/demo_banner.dart';
 
 class AgentListScreen extends ConsumerStatefulWidget {
   const AgentListScreen({super.key});
@@ -43,19 +46,21 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDemo = ref.watch(demoModeProvider);
     
     // Optimized: Select only necessary state parts to minimize rebuilds
     final connectionState = ref.watch(connectionProvider.select((c) => c.state));
-    final agents = ref.watch(connectionProvider.select((c) => c.agents));
-    final daemonConnected = ref.watch(connectionProvider.select((c) => c.daemonConnected));
+    final realAgents = ref.watch(connectionProvider.select((c) => c.agents));
+    final agents = isDemo ? mockAgents : realAgents;
+    final daemonConnected = isDemo ? true : ref.watch(connectionProvider.select((c) => c.daemonConnected));
     final daemonName = ref.watch(connectionProvider.select((c) => c.daemonName));
     final pairingCode = ref.watch(connectionProvider.select((c) => c.pairingCode));
     final relayUrl = ref.watch(connectionProvider.select((c) => c.relayUrl));
     final selectedAgentId = ref.watch(connectionProvider.select((c) => c.selectedAgentId));
 
-    final isConnected = connectionState is Connected;
-    final isReconnecting = connectionState is Reconnecting;
-    final isConnecting = connectionState is Connecting;
+    final isConnected = isDemo ? true : connectionState is Connected;
+    final isReconnecting = isDemo ? false : connectionState is Reconnecting;
+    final isConnecting = isDemo ? false : connectionState is Connecting;
     final daemonDown = isConnected && !daemonConnected;
 
     AgentStatus status;
@@ -98,6 +103,7 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
           children: [
             // Adjust for transparent app bar
             SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
+            if (isDemo) const DemoBanner(),
             if (!isConnected && pairingCode != null)
             ErrorBanner(
               message: isReconnecting
@@ -139,12 +145,14 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
                                 isOnline: agent.online,
                                 isSelected:
                                     agent.id == selectedAgentId,
-                                onTap: agent.online
+                                onTap: (isDemo || agent.online)
                                     ? () {
                                         HapticFeedback.lightImpact();
-                                        ref
-                                            .read(connectionProvider.notifier)
-                                            .selectAgent(agent.id);
+                                        if (!isDemo) {
+                                          ref
+                                              .read(connectionProvider.notifier)
+                                              .selectAgent(agent.id);
+                                        }
                                         context.go('/sessions');
                                       }
                                     : null,

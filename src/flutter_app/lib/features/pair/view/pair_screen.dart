@@ -8,6 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../core/demo/demo_mode.dart';
 import '../../../core/models/connection_state.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/providers/database_provider.dart';
@@ -217,6 +218,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
     }
     // Guest demo mode: allow reviewer to bypass pairing wall for Play Console review
     if (pairingCode == 'DEMO-A1B2') {
+      ref.read(demoModeProvider.notifier).state = true;
       setState(() {
         _isConnecting = false;
         _showCodeEntry = false;
@@ -527,8 +529,8 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
           const SizedBox(height: 16),
           TextButton.icon(
             onPressed: () {
-              _codeController.text = 'DEMO-A1B2';
-              setState(() => _showCodeEntry = true);
+              ref.read(demoModeProvider.notifier).state = true;
+              context.go('/agents');
             },
             icon: Icon(Icons.person_outlined, size: 16,
               color: isDark ? Colors.white.withValues(alpha: 0.35) : const Color(0xFF94A3B8)),
