@@ -527,6 +527,18 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
             },
           ),
           const SizedBox(height: 16),
+          _OptionCard(
+            icon: Icons.keyboard_rounded,
+            title: AppLocalizations.of(context)!.pairManualCodeTitle,
+            subtitle: AppLocalizations.of(context)!.pairManualCodeSubtitle,
+            isDark: isDark,
+            gradient: const [Color(0xFF94A3B8), Color(0xFF64748B)],
+            onTap: () => setState(() {
+              _showCodeEntry = true;
+              _error = null;
+            }),
+          ),
+          const SizedBox(height: 16),
           TextButton.icon(
             onPressed: () {
               ref.read(demoModeProvider.notifier).state = true;
@@ -545,18 +557,6 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
           ),
-          const SizedBox(height: 16),
-          _OptionCard(
-            icon: Icons.keyboard_rounded,
-          title: AppLocalizations.of(context)!.pairManualCodeTitle,
-          subtitle: AppLocalizations.of(context)!.pairManualCodeSubtitle,
-          isDark: isDark,
-          gradient: const [Color(0xFF94A3B8), Color(0xFF64748B)],
-          onTap: () => setState(() {
-            _showCodeEntry = true;
-            _error = null;
-          }),
-        ),
         ],
         const SizedBox(height: 24),
         TextButton(
