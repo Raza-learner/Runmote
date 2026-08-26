@@ -36,7 +36,12 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
   bool _qrScanned = false;
   bool _showScanner = false;
   bool _isStartingCamera = false;
-  late final MobileScannerController _scannerController;
+  late MobileScannerController _scannerController;
+
+  void _qrLog(String message) {
+    final ts = DateTime.now().toIso8601String().substring(11, 23);
+    debugPrint('[QR $ts] $message');
+  }
 
   @override
   void initState() {
@@ -47,21 +52,29 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
       detectionSpeed: DetectionSpeed.normal,
       autoStart: false,
     );
+    _qrLog('initState: controller created (autoStart=false)');
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _autoConnectWithToken());
   }
 
   Future<void> _startCamera() async {
+    _qrLog('startCamera: requested (mounted=$mounted, showScanner=$_showScanner, isStarting=$_isStartingCamera)');
     try {
       await _scannerController.start();
+      _qrLog('startCamera: success');
       if (mounted) {
         setState(() {
           _isStartingCamera = false;
           _error = null;
         });
       }
-    } on MobileScannerException catch (e) {
-      debugPrint('[QR] MobileScannerException: ${e.errorCode} ${e.errorDetails}');
+    } on MobileScannerException catch (e, st) {
+      _qrLog('startCamera: MobileScannerException '
+          'errorCode=${e.errorCode.name} '
+          'platformCode=${e.errorDetails?.code} '
+          'platformMessage=${e.errorDetails?.message} '
+          'platformDetails=${e.errorDetails?.details}\n'
+          'stack: $st');
       if (mounted) {
         setState(() {
           if (e.errorCode == MobileScannerErrorCode.permissionDenied) {
@@ -74,8 +87,8 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
           _isStartingCamera = false;
         });
       }
-    } catch (e) {
-      debugPrint('[QR] start error: $e');
+    } catch (e, st) {
+      _qrLog('startCamera: unexpected error: $e\nstack: $st');
       if (mounted) {
         setState(() {
           _error = 'Camera error: $e. Try again or use manual code.';
@@ -86,17 +99,25 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
   }
 
   Future<void> _retryCamera() async {
+    _qrLog('retryCamera: begin');
     try {
       await _scannerController.stop();
-    } catch (_) {}
+      _qrLog('retryCamera: old controller stopped');
+    } catch (e) {
+      _qrLog('retryCamera: old controller stop failed: $e');
+    }
     try {
       await _scannerController.dispose();
-    } catch (_) {}
+      _qrLog('retryCamera: old controller disposed');
+    } catch (e) {
+      _qrLog('retryCamera: old controller dispose failed: $e');
+    }
     _scannerController = MobileScannerController(
       facing: CameraFacing.back,
       detectionSpeed: DetectionSpeed.normal,
       autoStart: false,
     );
+    _qrLog('retryCamera: new controller created');
     if (mounted) {
       setState(() {
         _isStartingCamera = true;
@@ -108,6 +129,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
 
   @override
   void dispose() {
+    _qrLog('dispose: disposing scanner controller');
     WidgetsBinding.instance.removeObserver(this);
     _bgRetryTimer?.cancel();
     _codeController.removeListener(_onCodeChanged);
@@ -119,12 +141,15 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _qrLog('lifecycle: $state (showScanner=$_showScanner, isStarting=$_isStartingCamera)');
     // Camera lifecycle: pause/resume scanner when app backgrounds
     if (_showScanner) {
       if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+        _qrLog('lifecycle: stopping scanner');
         _scannerController.stop();
       } else if (state == AppLifecycleState.resumed) {
         // Small delay to let OS release camera
+        _qrLog('lifecycle: restart scheduled in 300ms');
         Future.delayed(const Duration(milliseconds: 300), () {
           if (mounted && _showScanner) _startCamera();
         });
@@ -338,6 +363,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
 
     ref.listen<AcpConnection>(connectionProvider, (prev, next) {
       if (next.paired && next.state is Connected) {
+        _qrLog('connection: paired+connected, stopping scanner');
         _scannerController.stop();
         setState(() {
           _isConnecting = false;
@@ -347,6 +373,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
         });
         context.go('/agents');
       } else if (next.state is Failed) {
+        _qrLog('connection: failed, stopping scanner (error=${next.error})');
         _scannerController.stop();
         setState(() {
           _isConnecting = false;
@@ -559,10 +586,18 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
             isDark: isDark,
             gradient: const [Color(0xFF6366F1), Color(0xFF4F46E5)],
             onTap: () async {
+              _qrLog('scanQrTap: requesting camera permission');
               try {
                 final status = await Permission.camera.request();
-                if (!mounted) return;
+                _qrLog('scanQrTap: permission result=$status '
+                    '(granted=${status.isGranted}, limited=${status.isLimited}, '
+                    'denied=${status.isDenied}, permanentlyDenied=${status.isPermanentlyDenied})');
+                if (!mounted) {
+                  _qrLog('scanQrTap: unmounted after permission, aborting');
+                  return;
+                }
                 if (status.isGranted || status.isLimited) {
+                  _qrLog('scanQrTap: showing scanner, camera start scheduled next frame');
                   setState(() {
                     _showScanner = true;
                     _isStartingCamera = true;
@@ -570,13 +605,15 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
                   });
                   WidgetsBinding.instance.addPostFrameCallback((_) => _startCamera());
                 } else if (status.isPermanentlyDenied) {
+                  _qrLog('scanQrTap: permanently denied, opening app settings');
                   setState(() => _error = 'Camera permission permanently denied. Open app settings to enable.');
                   await openAppSettings();
                 } else {
+                  _qrLog('scanQrTap: denied');
                   setState(() => _error = 'Camera permission is required to scan QR codes.');
                 }
-              } catch (e) {
-                debugPrint('[QR] onTap error: $e');
+              } catch (e, st) {
+                _qrLog('scanQrTap: error: $e\nstack: $st');
                 if (mounted) setState(() => _error = 'Camera error: $e');
               }
             },
@@ -718,6 +755,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
                         ? Colors.white.withValues(alpha: 0.7)
                         : theme.colorScheme.onSurface),
                 onPressed: () {
+                  _qrLog('backPressed: stopping scanner');
                   _scannerController.stop();
                   setState(() {
                     _showScanner = false;
@@ -752,9 +790,13 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
                   MobileScanner(
                     controller: _scannerController,
                     onDetect: (capture) {
-                      if (_qrScanned || _isConnecting) return;
+                      if (_qrScanned || _isConnecting) {
+                        _qrLog('onDetect: ignored (qrScanned=$_qrScanned, isConnecting=$_isConnecting)');
+                        return;
+                      }
                       final barcode = capture.barcodes.firstOrNull;
                       final raw = barcode?.rawValue?.trim();
+                      _qrLog('onDetect: barcodes=${capture.barcodes.length}, raw=${raw == null ? '<null>' : '"$raw"'}');
                       if (raw != null && raw.isNotEmpty) {
                         _qrScanned = true;
                         _scannerController.stop();
@@ -762,7 +804,10 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
                       }
                     },
                     errorBuilder: (context, error) {
-                      debugPrint('[QR] scanner error: $error');
+                      _qrLog('scanner errorBuilder: errorCode=${error.errorCode.name} '
+                          'platformCode=${error.errorDetails?.code} '
+                          'platformMessage=${error.errorDetails?.message} '
+                          'platformDetails=${error.errorDetails?.details}');
                       String msg;
                       if (error.errorCode == MobileScannerErrorCode.permissionDenied) {
                         msg = 'Camera permission denied. Please allow camera in Settings.';
@@ -796,7 +841,8 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Error: ${error.errorCode.name}',
+                                'Error: ${error.errorCode.name}'
+                                '${error.errorDetails?.message != null ? '\n${error.errorDetails!.message}' : ''}',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 12,
@@ -814,6 +860,7 @@ class _PairScreenState extends ConsumerState<PairScreen> with WidgetsBindingObse
                               const SizedBox(height: 12),
                               TextButton(
                                 onPressed: () {
+                                  _qrLog('manualCodeSelected: stopping scanner');
                                   _scannerController.stop();
                                   setState(() {
                                     _showScanner = false;
@@ -1252,10 +1299,10 @@ class _QrViewfinderState extends State<_QrViewfinder> with SingleTickerProviderS
           height: len,
           decoration: BoxDecoration(
             border: Border(
-              top: BorderSide(color: Colors.white, width: alignment.y == -1 ? thick : 0),
-              left: BorderSide(color: Colors.white, width: alignment.x == -1 ? thick : 0),
-              right: BorderSide(color: Colors.white, width: alignment.x == 1 ? thick : 0),
-              bottom: BorderSide(color: Colors.white, width: alignment.y == 1 ? thick : 0),
+              top: alignment.y == -1 ? const BorderSide(color: Colors.white, width: thick) : BorderSide.none,
+              left: alignment.x == -1 ? const BorderSide(color: Colors.white, width: thick) : BorderSide.none,
+              right: alignment.x == 1 ? const BorderSide(color: Colors.white, width: thick) : BorderSide.none,
+              bottom: alignment.y == 1 ? const BorderSide(color: Colors.white, width: thick) : BorderSide.none,
             ),
             borderRadius: borderRadius,
           ),
