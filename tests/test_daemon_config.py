@@ -3,6 +3,8 @@ from unittest import mock
 
 import pytest
 
+import daemon.config as config_module
+
 
 @pytest.fixture(autouse=True)
 def _clear_env():
@@ -15,15 +17,22 @@ def _clear_env():
 
 class TestDetectAcpAgents:
     def test_fallback_to_default_when_no_agents_found(self):
+        # Point the fallback at a synthetic exe no real detector looks for,
+        # so only the fallback path can resolve it.
         with (
-            mock.patch("daemon.config.shutil.which", return_value=None),
+            mock.patch.object(config_module, "AGENT_COMMAND", ["no-such-default-cli"]),
+            mock.patch(
+                "daemon.config.shutil.which",
+                side_effect=lambda c: "/usr/bin/no-such-default-cli"
+                if c == "no-such-default-cli"
+                else None,
+            ),
             mock.patch("daemon.config.os.scandir", return_value=[]),
         ):
-            from daemon.config import _detect_acp_agents
-
-            agents = _detect_acp_agents()
+            agents = config_module._detect_acp_agents()
             assert len(agents) == 1
             assert agents[0]["id"] == "default"
+            assert agents[0]["command"] == ["no-such-default-cli"]
 
     def test_detects_claude(self):
         def which_side_effect(cmd: str):
