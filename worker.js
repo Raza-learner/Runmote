@@ -14,7 +14,7 @@ export default {
         : (env.ACP_DAEMON_TOKEN_MAIN || '')
 
       const gh = `https://raw.githubusercontent.com/Raza-learner/Runmote/${branch}/scripts/install.${ext}`
-      const headers = { 'User-Agent': 'runmote-worker' } as Record<string, string>
+      const headers = { 'User-Agent': 'runmote-worker' }
       if (env.GITHUB_TOKEN) headers['Authorization'] = `Bearer ${env.GITHUB_TOKEN}`
       const resp = await fetch(gh, { headers })
       let text = await resp.text()
