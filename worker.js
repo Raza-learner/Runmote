@@ -13,8 +13,10 @@ export default {
         ? (env.ACP_DAEMON_TOKEN_DEV || '')
         : (env.ACP_DAEMON_TOKEN_MAIN || '')
 
-      const gh = `https://api.github.com/repos/Raza-learner/Runmote/contents/scripts/install.${ext}?ref=${branch}`
-      const resp = await fetch(gh, { headers: { 'Accept': 'application/vnd.github.raw', 'User-Agent': 'runmote-worker' } })
+      const gh = `https://raw.githubusercontent.com/Raza-learner/Runmote/${branch}/scripts/install.${ext}`
+      const headers = { 'User-Agent': 'runmote-worker' } as Record<string, string>
+      if (env.GITHUB_TOKEN) headers['Authorization'] = `Bearer ${env.GITHUB_TOKEN}`
+      const resp = await fetch(gh, { headers })
       let text = await resp.text()
       // Inject relay config from Worker secrets (no hardcoded tokens in source code)
       text = text.replaceAll('__ACP_RELAY_URL__', relayUrl)
