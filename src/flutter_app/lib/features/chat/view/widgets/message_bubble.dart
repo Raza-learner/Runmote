@@ -77,26 +77,37 @@ class MessageBubble extends StatelessWidget {
 
     // Assistant: full-screen plain text (ChatGPT/Claude style) — no bubble,
     // spans available width for readable markdown, tables, and code.
+    //
+    // Segments carry chronological order (message / thought / toolCall / plan),
+    // so text and tool calls render inline where they actually happened. Older
+    // persisted messages have no `message` segments; for those we fall back to
+    // rendering `content` first and the remaining segments below it.
+    final hasInlineSegments =
+        message.segments.any((s) => s.kind == SegmentKind.message);
     return Padding(
       padding: const EdgeInsets.only(bottom: 20, left: 4, right: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (message.content.isNotEmpty)
-            SelectionArea(
-              child: SafeMarkdownBody(
-                data: message.content,
-                theme: theme,
+          if (hasInlineSegments)
+            ..._buildInlineSegments(theme)
+          else ...[
+            if (message.content.isNotEmpty)
+              SelectionArea(
+                child: SafeMarkdownBody(
+                  data: message.content,
+                  theme: theme,
+                ),
               ),
-            ),
-          if (message.segments.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: _buildSegments(theme),
+            if (message.segments.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _buildSegments(theme),
+                ),
               ),
-            ),
+          ],
           if (message.isStreaming)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -123,6 +134,52 @@ class MessageBubble extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Renders segments in arrival order, so tool calls and thinking appear
+  /// inline between text blocks instead of always after the whole reply.
+  List<Widget> _buildInlineSegments(ThemeData theme) {
+    final result = <Widget>[];
+    final toolCalls = <AssistantSegment>[];
+
+    void flushTools() {
+      if (toolCalls.isNotEmpty) {
+        result.add(ToolCallGroup(
+          key: ValueKey('tools_${toolCalls.first.id}'),
+          segments: List.unmodifiable(toolCalls),
+          isStreaming: message.isStreaming,
+        ));
+        toolCalls.clear();
+      }
+    }
+
+    for (final seg in message.segments) {
+      switch (seg.kind) {
+        case SegmentKind.message:
+          flushTools();
+          if (seg.text.isNotEmpty) {
+            result.add(SelectionArea(
+              child: SafeMarkdownBody(data: seg.text, theme: theme),
+            ));
+          }
+          break;
+        case SegmentKind.thought:
+          flushTools();
+          result.add(ThinkingSection(
+            key: PageStorageKey('thought_${seg.id}'),
+            text: seg.text,
+            isStreaming: message.isStreaming,
+          ));
+          break;
+        case SegmentKind.toolCall:
+          toolCalls.add(seg);
+          break;
+        case SegmentKind.plan:
+          break;
+      }
+    }
+    flushTools();
+    return result;
   }
 
   List<Widget> _buildSegments(ThemeData theme) {
@@ -157,7 +214,7 @@ class MessageBubble extends StatelessWidget {
     switch (seg.kind) {
       case SegmentKind.thought:
         return ThinkingSection(
-          key: ValueKey('thought_${seg.id}'),
+          key: PageStorageKey('thought_${seg.id}'),
           text: seg.text,
           isStreaming: message.isStreaming,
         );

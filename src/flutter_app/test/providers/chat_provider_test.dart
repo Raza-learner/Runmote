@@ -830,6 +830,132 @@ void main() {
       container.dispose();
     });
 
+    test('text, tool, text keeps chronological segment order', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      void send(Map<String, dynamic> update) {
+        mock.injectMessage({
+          'method': 'session/update',
+          'params': {'sessionId': 'test-session', 'update': update},
+        });
+      }
+
+      send({'sessionUpdate': 'agent_message_chunk', 'content': 'Let me look. '});
+      send({
+        'sessionUpdate': 'tool_call',
+        'title': 'read_file',
+        'toolCallId': 'tool-1',
+      });
+      send({'sessionUpdate': 'agent_message_chunk', 'content': 'Found it.'});
+      await Future.delayed(Duration.zero);
+
+      final msg = container
+          .read(chatProvider(('test-session', '/home')))
+          .valueOrNull!
+          .messages
+          .first;
+      expect(msg.segments.map((s) => s.kind).toList(), [
+        SegmentKind.message,
+        SegmentKind.toolCall,
+        SegmentKind.message,
+      ]);
+      expect(msg.segments[0].text, 'Let me look. ');
+      expect(msg.segments[2].text, 'Found it.');
+      // content stays the full concatenation for copy/persist.
+      expect(msg.content, 'Let me look. Found it.');
+
+      container.dispose();
+    });
+
+    test('thought only merges when immediately preceding', () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      void send(Map<String, dynamic> update) {
+        mock.injectMessage({
+          'method': 'session/update',
+          'params': {'sessionId': 'test-session', 'update': update},
+        });
+      }
+
+      send({'sessionUpdate': 'agent_thought_chunk', 'content': 'think one'});
+      send({'sessionUpdate': 'agent_message_chunk', 'content': 'answer'});
+      send({'sessionUpdate': 'agent_thought_chunk', 'content': 'think two'});
+      await Future.delayed(Duration.zero);
+
+      final segments = container
+          .read(chatProvider(('test-session', '/home')))
+          .valueOrNull!
+          .messages
+          .first
+          .segments;
+      expect(
+        segments.where((s) => s.kind == SegmentKind.thought).length,
+        2,
+        reason: 'a text block must split thought segments',
+      );
+      expect(segments.map((s) => s.kind).toList(), [
+        SegmentKind.thought,
+        SegmentKind.message,
+        SegmentKind.thought,
+      ]);
+
+      container.dispose();
+    });
+
+    test('cumulative message chunks collapse into one message segment',
+        () async {
+      final container = createContainer();
+      container.read(activeSessionsProvider);
+      container.read(chatProvider(('test-session', '/home')));
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final mock = container.read(connectionProvider.notifier)
+          as MockConnectionNotifier;
+
+      void send(String content) {
+        mock.injectMessage({
+          'method': 'session/update',
+          'params': {
+            'sessionId': 'test-session',
+            'update': {
+              'sessionUpdate': 'agent_message_chunk',
+              'messageId': 'msg-1',
+              'content': content,
+            },
+          },
+        });
+      }
+
+      send('Hello');
+      send('Hello world');
+      await Future.delayed(Duration.zero);
+
+      final msg = container
+          .read(chatProvider(('test-session', '/home')))
+          .valueOrNull!
+          .messages
+          .first;
+      expect(msg.content, 'Hello world');
+      final messageSegments =
+          msg.segments.where((s) => s.kind == SegmentKind.message).toList();
+      expect(messageSegments.length, 1);
+      expect(messageSegments.single.text, 'Hello world');
+
+      container.dispose();
+    });
+
     test('stream tool_call_update appends output', () async {
       final container = createContainer();
       container.read(activeSessionsProvider);

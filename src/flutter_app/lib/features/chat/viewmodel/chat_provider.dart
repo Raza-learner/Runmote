@@ -455,6 +455,9 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
           content: m.content,
           isStreaming: false,
           createdAt: m.createdAt,
+          segmentsJson: m.segments.isEmpty
+              ? null
+              : jsonEncode(m.segments.map((s) => s.toJson()).toList()),
         );
       }
     } catch (e) {
@@ -742,8 +745,14 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
         if (_buffer[i].id == msgId) {
           final existing = _buffer[i].content;
           // Some agents send cumulative/full-message chunks instead of deltas.
-          final newContent = text.startsWith(existing) ? text : existing + text;
-          _buffer[i] = _buffer[i].copyWith(content: newContent);
+          final cumulative = existing.isNotEmpty && text.startsWith(existing);
+          final delta = cumulative ? text.substring(existing.length) : text;
+          final newContent = cumulative ? text : existing + text;
+          final updated = _appendMessageText(
+            _buffer[i].copyWith(content: newContent),
+            delta,
+          );
+          _buffer[i] = updated;
           if (_loaded) _syncState();
           return;
         }
@@ -753,50 +762,66 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     if (role == ChatMessageRole.assistant && _buffer.isNotEmpty) {
       final last = _buffer.last;
       if (last.role == ChatMessageRole.assistant && last.isStreaming) {
-        final newContent = last.content + text;
-        _buffer[_buffer.length - 1] = last.copyWith(content: newContent);
+        final updated = _appendMessageText(
+          last.copyWith(content: last.content + text),
+          text,
+        );
+        _buffer[_buffer.length - 1] = updated;
         if (_loaded) _syncState();
         return;
       }
     }
-    _buffer.add(ChatMessage(
+    var msg = ChatMessage(
       id: msgId ?? _uuid.v4(),
       role: role,
       content: text,
       isStreaming: role == ChatMessageRole.assistant,
       createdAt: DateTime.now().millisecondsSinceEpoch,
-    ));
+    );
+    if (role == ChatMessageRole.assistant && text.isNotEmpty) {
+      msg = _appendMessageText(msg, text);
+    }
+    _buffer.add(msg);
     if (role == ChatMessageRole.assistant) _bumpStreamingTimer();
     if (_loaded) _syncState();
+  }
+
+  /// Appends [delta] to the trailing `message` segment so assistant text and
+  /// thought/tool segments keep their chronological order for inline display.
+  /// `content` remains the full concatenation for copy/persist/back-compat.
+  ChatMessage _appendMessageText(ChatMessage message, String delta) {
+    if (delta.isEmpty) return message;
+    final segments = List<AssistantSegment>.from(message.segments);
+    if (segments.isNotEmpty && segments.last.kind == SegmentKind.message) {
+      final tail = segments.last;
+      segments[segments.length - 1] = tail.copyWith(text: tail.text + delta);
+    } else {
+      segments.add(AssistantSegment(
+        id: _uuid.v4(),
+        kind: SegmentKind.message,
+        text: delta,
+      ));
+    }
+    return message.copyWith(segments: segments);
   }
 
   void _addThoughtChunk(String text) {
     _ensureAssistantMessage();
     final last = _buffer.last;
-    final existing = last.segments
-        .where((s) => s.kind == SegmentKind.thought)
-        .toList();
-    if (existing.isNotEmpty) {
-      final found = existing.last;
-      _buffer[_buffer.length - 1] = last.copyWith(
-        segments: last.segments
-            .map((s) => s == found
-                ? s.copyWith(text: s.text + text)
-                : s)
-            .toList(),
-      );
+    final segments = List<AssistantSegment>.from(last.segments);
+    // Only merge into an immediately preceding thought so a thought stays in
+    // place between text/tool segments (interleaved chronological order).
+    if (segments.isNotEmpty && segments.last.kind == SegmentKind.thought) {
+      final tail = segments.last;
+      segments[segments.length - 1] = tail.copyWith(text: tail.text + text);
     } else {
-      _buffer[_buffer.length - 1] = last.copyWith(
-        segments: [
-          ...last.segments,
-          AssistantSegment(
-            id: _uuid.v4(),
-            kind: SegmentKind.thought,
-            text: text,
-          ),
-        ],
-      );
+      segments.add(AssistantSegment(
+        id: _uuid.v4(),
+        kind: SegmentKind.thought,
+        text: text,
+      ));
     }
+    _buffer[_buffer.length - 1] = last.copyWith(segments: segments);
     _bumpStreamingTimer();
     if (_loaded) _syncState();
   }

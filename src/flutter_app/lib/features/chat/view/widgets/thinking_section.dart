@@ -13,6 +13,10 @@ class ThinkingSection extends StatefulWidget {
 class _ThinkingSectionState extends State<ThinkingSection> {
   late bool _expanded;
 
+  /// Once the user taps the header, their choice wins — the streaming
+  /// auto-expand / auto-collapse must never override it.
+  bool _userToggled = false;
+
   @override
   void initState() {
     super.initState();
@@ -20,11 +24,34 @@ class _ThinkingSectionState extends State<ThinkingSection> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Restore a previous toggle when this section is recreated mid-stream
+    // (e.g. the message list rebuilds and disposes the element). Keyed by
+    // PageStorageKey so it survives widget recreation.
+    final stored = PageStorage.maybeOf(context)?.readState(context);
+    if (stored is bool) {
+      _expanded = stored;
+      _userToggled = true;
+    }
+  }
+
+  @override
   void didUpdateWidget(ThinkingSection oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_userToggled) return;
     if (!widget.isStreaming && oldWidget.isStreaming) {
       setState(() => _expanded = false);
     }
+  }
+
+  void _toggle() {
+    final next = !_expanded;
+    setState(() {
+      _expanded = next;
+      _userToggled = true;
+    });
+    PageStorage.maybeOf(context)?.writeState(context, next);
   }
 
   @override
@@ -49,7 +76,7 @@ class _ThinkingSectionState extends State<ThinkingSection> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
+            onTap: _toggle,
             borderRadius: BorderRadius.circular(12),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
