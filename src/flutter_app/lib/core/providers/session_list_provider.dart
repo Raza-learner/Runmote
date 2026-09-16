@@ -13,15 +13,19 @@ import '../models/connection_state.dart';
 
 class ActiveSessionsNotifier extends StateNotifier<Set<String>> {
   final Map<String, Timer> _timers = {};
+  final Map<String, String?> _agentForSession = {};
   String? _latest;
 
   ActiveSessionsNotifier() : super(const {});
 
   String? get latestSessionId => _latest;
 
-  void markActive(String sessionId) {
+  String? agentIdFor(String sessionId) => _agentForSession[sessionId];
+
+  void markActive(String sessionId, {String? agentId}) {
     _timers[sessionId]?.cancel();
     _latest = sessionId;
+    if (agentId != null) _agentForSession[sessionId] = agentId;
     if (!state.contains(sessionId)) {
       state = {...state, sessionId};
     }
@@ -30,6 +34,7 @@ class ActiveSessionsNotifier extends StateNotifier<Set<String>> {
     _timers[sessionId] = Timer(const Duration(seconds: 60), () {
       final next = Set<String>.from(state)..remove(sessionId);
       _timers.remove(sessionId);
+      _agentForSession.remove(sessionId);
       state = next;
     });
   }
@@ -39,6 +44,7 @@ class ActiveSessionsNotifier extends StateNotifier<Set<String>> {
   void markInactive(String sessionId) {
     _timers[sessionId]?.cancel();
     _timers.remove(sessionId);
+    _agentForSession.remove(sessionId);
     final next = Set<String>.from(state)..remove(sessionId);
     if (_latest == sessionId) _latest = next.isEmpty ? null : next.last;
     state = next;
@@ -49,6 +55,7 @@ class ActiveSessionsNotifier extends StateNotifier<Set<String>> {
       t.cancel();
     }
     _timers.clear();
+    _agentForSession.clear();
     _latest = null;
     state = const {};
   }
@@ -165,7 +172,13 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
         final params = msg['params'] as Map<String, dynamic>?;
         final sessionId = params?['sessionId'] as String?;
         if (sessionId != null) {
-          _ref.read(activeSessionsProvider.notifier).markActive(sessionId);
+          final agentId = params?['agentId'] as String? ??
+              msg['agentId'] as String? ??
+              (params?['update'] as Map<String, dynamic>?)?['agentId'] as String?;
+          _ref.read(activeSessionsProvider.notifier).markActive(
+                sessionId,
+                agentId: agentId,
+              );
         }
       }
     });

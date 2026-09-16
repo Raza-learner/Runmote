@@ -989,9 +989,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       if (modelLabel != null)
                         _ModelChip(
                           label: modelLabel,
-                          onTap: configOptions.isNotEmpty
-                              ? () => _showConfigSheet(context, configOptions)
-                              : null,
+                          onTap: () => _showConfigSheet(context),
                         ),
                     ],
                   ),
@@ -1285,7 +1283,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  void _showConfigSheet(BuildContext context, List<ConfigOption> configOptions) {
+  void _showConfigSheet(BuildContext context) {
     FocusScope.of(context).unfocus();
     showModalBottomSheet(
       context: context,
@@ -1324,57 +1322,83 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     sessionId: widget.sessionId,
                     cwd: widget.cwd,
                   ),
-                  ...configOptions.map((opt) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                      child: Column(
+                  Consumer(
+                    builder: (ctx2, ref2, _) {
+                      final live = ref2
+                          .watch(chatProvider((widget.sessionId, widget.cwd)))
+                          .valueOrNull;
+                      final opts = live?.configOptions ?? [];
+                      if (opts.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Loading model options…',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            opt.name,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Consumer(
-                            builder: (ctx2, ref2, _) {
-                              final live = ref2
-                                  .watch(chatProvider((
-                                          widget.sessionId, widget.cwd)))
-                                  .valueOrNull;
-                              final liveOpt = live?.configOptions
-                                  .where((o) => o.id == opt.id)
-                                  .firstOrNull;
-                              final currentValue =
-                                  liveOpt?.currentValue ?? opt.currentValue;
-                              return Wrap(
-                                spacing: 8,
-                                runSpacing: 6,
-                                children: opt.options.map((v) {
-                                  final selected =
-                                      v.value == currentValue;
-                                  return ChoiceChip(
-                                    label: Text(v.name),
-                                    selected: selected,
-                                    onSelected: (_) {
-                                      ref2
-                                          .read(chatProvider((
-                                                  widget.sessionId,
-                                                  widget.cwd))
-                                              .notifier)
-                                          .setConfigOption(
-                                              opt.id, v.value);
-                                    },
-                                  );
-                                }).toList(),
-                              );
-                            },
-                          ),
+                          ...opts.map((opt) {
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.only(bottom: AppSpacing.md),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    opt.name,
+                                    style:
+                                        theme.textTheme.labelMedium?.copyWith(
+                                      color:
+                                          theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    children: opt.options.map((v) {
+                                      final selected =
+                                          v.value == opt.currentValue;
+                                      return ChoiceChip(
+                                        label: Text(v.name),
+                                        selected: selected,
+                                        onSelected: (_) {
+                                          ref2
+                                              .read(chatProvider((
+                                                      widget.sessionId,
+                                                      widget.cwd))
+                                                  .notifier)
+                                              .setConfigOption(opt.id, v.value);
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
                         ],
-                      ),
-                    );
-                  }),
+                      );
+                    },
+                  ),
                   const SizedBox(height: AppSpacing.md),
                 ],
               ),

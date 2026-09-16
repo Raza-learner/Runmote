@@ -12,12 +12,26 @@ class OngoingSessionBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final activeIds = ref.watch(activeSessionsProvider);
     final connection = ref.watch(connectionProvider);
-    
+
     if (activeIds.isEmpty || !connection.daemonConnected) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
-    final latestId = ref.read(activeSessionsProvider.notifier).latestSessionId;
-    final agentName = connection.agentInfo?.name ?? 'Agent';
+    final notifier = ref.read(activeSessionsProvider.notifier);
+    final latestId = notifier.latestSessionId;
+    // Resolve the agent that actually owns the active session, not the
+    // currently selected agent in the UI. Falls back to selected agent.
+    String? activeAgentId;
+    if (latestId != null) activeAgentId = notifier.agentIdFor(latestId);
+    activeAgentId ??= activeIds.isNotEmpty
+        ? notifier.agentIdFor(activeIds.first)
+        : null;
+    String agentName = connection.agentInfo?.name ?? 'Agent';
+    if (activeAgentId != null) {
+      final agent = connection.agents
+          .where((a) => a.id == activeAgentId)
+          .firstOrNull;
+      if (agent != null) agentName = agent.name;
+    }
     final label = activeIds.length == 1
         ? '$agentName is responding...'
         : '${activeIds.length} sessions active';

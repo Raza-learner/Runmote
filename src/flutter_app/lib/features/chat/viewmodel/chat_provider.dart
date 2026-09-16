@@ -265,7 +265,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     try {
       final activeNotifier = _ref.read(activeSessionsProvider.notifier);
       if (nowBusy) {
-        activeNotifier.markActive(_sessionId);
+        activeNotifier.markActive(_sessionId, agentId: _agentIdForSession);
       } else {
         activeNotifier.markInactive(_sessionId);
         // Notify only when the agent just finished and the user is not
