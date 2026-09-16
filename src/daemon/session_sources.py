@@ -244,6 +244,117 @@ _READERS = {
 }
 
 
+def _delete_opencode_session(session_id: str, home: Path) -> bool:
+    db_path = _opencode_db_path(home)
+    if db_path is None:
+        return False
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=5)
+        cur = conn.execute("DELETE FROM session WHERE id = ?", (session_id,))
+        conn.commit()
+        deleted = cur.rowcount > 0
+        conn.close()
+        return deleted
+    except Exception:
+        return False
+
+
+def _delete_cursor_session(session_id: str, home: Path) -> bool:
+    target = home / ".cursor" / "acp-sessions" / session_id
+    try:
+        if target.is_dir():
+            import shutil
+
+            shutil.rmtree(target)
+            return True
+        if target.is_file():
+            target.unlink()
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _delete_claude_session(session_id: str, home: Path) -> bool:
+    base = home / ".claude" / "projects"
+    try:
+        for proj in base.iterdir():
+            if not proj.is_dir():
+                continue
+            target = proj / f"{session_id}.jsonl"
+            if target.is_file():
+                try:
+                    target.unlink()
+                    return True
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return False
+
+
+def _delete_codex_session(session_id: str, home: Path) -> bool:
+    base = home / ".codex" / "sessions"
+    try:
+        for path in base.rglob(f"*{session_id}*.jsonl"):
+            try:
+                path.unlink()
+                return True
+            except Exception:
+                continue
+        # Fallback: search by payload id
+        for path in base.rglob("*.jsonl"):
+            try:
+                with open(path, "r", errors="replace") as f:
+                    first = f.readline().strip()[:4096]
+                if first.startswith("{"):
+                    obj = json.loads(first)
+                    payload = obj.get("payload") if isinstance(obj, dict) else None
+                    if isinstance(payload, dict) and str(payload.get("id") or "") == session_id:
+                        path.unlink()
+                        return True
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return False
+
+
+_DELETE_HANDLERS = {
+    "opencode": _delete_opencode_session,
+    "cursor": _delete_cursor_session,
+    "claude": _delete_claude_session,
+    "codex": _delete_codex_session,
+}
+
+
+def delete_local_session(agent_id: str, session_id: str, home: Path | None = None) -> bool:
+    """Delete a session from on-disk stores. Returns True if something was deleted."""
+    if not session_id:
+        return False
+    lowered = (agent_id or "").lower()
+    tried: set[str] = set()
+    # Try the handler matching the agent first, then all others as fallback
+    # (covers cases where the relay forwards with a different agentId).
+    order: list[str] = []
+    for key in _DELETE_HANDLERS:
+        if key in lowered:
+            order.append(key)
+    for key in _DELETE_HANDLERS:
+        if key not in order:
+            order.append(key)
+    for key in order:
+        if key in tried:
+            continue
+        tried.add(key)
+        try:
+            if _DELETE_HANDLERS[key](session_id, home or _home()):
+                return True
+        except Exception:
+            continue
+    return False
+
+
 def list_local_sessions(agent_id: str, home: Path | None = None) -> list[dict]:
     """Return sessions found on disk for *agent_id*, newest first.
 

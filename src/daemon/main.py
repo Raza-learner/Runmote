@@ -17,7 +17,11 @@ if str(_src) not in sys.path:
     sys.path.insert(0, str(_src))
 
 from config import get_agent_configs, DAEMON_ID, DAEMON_TOKEN, RECONNECT_DELAY, RELAY_URL
-from session_sources import list_local_sessions, merge_session_lists
+from session_sources import (
+    delete_local_session,
+    list_local_sessions,
+    merge_session_lists,
+)
 from websockets.asyncio.client import connect
 
 
@@ -842,6 +846,25 @@ async def run_daemon():
                                 _list_pending[key]["task"] = asyncio.create_task(
                                     _list_fallback(websocket, key)
                                 )
+
+                            # Delete local session files for session/delete or
+                            # session/close (relay converts delete→close). This
+                            # removes the session from the on-disk stores so a
+                            # subsequent session/list doesn't resurrect it even
+                            # if the agent doesn't delete it itself.
+                            if method in ("session/delete", "session/close"):
+                                sid = None
+                                try:
+                                    params = data.get("params") or {}
+                                    sid = params.get("sessionId") or params.get("id")
+                                except Exception:
+                                    pass
+                                if sid:
+                                    try:
+                                        if delete_local_session(agent.id, str(sid)):
+                                            log("deleted local session %s for %s", sid, agent.id)
+                                    except Exception as e:
+                                        log("failed to delete local session %s: %s", sid, e)
 
                             # Save request info (cwd, method) keyed by message id.
                             # Used to inject cwd into the agent response and to

@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../viewmodel/chat_provider.dart';
 import '../../../core/providers/connection_provider.dart';
+import '../../../core/providers/current_chat_provider.dart';
 import '../../../core/providers/session_list_provider.dart';
 import '../../../core/providers/usage_provider.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -47,9 +48,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     _title = _fallbackTitle(widget.cwd);
     _scrollController.addListener(_onScroll);
+    Future.microtask(() {
+      ref.read(currentChatSessionProvider.notifier).state = widget.sessionId;
+    });
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) setState(() => _showSkeleton = false);
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sessionId != widget.sessionId) {
+      ref.read(currentChatSessionProvider.notifier).state = widget.sessionId;
+      _title = _fallbackTitle(widget.cwd);
+    }
   }
 
   String _fallbackTitle(String cwd) {
@@ -62,6 +75,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    if (ref.read(currentChatSessionProvider) == widget.sessionId) {
+      ref.read(currentChatSessionProvider.notifier).state = null;
+    }
     _textController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -1046,57 +1062,62 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      ValueListenableBuilder<TextEditingValue>(
-                        valueListenable: _textController,
-                        builder: (context, value, _) {
-                          final canSend = !isBusy &&
-                              !daemonDown &&
-                              (value.text.trim().isNotEmpty ||
-                                  _attachments.isNotEmpty);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 2),
-                            child: SizedBox(
-                              width: 46,
-                              height: 46,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 220),
-                                switchInCurve: Curves.easeOutCubic,
-                                switchOutCurve: Curves.easeInCubic,
-                                transitionBuilder: (child, anim) => ScaleTransition(
-                                  scale: anim,
-                                  child: FadeTransition(opacity: anim, child: child),
-                                ),
-                                child: isBusy
-                                    ? IconButton.filled(
-                                        key: const ValueKey('stop'),
-                                        tooltip: 'Stop response',
-                                        onPressed: () => ref
-                                            .read(chatProvider((
-                                              widget.sessionId,
-                                              widget.cwd))
-                                                .notifier)
-                                            .cancelResponse(),
-                                        icon: const Icon(Icons.stop_rounded, size: 22),
-                                        style: IconButton.styleFrom(
-                                          backgroundColor: t.colorScheme.errorContainer,
-                                          foregroundColor: t.colorScheme.onErrorContainer,
-                                        ),
-                                      )
-                                    : IconButton.filled(
+                      // Stop / Send: `isBusy` must drive the switch directly so
+                      // the button flips the moment the assistant starts
+                      // streaming, even if the text field hasn't changed.
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: SizedBox(
+                          width: 46,
+                          height: 46,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (child, anim) => ScaleTransition(
+                              scale: anim,
+                              child: FadeTransition(opacity: anim, child: child),
+                            ),
+                            child: isBusy
+                                ? IconButton.filled(
+                                    key: const ValueKey('stop'),
+                                    tooltip: 'Stop response',
+                                    onPressed: () => ref
+                                        .read(chatProvider((
+                                          widget.sessionId,
+                                          widget.cwd))
+                                            .notifier)
+                                        .cancelResponse(),
+                                    icon: const Icon(Icons.stop_rounded, size: 22),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: t.colorScheme.errorContainer,
+                                      foregroundColor: t.colorScheme.onErrorContainer,
+                                    ),
+                                  )
+                                : ValueListenableBuilder<TextEditingValue>(
+                                    key: const ValueKey('send_builder'),
+                                    valueListenable: _textController,
+                                    builder: (context, value, _) {
+                                      final canSend = !daemonDown &&
+                                          (value.text.trim().isNotEmpty ||
+                                              _attachments.isNotEmpty);
+                                      return IconButton.filled(
                                         key: const ValueKey('send'),
                                         onPressed: canSend ? _sendMessage : null,
                                         icon: const Icon(Icons.arrow_upward, size: 22),
                                         style: IconButton.styleFrom(
                                           backgroundColor: t.colorScheme.primary,
                                           foregroundColor: t.colorScheme.onPrimary,
-                                          disabledBackgroundColor: t.colorScheme.surfaceContainerHighest,
-                                          disabledForegroundColor: t.colorScheme.onSurfaceVariant,
+                                          disabledBackgroundColor:
+                                              t.colorScheme.surfaceContainerHighest,
+                                          disabledForegroundColor:
+                                              t.colorScheme.onSurfaceVariant,
                                         ),
-                                      ),
-                              ),
-                            ),
-                          );
-                        },
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ),
                       ),
                     ],
                   ),

@@ -8,6 +8,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/preferences_provider.dart';
 import 'core/providers/connection_provider.dart';
+import 'core/services/notification_service.dart';
 import 'l10n/app_localizations.dart';
 
 class App extends ConsumerStatefulWidget {
@@ -23,6 +24,9 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadPrefs();
+    // Pre-warm notifications so completion alerts work even if the first
+    // agent finishes before the user ever opens a chat.
+    NotificationService().init();
   }
 
   @override

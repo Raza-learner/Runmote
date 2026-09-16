@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import 'connection_provider.dart';
 import 'database_provider.dart';
@@ -18,13 +22,19 @@ class ActiveSessionsNotifier extends StateNotifier<Set<String>> {
   void markActive(String sessionId) {
     _timers[sessionId]?.cancel();
     _latest = sessionId;
-    state = {...state, sessionId};
-    _timers[sessionId] = Timer(const Duration(seconds: 5), () {
+    if (!state.contains(sessionId)) {
+      state = {...state, sessionId};
+    }
+    // Keep active for 60s without updates; explicit markInactive() from
+    // ChatNotifier (when isBusy→false) will clear it sooner on completion.
+    _timers[sessionId] = Timer(const Duration(seconds: 60), () {
       final next = Set<String>.from(state)..remove(sessionId);
       _timers.remove(sessionId);
       state = next;
     });
   }
+
+  bool isActive(String sessionId) => state.contains(sessionId);
 
   void markInactive(String sessionId) {
     _timers[sessionId]?.cancel();
@@ -188,11 +198,48 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
     );
   }
 
+  Future<File> _deletedIdsFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File(p.join(dir.path, 'deleted_sessions.json'));
+  }
+
+  Future<Set<String>> _loadDeletedIdsFromFile() async {
+    try {
+      final file = await _deletedIdsFile();
+      if (!await file.exists()) return {};
+      final raw = await file.readAsString();
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _saveDeletedIdsToFile(Set<String> ids) async {
+    try {
+      final file = await _deletedIdsFile();
+      await file.writeAsString(jsonEncode(ids.toList()));
+    } catch (e) {
+      debugPrint('[session_list] file save failed: $e');
+    }
+  }
+
   Future<void> _ensureDeletedIds() async {
     if (!_deletedIdsLoaded) {
       final prefs = await _ref.read(preferencesServiceProvider.future);
-      _deletedIds = prefs.getDeletedSessionIds().toSet();
+      final prefsIds = prefs.getDeletedSessionIds().toSet();
+      final fileIds = await _loadDeletedIdsFromFile();
+      _deletedIds = {...prefsIds, ...fileIds};
+      // Backfill file from prefs if needed.
+      if (prefsIds.isNotEmpty && fileIds.isEmpty) {
+        await _saveDeletedIdsToFile(_deletedIds);
+      } else if (fileIds.isNotEmpty && prefsIds.isEmpty) {
+        try {
+          await prefs.setDeletedSessionIds(_deletedIds.toList());
+        } catch (_) {}
+      }
       _deletedIdsLoaded = true;
+      debugPrint('[session_list] _ensureDeletedIds loaded ${_deletedIds.length} ids');
     }
   }
 
@@ -526,7 +573,13 @@ class SessionListNotifier extends StateNotifier<AsyncValue<List<AcpSession>>> {
     final db = _ref.read(databaseProvider);
     await db.removeCachedSession(id);
     final prefs = await _ref.read(preferencesServiceProvider.future);
-    await prefs.setDeletedSessionIds(_deletedIds.toList());
+    try {
+      await prefs.setDeletedSessionIds(_deletedIds.toList());
+    } catch (e) {
+      debugPrint('[session_list] prefs setDeleted failed: $e');
+    }
+    await _saveDeletedIdsToFile(_deletedIds);
+    debugPrint('[session_list] deleted $id, _deletedIds=$_deletedIds');
     state.whenData((sessions) {
       state = AsyncValue.data(sessions.where((s) => s.id != id).toList());
     });

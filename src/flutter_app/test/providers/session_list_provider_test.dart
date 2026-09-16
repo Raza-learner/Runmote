@@ -298,7 +298,7 @@ void main() {
       container.dispose();
     });
 
-    test('ActiveSessionsNotifier marks active and auto-expires after 5s', () async {
+    test('ActiveSessionsNotifier marks active and stays active for 60s', () async {
       final container = createContainer(db);
       final notifier = container.read(activeSessionsProvider.notifier);
 
@@ -308,6 +308,8 @@ void main() {
       expect(notifier.latestSessionId, 'sess-1');
 
       await Future.delayed(const Duration(seconds: 6));
+      expect(notifier.state, contains('sess-1'));
+      notifier.markInactive('sess-1');
       expect(notifier.state, isEmpty);
       container.dispose();
     });

@@ -9,10 +9,12 @@ import '../../../core/database/app_database.dart' as db;
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/assistant_segment.dart';
 import '../../../core/providers/connection_provider.dart';
+import '../../../core/providers/current_chat_provider.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/providers/session_list_provider.dart';
 import '../../../core/providers/usage_provider.dart';
 import '../../../core/models/connection_state.dart';
+import '../../../core/services/notification_service.dart';
 
 class ConfigOption {
   final String id;
@@ -205,6 +207,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   /// connection drops we cancel timers and skip work to avoid triggering
   /// UI rebuilds during the reconnect storm.
   bool _connected = true;
+  bool _wasBusy = false;
 
   ChatNotifier(this._ref, this._sessionId, this._cwd)
       : super(const AsyncValue.loading()) {
@@ -255,6 +258,59 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     return busyPending > 0 || _buffer.any((m) => m.isStreaming);
   }
 
+  void _syncActiveAndNotify() {
+    final nowBusy = _isBusy;
+    if (nowBusy == _wasBusy) return;
+    _wasBusy = nowBusy;
+    try {
+      final activeNotifier = _ref.read(activeSessionsProvider.notifier);
+      if (nowBusy) {
+        activeNotifier.markActive(_sessionId);
+      } else {
+        activeNotifier.markInactive(_sessionId);
+        // Notify only when the agent just finished and the user is not
+        // currently looking at this chat. This covers "leave running agent
+        // in background → completion notification".
+        final current = _ref.read(currentChatSessionProvider);
+        if (current != _sessionId) {
+          String title = 'Agent finished';
+          String? body;
+          try {
+            // Prefer session title from the session list, fallback to cwd.
+            final sessions = _ref.read(sessionListProvider).valueOrNull;
+            if (sessions != null) {
+              for (final s in sessions) {
+                if (s.id == _sessionId) {
+                  title = s.title?.isNotEmpty == true ? s.title! : 'Session ${s.id.substring(0, 8)}';
+                  body = s.cwd.isNotEmpty ? s.cwd : null;
+                  break;
+                }
+              }
+            }
+            if (body == null && _buffer.isNotEmpty) {
+              final last = _buffer.lastWhere(
+                (m) => m.role == ChatMessageRole.assistant && m.content.isNotEmpty,
+                orElse: () => _buffer.last,
+              );
+              final preview = last.content.trim().split('\n').first.trim();
+              if (preview.isNotEmpty) {
+                body = preview.length > 80 ? '${preview.substring(0, 80)}…' : preview;
+              }
+            }
+          } catch (_) {}
+          NotificationService().showAgentDone(
+            sessionId: _sessionId,
+            title: title,
+            body: body ?? 'Tap to open',
+            cwd: _cwd,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[chat_provider] _syncActiveAndNotify failed: $e');
+    }
+  }
+
   /// Called periodically or after state changes to clean up streaming that
   /// was orphaned (no pending request IDs) — likely from another client.
   void _cleanOrphanedStream() {
@@ -286,6 +342,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       availableCommands: _slashCommands,
       permissionRequest: _permissionRequest,
     ));
+    _syncActiveAndNotify();
   }
 
   void _bumpStreamingTimer() {
@@ -323,6 +380,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       availableCommands: _slashCommands,
       permissionRequest: _permissionRequest,
     ));
+    _syncActiveAndNotify();
   }
 
   Future<void> loadMessages() async {
@@ -753,7 +811,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
             delta,
           );
           _buffer[i] = updated;
-          if (_loaded) _syncState();
+          _syncState();
           return;
         }
       }
@@ -767,7 +825,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
           text,
         );
         _buffer[_buffer.length - 1] = updated;
-        if (_loaded) _syncState();
+        _syncState();
         return;
       }
     }
@@ -783,7 +841,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     }
     _buffer.add(msg);
     if (role == ChatMessageRole.assistant) _bumpStreamingTimer();
-    if (_loaded) _syncState();
+    _syncState();
   }
 
   /// Appends [delta] to the trailing `message` segment so assistant text and
@@ -823,7 +881,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     }
     _buffer[_buffer.length - 1] = last.copyWith(segments: segments);
     _bumpStreamingTimer();
-    if (_loaded) _syncState();
+    _syncState();
   }
 
   void _ensureAssistantMessage() {
@@ -868,7 +926,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
                 .toList(),
           );
           _bumpStreamingTimer();
-          if (_loaded) _syncState();
+          _syncState();
           return;
         }
       }
@@ -907,7 +965,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       text: text,
     );
     _buffer[_buffer.length - 1] = last.copyWith(segments: [...last.segments, seg]);
-    if (_loaded) _syncState();
+    _syncState();
   }
 
   Future<void> sendMessage(String text, {List<Map<String, dynamic>>? extra}) async {
@@ -1273,6 +1331,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       availableCommands: _slashCommands,
       permissionRequest: _permissionRequest,
     ));
+    _syncActiveAndNotify();
   }
 
   void respondToPermission(String optionId) {
@@ -1295,6 +1354,7 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       isBusy: _isBusy,
       availableCommands: _slashCommands,
     ));
+    _syncActiveAndNotify();
   }
 
   void dismissPermission() {
@@ -1314,12 +1374,18 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
       isBusy: _isBusy,
       availableCommands: _slashCommands,
     ));
+    _syncActiveAndNotify();
   }
 
   @override
   void dispose() {
     _streamingTimer?.cancel();
     _sub?.cancel();
+    if (_wasBusy) {
+      try {
+        _ref.read(activeSessionsProvider.notifier).markInactive(_sessionId);
+      } catch (_) {}
+    }
     super.dispose();
   }
 }
