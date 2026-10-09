@@ -23,6 +23,7 @@ import '../../../shared/widgets/daemon_offline_banner.dart';
 import '../../../shared/widgets/animated_background.dart';
 import 'widgets/chat_skeleton.dart';
 import 'widgets/message_bubble.dart';
+import '../../../../shared/widgets/diff_viewer.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String sessionId;
@@ -1220,7 +1221,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             if (req.toolContent.isNotEmpty)
               ...req.toolContent.map((c) {
+                final ctype = (c['type'] as String?)?.toLowerCase() ?? '';
+                if (ctype == 'diff') {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: DiffViewer(
+                      oldText: (c['oldText'] as String?) ??
+                          (c['old_text'] as String?) ??
+                          '',
+                      newText: (c['newText'] as String?) ??
+                          (c['new_text'] as String?) ??
+                          (c['unifiedDiff'] as String?) ??
+                          '',
+                      filePath: c['path'] as String?,
+                    ),
+                  );
+                }
                 final text = c['text'] as String? ?? '';
+                if (text.isEmpty) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Text(

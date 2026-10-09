@@ -68,6 +68,27 @@ class TestOpencodeReader:
         conn.close()
         assert list_local_sessions("opencode", home=tmp_path) == []
 
+    def test_child_subagent_sessions_excluded(self, tmp_path):
+        db_dir = tmp_path / ".local" / "share" / "opencode"
+        db_dir.mkdir(parents=True)
+        conn = sqlite3.connect(db_dir / "opencode.db")
+        conn.execute(
+            "CREATE TABLE session (id TEXT, title TEXT, directory TEXT, "
+            "time_created INTEGER, time_updated INTEGER, parent_id TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO session VALUES (?, ?, ?, ?, ?, ?)",
+            ("ses_parent", "Parent", "/proj", 1000, 2000, None),
+        )
+        conn.execute(
+            "INSERT INTO session VALUES (?, ?, ?, ?, ?, ?)",
+            ("ses_child", "Child (@explore subagent)", "/proj", 1500, 2500, "ses_parent"),
+        )
+        conn.commit()
+        conn.close()
+        sessions = list_local_sessions("opencode", home=tmp_path)
+        assert [s["sessionId"] for s in sessions] == ["ses_parent"]
+
 
 class TestCursorReader:
     def test_reads_meta_json(self, tmp_path):

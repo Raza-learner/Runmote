@@ -40,12 +40,16 @@ def _as_seconds(value) -> float:
     return ts / 1000.0 if ts > 9999999999 else ts
 
 
-def _opencode_db_path(home: Path) -> Path | None:
+def _opencode_db_path(home: Path, respect_xdg: bool = True) -> Path | None:
     xdg = os.environ.get("XDG_DATA_HOME")
     candidates = []
-    if xdg:
+    home_candidate = home / ".local" / "share" / "opencode" / "opencode.db"
+    if respect_xdg and xdg:
+        # XDG override first in production (default home), but an explicitly
+        # passed home (tests / custom layouts) must win — otherwise tmp dirs
+        # in tests resolve to the real DB.
         candidates.append(Path(xdg) / "opencode" / "opencode.db")
-    candidates.append(home / ".local" / "share" / "opencode" / "opencode.db")
+    candidates.append(home_candidate)
     if os.name == "nt":
         local = os.environ.get("LOCALAPPDATA", "")
         if local:
@@ -59,8 +63,8 @@ def _opencode_db_path(home: Path) -> Path | None:
     return None
 
 
-def _opencode_sessions(agent_id: str, home: Path) -> list[dict]:
-    db_path = _opencode_db_path(home)
+def _opencode_sessions(agent_id: str, home: Path, _explicit_home: bool = False) -> list[dict]:
+    db_path = _opencode_db_path(home, respect_xdg=not _explicit_home)
     if db_path is None:
         return []
     try:
@@ -70,12 +74,23 @@ def _opencode_sessions(agent_id: str, home: Path) -> list[dict]:
     try:
         try:
             rows = conn.execute(
-                "SELECT id, title, directory, time_created FROM session"
+                "SELECT id, title, directory, time_created, time_updated FROM session "
+                "WHERE parent_id IS NULL"
             ).fetchall()
         except Exception:
-            return []
+            # Older/minimal session tables (e.g. tests) lack parent_id /
+            # time_updated — fall back to the plain select.
+            try:
+                rows = conn.execute(
+                    "SELECT id, title, directory, time_created FROM session"
+                ).fetchall()
+            except Exception:
+                return []
         sessions = []
-        for sid, title, directory, created in rows:
+        for row in rows:
+            sid, title, directory = row[0], row[1], row[2]
+            created = row[3] if len(row) > 3 else 0
+            updated = row[4] if len(row) > 4 else 0
             if not sid:
                 continue
             sessions.append(
@@ -83,7 +98,7 @@ def _opencode_sessions(agent_id: str, home: Path) -> list[dict]:
                     "sessionId": str(sid),
                     "title": title or "",
                     "cwd": directory or "",
-                    "updatedAt": _as_seconds(created),
+                    "updatedAt": _as_seconds(updated or created),
                     "agentId": agent_id,
                 }
             )
@@ -369,7 +384,10 @@ def list_local_sessions(agent_id: str, home: Path | None = None) -> list[dict]:
     if reader is None:
         return []
     try:
-        sessions = reader(agent_id, home or _home())
+        if reader is _opencode_sessions:
+            sessions = reader(agent_id, home or _home(), home is not None)
+        else:
+            sessions = reader(agent_id, home or _home())
     except Exception:
         return []
     sessions.sort(key=lambda s: s.get("updatedAt") or 0.0, reverse=True)

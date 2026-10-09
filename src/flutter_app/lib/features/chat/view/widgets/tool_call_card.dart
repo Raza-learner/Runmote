@@ -26,6 +26,29 @@ class ToolCallCard extends StatefulWidget {
 
 class _ToolCallCardState extends State<ToolCallCard> {
   bool _expanded = false;
+  bool _autoExpanded = false;
+
+  bool get _hasDiffs => widget.diffs != null && widget.diffs!.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-expand cards that carry diffs so code changes are visible
+    // inline (opencode-style) without extra taps.
+    if (_hasDiffs) {
+      _expanded = true;
+      _autoExpanded = true;
+    }
+  }
+
+  @override
+  void didUpdateWidget(ToolCallCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_autoExpanded && _hasDiffs) {
+      _expanded = true;
+      _autoExpanded = true;
+    }
+  }
 
   IconData get _icon {
     final lower = widget.name.toLowerCase();

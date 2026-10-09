@@ -1,3 +1,4 @@
+import copy
 import json
 from fastapi import APIRouter, WebSocket
 
@@ -196,7 +197,12 @@ async def daemon_endpoint(websocket: WebSocket):
 
             for cid, client in _paired_clients(session):
                 try:
-                    fwd = data
+                    # Deep-copy per client: session/list filtering mutates
+                    # result.sessions, and sharing one dict across clients
+                    # leaks one client's filtered list into the next.
+                    # session/update notifications (method, no result.sessions)
+                    # pass through untouched with no per-client mutation.
+                    fwd = copy.deepcopy(data)
                     if fwd.get("result") and isinstance(fwd["result"], dict):
                         sess_list = fwd["result"].get("sessions")
                         if isinstance(sess_list, list):

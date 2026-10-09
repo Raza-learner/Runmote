@@ -465,6 +465,21 @@ async def _send_json(websocket, message: dict):
     await websocket.send(json.dumps(message))
 
 
+async def _safe_forward(websocket, message: dict, agent_id: str) -> bool:
+    """Forward one agent message to the relay without killing the pump.
+
+    Returns False when the socket is dead so the caller can exit cleanly
+    (reconnect logic restarts the pump). Transient encode errors are
+    logged and skipped so a single bad frame can't freeze the stream.
+    """
+    try:
+        await websocket.send(json.dumps(message))
+        return True
+    except Exception as exc:
+        log("%s agent_to_relay: relay send failed (%s)", agent_id, exc)
+        return False
+
+
 async def run_daemon():
     agents = {
         config["id"]: AgentProcess(config)
@@ -911,10 +926,12 @@ async def run_daemon():
                     if not agent.proc or not agent.proc.stdout:
                         return
                     buf = b""
-                    while True:
+                    alive = True
+                    while alive:
                         try:
                             chunk = await agent.proc.stdout.read(65536)
-                        except Exception:
+                        except Exception as exc:
+                            log("%s agent_to_relay: stdout read failed (%s)", agent.id, exc)
                             break
                         if not chunk:
                             break
@@ -952,12 +969,37 @@ async def run_daemon():
                                             agent.id,
                                         )
                                     continue
-                                await _send_json(websocket, tagged)
+                                if not await _safe_forward(websocket, tagged, agent.id):
+                                    alive = False
+                                    break
                             except json.JSONDecodeError:
-                                await websocket.send(raw)
+                                try:
+                                    await websocket.send(raw)
+                                except Exception as exc:
+                                    log("%s agent_to_relay: relay send failed (%s)", agent.id, exc)
+                                    alive = False
+                                    break
                         if len(buf) > 1_048_576:
-                            log("%s stdout: discarding oversized buffer (%d bytes without newline)", agent.id, len(buf))
+                            # A huge frame without newline is usually a big
+                            # tool output/diff. Try to salvage it as JSON
+                            # instead of silently dropping the live chunk.
+                            raw = buf.decode(errors="replace").strip()
+                            log("%s stdout: oversized buffer (%d bytes); flushing", agent.id, len(buf))
                             buf = b""
+                            if raw:
+                                try:
+                                    data = json.loads(raw)
+                                    tagged = _tag_agent_response(data, agent)
+                                    if not await _safe_forward(websocket, tagged, agent.id):
+                                        alive = False
+                                        break
+                                except json.JSONDecodeError:
+                                    try:
+                                        await websocket.send(raw)
+                                    except Exception as exc:
+                                        log("%s agent_to_relay: relay send failed (%s)", agent.id, exc)
+                                        alive = False
+                                        break
                     if buf:
                         raw = buf.decode(errors="replace").strip()
                         if raw:
@@ -986,9 +1028,12 @@ async def run_daemon():
                                             agent.id,
                                         )
                                 else:
-                                    await _send_json(websocket, tagged)
+                                    await _safe_forward(websocket, tagged, agent.id)
                             except json.JSONDecodeError:
-                                await websocket.send(raw)
+                                try:
+                                    await websocket.send(raw)
+                                except Exception:
+                                    pass
                     log("%s agent_to_relay: stdout pipe closed", agent.id)
 
                 async def log_stderr(agent: AgentProcess):
