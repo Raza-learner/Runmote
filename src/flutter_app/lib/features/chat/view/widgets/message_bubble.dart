@@ -175,6 +175,12 @@ class MessageBubble extends StatelessWidget {
           toolCalls.add(seg);
           break;
         case SegmentKind.plan:
+          flushTools();
+          result.add(_PlanSection(
+            key: ValueKey('plan_${seg.id}'),
+            text: seg.text,
+            isStreaming: message.isStreaming,
+          ));
           break;
       }
     }
@@ -200,6 +206,13 @@ class MessageBubble extends StatelessWidget {
     for (final seg in message.segments) {
       if (seg.kind == SegmentKind.toolCall) {
         toolCalls.add(seg);
+      } else if (seg.kind == SegmentKind.plan) {
+        flushTools();
+        result.add(_PlanSection(
+          key: ValueKey('plan_${seg.id}'),
+          text: seg.text,
+          isStreaming: message.isStreaming,
+        ));
       } else {
         flushTools();
         result.add(_buildSegment(seg, theme));
@@ -694,6 +707,77 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
   }
 }
 
+class _PlanSection extends StatelessWidget {
+  final String text;
+  final bool isStreaming;
+
+  const _PlanSection({super.key, required this.text, required this.isStreaming});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final lines =
+        text.split('\n').where((l) => l.trim().isNotEmpty).toList();
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.purple.withValues(alpha: 0.08)
+            : theme.colorScheme.tertiaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.list_alt,
+                  size: 14, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Text('Plan',
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+              if (isStreaming) ...[
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.colorScheme.primary),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...lines.map((l) => Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• ',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.primary)),
+                    Expanded(
+                      child: Text(l.trim(),
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(height: 1.4)),
+                    ),
+                  ],
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
 class ToolCallGroup extends StatefulWidget {
   final List<AssistantSegment> segments;
   final bool isStreaming;
@@ -711,6 +795,32 @@ class ToolCallGroup extends StatefulWidget {
 class _ToolCallGroupState extends State<ToolCallGroup>
     with SingleTickerProviderStateMixin {
   bool _expanded = false;
+  bool _autoExpandedForDiffs = false;
+
+  bool get _hasDiffs => widget.segments.any((s) {
+        final d = s.metadata['diffs'];
+        return d is List && d.isNotEmpty;
+      });
+
+  @override
+  void initState() {
+    super.initState();
+    // Diffs are the code changes the user asked for — show them inline
+    // like opencode instead of hiding behind two collapsed groups.
+    if (_hasDiffs) {
+      _expanded = true;
+      _autoExpandedForDiffs = true;
+    }
+  }
+
+  @override
+  void didUpdateWidget(ToolCallGroup oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_autoExpandedForDiffs && _hasDiffs) {
+      _expanded = true;
+      _autoExpandedForDiffs = true;
+    }
+  }
 
   Map<String, int> get _counts {
     final counts = <String, int>{};

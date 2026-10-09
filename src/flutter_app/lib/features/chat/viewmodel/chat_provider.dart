@@ -221,10 +221,21 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   void _watchConnection() {
     _ref.listen(connectionProvider, (prev, next) {
       if (next.state is Connected && prev?.state is! Connected) {
+        final wasDown = !_connected;
         _connected = true;
+        if (wasDown) {
+          // Reconnect gap: live session/update frames sent while we were
+          // away are gone (relay is fire-and-forget). Re-load from the
+          // agent so a mid-prompt stream resumes instead of freezing and
+          // requiring a manual refresh.
+          debugPrint('[chat_provider] reconnected; resyncing session=$_sessionId');
+          _loadSessionFromAgent();
+          _syncState();
+        }
       } else if (next.state is Disconnected || next.state is Reconnecting) {
+        // Keep buffering + rendering while down; updates arriving on the
+        // old broadcast still apply, and the timer keeps orphan detection.
         _connected = false;
-        _streamingTimer?.cancel();
       }
     });
   }
@@ -326,10 +337,6 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
 
   void _syncState() {
     if (!mounted) return;
-    if (!_connected) {
-      debugPrint('[chat_provider] _syncState skipped: not connected');
-      return;
-    }
     _logBusy('sync');
     final current = state.valueOrNull;
     debugPrint('[chat_provider] _syncState: ${_buffer.length} messages, was loading=${state.isLoading}');
@@ -368,7 +375,6 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
   }
 
   void _syncConfigAndState(List<ConfigOption> configs) {
-    if (!_connected) return;
     final model = configs.where((c) => c.category == 'model').firstOrNull;
     final mode = configs.where((c) => c.category == 'mode').firstOrNull;
     state = AsyncValue.data(ChatState(
@@ -676,11 +682,14 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
         break;
       case 'tool_call':
         _ensureAssistantMessage();
-        _addSegment(
-          SegmentKind.toolCall,
-          update['title'] as String? ?? 'tool call',
-          update['toolCallId'] as String? ?? '',
-        );
+        final toolTitle = (update['title'] as String?)?.trim().isNotEmpty == true
+            ? update['title'] as String
+            : (update['kind'] as String? ?? 'tool call');
+        final newToolId = (update['toolCallId'] as String?) ??
+            (update['tool_call_id'] as String?) ??
+            (update['id'] as String?) ??
+            '';
+        _addSegment(SegmentKind.toolCall, toolTitle, newToolId);
         break;
       case 'tool_call_update':
         final toolOut = update['content'] as List<dynamic>?;
@@ -689,22 +698,61 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
         String? terminalId;
         if (toolOut != null) {
           for (final c in toolOut) {
-            final map = c as Map<String, dynamic>;
-            if (map['type'] == 'diff') {
-              diffs.add({
-                'path': map['path'] as String? ?? '',
-                'oldText': map['oldText'] as String? ?? '',
-                'newText': map['newText'] as String? ?? '',
-              });
-            } else if (map['type'] == 'terminal') {
-              terminalId = map['terminalId'] as String?;
-            } else {
-              textParts.add(map['text'] as String? ?? '');
+            if (c is! Map<String, dynamic>) {
+              textParts.add(c.toString());
+              continue;
             }
+            final map = c;
+            final ctype = (map['type'] as String?)?.toLowerCase() ?? '';
+            if (ctype == 'diff') {
+              final unified = map['unifiedDiff'] as String? ??
+                  map['unified_diff'] as String? ??
+                  map['diff'] as String?;
+              if (unified != null && unified.isNotEmpty) {
+                diffs.add({
+                  'path': (map['path'] as String?) ?? '',
+                  'oldText': '',
+                  'newText': unified,
+                });
+              } else {
+                diffs.add({
+                  'path': (map['path'] as String?) ?? '',
+                  'oldText': (map['oldText'] as String?) ??
+                      (map['old_text'] as String?) ??
+                      '',
+                  'newText': (map['newText'] as String?) ??
+                      (map['new_text'] as String?) ??
+                      '',
+                });
+              }
+            } else if (ctype == 'terminal') {
+              terminalId = (map['terminalId'] as String?) ??
+                  (map['terminal_id'] as String?);
+              final termText = map['text'] as String?;
+              if (termText != null && termText.isNotEmpty) {
+                textParts.add(termText);
+              }
+            } else {
+              final t = (map['text'] as String?) ?? '';
+              if (t.isNotEmpty) textParts.add(t);
+            }
+          }
+        } else {
+          // Some agents put diff/terminal fields at update level.
+          final ulvl = update['diff'];
+          if (ulvl is Map<String, dynamic>) {
+            diffs.add({
+              'path': (ulvl['path'] as String?) ?? '',
+              'oldText': (ulvl['oldText'] as String?) ?? '',
+              'newText': (ulvl['newText'] as String?) ?? '',
+            });
           }
         }
         final outText = textParts.join('\n');
-        final toolId = update['toolCallId'] as String? ?? '';
+        final toolId = (update['toolCallId'] as String?) ??
+            (update['tool_call_id'] as String?) ??
+            (update['id'] as String?) ??
+            '';
         final toolStatus = update['status'] as String?;
         _updateToolOutput(toolId, outText, toolStatus,
             diffs: diffs, terminalId: terminalId);
@@ -777,9 +825,11 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
 
   void _finalizeStreaming() {
     if (!mounted) return;
-    if (!_connected) return;
     _finalizeTimer?.cancel();
-    _finalizeTimer = Timer(const Duration(milliseconds: 600), () {
+    // Grace period so trailing session/update chunks that arrive just after
+    // the prompt result still render instead of looking like a stall.
+    // Any new update cancels this timer (see _handleUpdate).
+    _finalizeTimer = Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
       _doFinalizeStreaming();
     });
@@ -787,7 +837,6 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
 
   void _doFinalizeStreaming() {
     if (!mounted) return;
-    if (!_connected) return;
     for (var i = 0; i < _buffer.length; i++) {
       if (_buffer[i].isStreaming) {
         _buffer[i] = _buffer[i].copyWith(isStreaming: false);
@@ -806,11 +855,17 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
           final cumulative = existing.isNotEmpty && text.startsWith(existing);
           final delta = cumulative ? text.substring(existing.length) : text;
           final newContent = cumulative ? text : existing + text;
-          final updated = _appendMessageText(
+          var updated = _appendMessageText(
             _buffer[i].copyWith(content: newContent),
             delta,
           );
+          // Late chunk after a prompt result: re-enter streaming so the UI
+          // spinner/timer resumes instead of appearing frozen.
+          if (role == ChatMessageRole.assistant && !updated.isStreaming) {
+            updated = updated.copyWith(isStreaming: true);
+          }
           _buffer[i] = updated;
+          if (role == ChatMessageRole.assistant) _bumpStreamingTimer();
           _syncState();
           return;
         }
@@ -819,12 +874,15 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
     // If no msgId and role is assistant, append to last streaming assistant message
     if (role == ChatMessageRole.assistant && _buffer.isNotEmpty) {
       final last = _buffer.last;
-      if (last.role == ChatMessageRole.assistant && last.isStreaming) {
+      if (last.role == ChatMessageRole.assistant) {
+        // Attach to the last assistant message even if it was just
+        // finalized (trailing chunks after prompt result).
         final updated = _appendMessageText(
-          last.copyWith(content: last.content + text),
+          last.copyWith(content: last.content + text, isStreaming: true),
           text,
         );
         _buffer[_buffer.length - 1] = updated;
+        _bumpStreamingTimer();
         _syncState();
         return;
       }
@@ -900,13 +958,20 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
 
   void _updateToolOutput(String toolId, String outText, String? status,
       {List<Map<String, String>> diffs = const [], String? terminalId}) {
+    if (outText.isEmpty && diffs.isEmpty && terminalId == null && status == null) {
+      return;
+    }
+    bool applied = false;
     for (var i = 0; i < _buffer.length; i++) {
       final m = _buffer[i];
       for (final seg in m.segments) {
-        if (seg.kind == SegmentKind.toolCall && seg.id == toolId) {
+        // Empty toolId (agent omitted it) or out-of-order update: match by
+        // id when present, else fall through to orphan handling below.
+        if (seg.kind == SegmentKind.toolCall &&
+            (toolId.isEmpty ? false : seg.id == toolId)) {
           final newMeta = Map<String, dynamic>.from(seg.metadata);
           if (outText.isNotEmpty) {
-            newMeta['output'] = (newMeta['output'] ?? '') + outText;
+            newMeta['output'] = ((newMeta['output'] as String?) ?? '') + outText;
           }
           if (status != null) {
             newMeta['status'] = status;
@@ -925,12 +990,63 @@ class ChatNotifier extends StateNotifier<AsyncValue<ChatState>> {
                 .map((s) => s == seg ? s.copyWith(metadata: newMeta) : s)
                 .toList(),
           );
-          _bumpStreamingTimer();
-          _syncState();
-          return;
+          applied = true;
+          break;
         }
       }
+      if (applied) break;
     }
+    if (!applied) {
+      // Orphan tool_call_update (missing id, update-before-call, or id
+      // reuse): attach to the last toolCall so diffs are never silently
+      // dropped. Create one if needed.
+      _ensureAssistantMessage();
+      final idx = _buffer.length - 1;
+      final last = _buffer[idx];
+      var segIdx = -1;
+      for (var i = last.segments.length - 1; i >= 0; i--) {
+        if (last.segments[i].kind == SegmentKind.toolCall) {
+          segIdx = i;
+          break;
+        }
+      }
+      final meta = <String, dynamic>{
+        if (outText.isNotEmpty) 'output': outText,
+        if (status != null) 'status': status,
+        if (diffs.isNotEmpty) 'diffs': diffs,
+        if (terminalId != null) 'terminalId': terminalId,
+      };
+      if (segIdx >= 0) {
+        final seg = last.segments[segIdx];
+        final merged = Map<String, dynamic>.from(seg.metadata);
+        if (outText.isNotEmpty) {
+          merged['output'] = ((merged['output'] as String?) ?? '') + outText;
+        }
+        if (status != null) merged['status'] = status;
+        if (diffs.isNotEmpty) {
+          final existing =
+              (merged['diffs'] as List<dynamic>?)?.cast<Map<String, String>>() ??
+                  [];
+          merged['diffs'] = [...existing, ...diffs];
+        }
+        if (terminalId != null) merged['terminalId'] = terminalId;
+        final segs = List.of(last.segments);
+        segs[segIdx] = seg.copyWith(metadata: merged);
+        _buffer[idx] = last.copyWith(isStreaming: true, segments: segs);
+      } else {
+        final seg = AssistantSegment(
+          id: toolId.isNotEmpty ? toolId : _uuid.v4(),
+          kind: SegmentKind.toolCall,
+          text: 'tool call',
+          metadata: meta,
+        );
+        _buffer[idx] = last.copyWith(
+            isStreaming: true, segments: [...last.segments, seg]);
+      }
+      debugPrint('[chat_provider] orphan tool_call_update attached toolId=$toolId');
+    }
+    _bumpStreamingTimer();
+    _syncState();
   }
 
   void _handleLegacyNotification(Map<String, dynamic> params) {
