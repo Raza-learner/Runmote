@@ -139,7 +139,7 @@ abstract class AppLocalizations {
   /// No description provided for @pairInvalidCode.
   ///
   /// In en, this message translates to:
-  /// **'Please enter a 6-digit or 8-character pairing code'**
+  /// **'Please enter a 8-character or 8-character pairing code'**
   String get pairInvalidCode;
 
   /// No description provided for @pairConnectionFailed.
