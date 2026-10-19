@@ -86,7 +86,7 @@ You *could* SSH tunnel into your PC. If you like typing firewall rules at 11pm.
 ## Features
 
 - **One command install** -- auto-detects your agents, no config files
-- **6-digit pairing** -- open app, type code, connected
+- **8-character pairing** -- open app, type code, connected
 - **Persistent sessions** -- switch apps, phone dies, you're right where you left off
 - **Streaming responses** -- watch the agent think, run tools, apply diffs live
 - **Works on any network** -- home, office, 4G, coffee shop WiFi
@@ -102,7 +102,7 @@ You *could* SSH tunnel into your PC. If you like typing firewall rules at 11pm.
   │    1. Install daemon    │               │  2. Open Runmote app    │               │  3. Code from anywhere   │
   │        on your PC       │      -->      │      on your phone      │      -->      │                           │
   │                         │               │                         │               │                           │
-  │  curl runmote.dev/      │               │  Enter 6-digit code     │               │  Full chat + toolkit     │
+  │  curl runmote.dev/      │               │  Enter 8-character code │               │  Full chat + toolkit     │
   │  install.sh | bash      │               │  from terminal          │               │  any network, no config  │
   └─────────────────────────┘               └─────────────────────────┘               └──────────────────────────┘
 ```
@@ -167,7 +167,7 @@ Every connection is encrypted with WSS (WebSocket over TLS). Session data lives 
 <details>
 <summary><b>How does pairing work -- can anyone connect?</b></summary>
 
-The daemon generates a fresh 6-digit code each time it starts. Only someone who can see your terminal (or the log file) can get that code. Codes rotate on daemon restart.
+The daemon generates a fresh 8-character code each time it starts. Only someone who can see your terminal (or the log file) can get that code. Codes rotate on daemon restart.
 
 </details>
 
@@ -222,7 +222,7 @@ runmote/
 │   │   └── config.py        # agent auto-detection
 │   ├── relay/               # FastAPI relay server
 │   │   ├── main.py          # entry point
-│   │   ├── pairing.py       # 6-digit codes
+│   │   ├── pairing.py       # 8-character codes
 │   │   ├── database.py      # SQLite
 │   │   ├── session_store.py # persistence
 │   │   ├── state.py         # WebSocket state
