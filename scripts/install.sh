@@ -14,13 +14,21 @@ if [[ ! -f "$(dirname "$0")/lib/utils.sh" ]]; then
     TMP_DIR="$(mktemp -d)"
     SCRIPT_DIR="$TMP_DIR/runmote"
 
-    # Shallow git clone first: git protocol is far faster than the
-    # codeload tarball (measured 96s for a 12MB archive on a slow link).
+    # Shallow + sparse + partial clone: git protocol is far faster than the
+    # codeload tarball, and the daemon only needs a fraction of the repo
+    # (the app, desktop and demo assets are ~25MB). A failed sparse clone
+    # falls back to a full shallow clone.
     if command -v git &>/dev/null; then
         echo "Cloning repository (this may take a moment)..."
         # Try HTTPS first, then SSH (for private repos with keys)
-        git clone --depth 1 --branch "$BRANCH" "$REPO" "$SCRIPT_DIR" 2>/dev/null || \
-        git clone --depth 1 --branch "$BRANCH" "git@github.com:Raza-learner/Runmote.git" "$SCRIPT_DIR" 2>/dev/null || true
+        if ! { git clone --depth 1 --filter=blob:none --sparse --branch "$BRANCH" "$REPO" "$SCRIPT_DIR" 2>/dev/null && \
+               git -C "$SCRIPT_DIR" sparse-checkout set scripts src/daemon src/common src/relay 2>/dev/null; }; then
+            rm -rf "$SCRIPT_DIR"
+        fi
+        if [[ ! -f "$SCRIPT_DIR/scripts/install.sh" ]]; then
+            git clone --depth 1 --branch "$BRANCH" "$REPO" "$SCRIPT_DIR" 2>/dev/null || \
+            git clone --depth 1 --branch "$BRANCH" "git@github.com:Raza-learner/Runmote.git" "$SCRIPT_DIR" 2>/dev/null || true
+        fi
     fi
 
     # Fallback: archive download when git is missing or blocked

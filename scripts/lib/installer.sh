@@ -285,7 +285,8 @@ install_dependencies() {
         rm -rf .venv
     fi
     # --frozen uses uv.lock: no resolution step, deterministic, faster.
-    "$uv_cmd" sync --frozen || "$uv_cmd" sync || return 1
+    # --no-dev skips pytest/ruff (~35MB) the daemon never uses.
+    "$uv_cmd" sync --frozen --no-dev || "$uv_cmd" sync --no-dev || return 1
     success "Dependencies installed"
 
     return 0
@@ -472,8 +473,7 @@ start_daemon() {
 
     esac
 
-    sleep 2
-
+    # The pairing wizard polls for the code, so no fixed sleep is needed.
     success "Daemon started"
 
     return 0
