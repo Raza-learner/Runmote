@@ -172,3 +172,11 @@ class TestDaemonId:
         store.register("s2", agent_id="a1", daemon_id="pc-b")
         sessions = store.list_sessions(agent_id="a1", daemon_id="pc-b")
         assert {s["sessionId"] for s in sessions} == {"s2"}
+
+    def test_list_daemon_id_includes_legacy_empty_daemon(self, store):
+        # Legacy sessions (daemonId == "") are intentionally visible to every PC.
+        store.register("legacy", agent_id="a1", daemon_id="")
+        store.register("s1", agent_id="a1", daemon_id="pc-a")
+        store.register("s2", agent_id="a1", daemon_id="pc-b")
+        sessions = store.list_sessions(agent_id="a1", daemon_id="pc-a")
+        assert {s["sessionId"] for s in sessions} == {"legacy", "s1"}

@@ -62,3 +62,27 @@ class TestCodeExpiry:
         _code_created_at[code] = 0
         cleanup_expired_codes(existing)
         assert code not in existing
+
+    def test_cleanup_keeps_fresh(self):
+        code = generate_pairing_code(set())
+        existing = {code}
+        cleanup_expired_codes(existing)
+        assert code in existing
+        assert code in _code_created_at
+
+    def test_cleanup_pops_expired_timestamp(self):
+        code = generate_pairing_code(set())
+        existing = {code}
+        _code_created_at[code] = 0
+        cleanup_expired_codes(existing)
+        assert code not in _code_created_at
+
+    def test_expiry_boundary(self):
+        code = generate_pairing_code(set())
+        created = _code_created_at[code]
+        # Exactly CODES_TTL old is still valid (check is strictly greater-than).
+        with mock.patch("relay.pairing.time.time", return_value=created + CODES_TTL):
+            assert not is_code_expired(code)
+        # One second past the TTL is expired.
+        with mock.patch("relay.pairing.time.time", return_value=created + CODES_TTL + 1):
+            assert is_code_expired(code)
